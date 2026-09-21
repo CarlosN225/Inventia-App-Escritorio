@@ -1,0 +1,23 @@
+   # Entornos virtuales
+   venv/
+   backend/venv/
+   env/
+
+   # Python
+   __pycache__/
+   *.pyc
+
+   # Base de datos local
+   *.sqlite3
+   db.sqlite3
+
+   # Node / React
+   node_modules/
+   frontend/build/
+
+   # Config sensible
+   .env
+
+   # Sistema
+   .DS_Store
+   Thumbs.db
