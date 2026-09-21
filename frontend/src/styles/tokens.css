@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  /* ---------- Color (paleta del logo: cyan → azul → turquesa) ---------- */
+  --color-bg:           #f6f8fb;
+  --color-surface:      #ffffff;
+  --color-surface-2:    #f3f6fa;
+  --color-border:       #e4e9f0;
+  --color-border-2:     #cfd7e3;
+  --color-text:         #0b1220;
+  --color-text-muted:   #64748b;
+  --color-text-soft:    #94a3b8;
+
+  /* Brand principal — azul del centro del logo */
+  --color-brand:        #1668e3;
+  --color-brand-2:      #2aa9e0;   /* cyan */
+  --color-brand-3:      #22c5b8;   /* turquesa */
+  --color-brand-4:      #0ea5e9;   /* celeste claro */
+  --color-brand-soft:   #e6f0fe;
+  --color-brand-ring:   rgba(22, 104, 227, 0.28);
+
+  /* Acentos */
+  --color-success:      #14a06b;
+  --color-success-soft: #e4f7ef;
+  --color-warning:      #d97706;
+  --color-warning-soft: #fdf3e2;
+  --color-danger:       #dc2626;
+  --color-danger-soft:  #fdecec;
+  --color-info:         #1668e3;
+  --color-info-soft:    #e6f0fe;
+
+  /* Gradiente brand — extraído del logo */
+  --grad-brand: linear-gradient(135deg, #22c5b8 0%, #2aa9e0 45%, #1668e3 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(34,197,184,0.10) 0%, rgba(42,169,224,0.10) 50%, rgba(22,104,227,0.10) 100%);
+
+  /* ---------- Espaciado ---------- */
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;
+  --sp-4: 16px;  --sp-5: 20px;  --sp-6: 24px;
+  --sp-7: 28px;  --sp-8: 32px;  --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px;
+
+  /* ---------- Radios ---------- */
+  --r-xs: 6px;  --r-sm: 8px;  --r-md: 10px;
+  --r-lg: 14px; --r-xl: 18px; --r-2xl: 24px;
+  --r-full: 999px;
+
+  /* ---------- Sombras ---------- */
+  --shadow-1: 0 1px 2px rgba(11, 18, 32, 0.04);
+  --shadow-2: 0 1px 3px rgba(11, 18, 32, 0.06), 0 1px 2px rgba(11, 18, 32, 0.04);
+  --shadow-3: 0 4px 14px rgba(11, 18, 32, 0.07), 0 2px 5px rgba(11, 18, 32, 0.04);
+  --shadow-4: 0 14px 38px rgba(11, 18, 32, 0.10), 0 4px 10px rgba(11, 18, 32, 0.05);
+  --shadow-brand: 0 10px 24px rgba(22, 104, 227, 0.30);
+
+  /* ---------- Layout ---------- */
+  --sidebar-w: 260px;
+  --sidebar-w-collapsed: 76px;
+  --topbar-h: 68px;
+  --page-max: 1320px;
+  --page-pad-x: 32px;
+  --page-pad-y: 28px;
+
+  /* ---------- Tipografía ---------- */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-xs: 12px; --fs-sm: 13px; --fs-md: 14px;
+  --fs-lg: 16px; --fs-xl: 18px; --fs-2xl: 22px;
+  --fs-3xl: 28px; --fs-4xl: 34px; --fs-5xl: 44px;
+
+  /* ---------- Motion ---------- */
+  --t-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- Focus ---------- */
+  --focus-ring: 0 0 0 3px var(--color-brand-ring);
+}
