@@ -36,14 +36,25 @@ def logout_view(request):
 
 @api_view(['GET'])
 def me_view(request):
+    print("SESSION:", request.session.session_key)
+    print("ID USUARIO:", request.session.get('id_usuario'))
+    print("ROL:", request.session.get('rol'))
+
     id_usuario = request.session.get('id_usuario')
+
     if not id_usuario:
-        return Response({'error': 'No hay sesión activa'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response(
+            {'error': 'No hay sesión activa'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
     try:
         usuario = Usuario.objects.get(id=id_usuario, activo=True)
     except Usuario.DoesNotExist:
-        return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {'error': 'Usuario no encontrado'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     return Response(UsuarioSerializer(usuario).data)
 
