@@ -14,9 +14,11 @@ export async function login(correo, contrasena) {
         }
     );
 
+    console.log('RESPUESTA LOGIN:', response.data);
+    console.log('COOKIES:', document.cookie);
+
     return response.data;
 }
-
 export async function logout() {
     const response = await axios.post(
         API_URL + '/usuarios/logout/',

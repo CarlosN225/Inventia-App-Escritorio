@@ -21,3 +21,8 @@ frontend/build/
 # Sistema
 .DS_Store
 Thumbs.db
+
+backend/build/
+backend/dist/
+frontend/release/
+backend/staticfiles/
