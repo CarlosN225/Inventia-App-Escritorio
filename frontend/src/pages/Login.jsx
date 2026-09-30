@@ -47,6 +47,11 @@ export default function Login() {
     event.preventDefault()
 
     if (status !== 'idle') return
+    
+    if (!correo.trim() || !password) {
+      setErrorMsg('Ingresa tu correo y contraseña')
+      return
+    }
 
     setStatus('loading')
     setErrorMsg('')
