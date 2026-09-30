@@ -13,16 +13,20 @@ db.sqlite3
 
 # Node / React
 node_modules/
+build/
+dist/
 frontend/build/
+frontend/release/
+
+# Django empaquetado
+backend/build/
+backend/dist/
+backend/staticfiles/
 
 # Config sensible
 .env
 
-# Sistema
+# Editor / Sistema
+.vscode/
 .DS_Store
 Thumbs.db
-
-backend/build/
-backend/dist/
-frontend/release/
-backend/staticfiles/

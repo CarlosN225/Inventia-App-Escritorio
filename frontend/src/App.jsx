@@ -1,13 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import RutaProtegida from './components/RutaProtegida.jsx'
 import Layout from './components/Layout.jsx'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Catalogo from './pages/Catalogo'
-import Movimientos from './pages/Movimientos'
-import Alertas from './pages/Alertas'
-import Configuracion from './pages/Configuracion'
-import ProductoForm from './pages/ProductoForm'
+import Login from './pages/Login.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Catalogo from './pages/Catalogo.jsx'
+import Movimientos from './pages/Movimientos.jsx'
+import Alertas from './pages/Alertas.jsx'
+import Configuracion from './pages/Configuracion.jsx'
+import ProductoForm from './pages/ProductoForm.jsx'
 
 export default function App() {
   return (
