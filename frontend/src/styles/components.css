@@ -946,3 +946,196 @@ td.muted,
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-3);
 }
+
+/* ============ LOGIN · MEJORAS ============ */
+
+/* Pastilla con el nombre del negocio */
+.login-panel {
+  position: relative;
+}
+
+.login-negocio {
+  position: absolute;
+  top: 32px;
+  right: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e40af;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Aviso de Bloq Mayús */
+.login-bloqmayus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Fila: mantener sesión + olvidaste contraseña */
+.login-opciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 20px;
+  font-size: 14px;
+}
+
+.login-recordar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f1b2d;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-recordar input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+/* ¿Olvidaste tu contraseña? */
+.login-ayuda {
+  position: relative;
+}
+
+.login-ayuda__enlace {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #2563eb;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-ayuda__enlace:hover {
+  text-decoration: underline;
+}
+
+.login-ayuda__globo {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  z-index: 20;
+  width: 300px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e9f0;
+  box-shadow: 0 12px 32px rgba(15, 27, 45, 0.14);
+  animation: login-ayuda-aparecer 0.15s ease-out;
+}
+
+/* Flechita que apunta al enlace */
+.login-ayuda__globo::after {
+  content: '';
+  position: absolute;
+  right: 28px;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-right: 1px solid #e5e9f0;
+  border-bottom: 1px solid #e5e9f0;
+  transform: rotate(45deg);
+}
+
+.login-ayuda__titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #0f1b2d;
+  font-weight: 700;
+}
+
+.login-ayuda__icono {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.login-ayuda__texto {
+  margin: 0 0 14px;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login-ayuda__ok {
+  display: block;
+  margin-left: auto;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-ayuda__ok:hover {
+  background: #dbeafe;
+}
+
+@keyframes login-ayuda-aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mensaje de error del login */
+.login-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.login-error::before {
+  content: '!';
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+}

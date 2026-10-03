@@ -2,20 +2,21 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:8000/api';
 
-export async function login(correo, contrasena) {
+export async function login(correo, contrasena, mantenerSesion = false) {
     const response = await axios.post(
         API_URL + '/usuarios/login/',
         {
             correo: correo,
-            contrasena: contrasena
+            contrasena: contrasena, 
+            mantener_sesion: mantenerSesion
+
         },
         {
             withCredentials: true
         }
     );
 
-    console.log('RESPUESTA LOGIN:', response.data);
-    console.log('COOKIES:', document.cookie);
+  
 
     return response.data;
 }
