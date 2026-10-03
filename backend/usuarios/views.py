@@ -22,6 +22,12 @@ def login_view(request):
     request.session['id_usuario'] = usuario.id
     request.session['rol'] = usuario.rol
 
+        # Mantener sesión: 30 días si lo marcó, si no se cierra al cerrar la app
+    if request.data.get('mantener_sesion'):
+        request.session.set_expiry(60 * 60 * 24 * 30)
+    else:
+        request.session.set_expiry(0)
+
     return Response({
         'usuario': UsuarioSerializer(usuario).data,
         'mensaje': 'Login exitoso'
