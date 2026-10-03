@@ -1,153 +1,428 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, MessageCircle, Plus, Eye,
-  PackagePlus, PackageMinus,
+  Info, ArrowUp, ArrowUpRight, Receipt,
+  AlertTriangle, CalendarX, Clock, Candy,
+  Package, Bell, ShoppingCart,
 } from 'lucide-react'
-import Card from '../components/Card.jsx'
-import LinkButton from '../components/LinkButton.jsx'
-import PageHeader from '../components/PageHeader.jsx'
-import StockBar from '../components/StockBar.jsx'
-import Tag from '../components/Tag.jsx'
 
-const movimientosRecientes = [
-  { id: 1, producto: 'Paleta payaso',   tipo: 'Salida',  cantidad: 5,  tiempo: 'Hace 3 h' },
-  { id: 2, producto: 'Chocolate turín', tipo: 'Entrada', cantidad: 30, tiempo: 'Hace 4 h' },
-  { id: 3, producto: 'Piñata estrella', tipo: 'Salida',  cantidad: 2,  tiempo: 'Hace 5 h' },
+import '../styles/dashboard.css'
+
+/* ============================================================
+   ESTADO INICIAL — Todo vacío hasta que conectes el backend
+   ============================================================ */
+
+// Se llenará con los datos reales del usuario logueado
+const USUARIO = null      // ej. { nombre: 'Ana Luisa', negocio: 'Dulcería Los Querubines' }
+const RESULTADOS = null   // ej. { ventas: 0, numVentas: 0, ganancia: 0, cambio: 0 }
+const GANANCIA_DIARIA = []      // ej. [{ dia: 'Lun', valor: 0 }, ...]
+const MAS_VENDIDOS = []         // ej. [{ nombre: '...', piezas: 0 }, ...]
+const MENOS_VENDIDOS = []       // ej. [{ nombre: '...', piezas: 0 }, ...]
+const MOVIMIENTOS = []          // ej. [{ id, producto, tipo, cantidad, usuario, hace }, ...]
+const AVISOS = []               // ej. [{ id, tipo, nombre, detalle, accion }, ...]
+
+const PERIODOS = [
+  { id: 'hoy',    label: 'Hoy' },
+  { id: 'semana', label: 'Semana' },
+  { id: 'mes',    label: 'Mes' },
 ]
 
-const stockBajo = [
-  { id: 1, producto: 'Piñata estrella', stock: 1, minimo: 3 },
-  { id: 2, producto: 'Paleta payaso',   stock: 3, minimo: 10 },
-  { id: 3, producto: 'Chocolate turín', stock: 5, minimo: 15 },
-]
+const TIPOS_MOVIMIENTO = {
+  venta:      'Venta',
+  compra:     'Compra',
+  merma:      'Merma',
+  correccion: 'Corrección',
+}
 
-/* Solo 3 stats — quitamos "Estado del sistema" porque ya está en el topbar */
-const stats = [
-  { key: 'productos', label: 'Productos',          value: '128',             tone: 'neutral' },
-  { key: 'stockBajo', label: 'Stock bajo',         value: stockBajo.length,  tone: 'warning' },
-  { key: 'alertas',   label: 'Alertas pendientes', value: '2',               tone: 'accent'  },
-]
+const ICONOS_AVISO = {
+  stock:     AlertTriangle,
+  urgente:   CalendarX,
+  caducidad: Clock,
+}
+
+const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const monedaCorta = new Intl.NumberFormat('es-MX', {
+  style: 'currency', currency: 'MXN', maximumFractionDigits: 0,
+})
+const numero = new Intl.NumberFormat('es-MX')
+
+/* ============================================================ */
 
 export default function Dashboard() {
+  const navigate = useNavigate()
+  const [periodo, setPeriodo] = useState('mes')
+  const [vistaTop, setVistaTop] = useState('mas')
+
+  const nombreUsuario = USUARIO?.nombre ?? 'de nuevo'
+  const nombreNegocio = USUARIO?.negocio ?? 'tu negocio'
+
+  const resumen = RESULTADOS // null si no hay datos
+  const topLista = vistaTop === 'mas' ? MAS_VENDIDOS : MENOS_VENDIDOS
+  const sinTopProductos = topLista.length === 0
+  const sinMovimientos = MOVIMIENTOS.length === 0
+  const sinAvisos = AVISOS.length === 0
+  const sinGanancia = GANANCIA_DIARIA.length === 0
+
+  const maxGanancia = sinGanancia ? 0 : Math.max(...GANANCIA_DIARIA.map((d) => d.valor))
+  const maxTop = sinTopProductos ? 0 : Math.max(...topLista.map((p) => p.piezas))
+  const escalaMax = sinGanancia ? 1000 : Math.ceil(maxGanancia / 500) * 500
+  const marcasEje = sinGanancia
+    ? [1000, 500, 0]
+    : [escalaMax, escalaMax / 2, 0]
+
   return (
-    <>
-      <PageHeader
-        title="Panel principal"
-        subtitle="Resumen del estado actual de tu inventario"
-      />
+    <div className="dash">
+      {/* ============ ENCABEZADO ============ */}
+      <header className="dash-encabezado">
+        <div>
+          <h1 className="dash-encabezado__titulo">Hola, {nombreUsuario}</h1>
+          <p className="dash-encabezado__subtitulo">Así va {nombreNegocio} hoy</p>
+        </div>
 
-      {/* ============ STATS (3 tarjetas) ============ */}
-      <div className="stats stats--three">
-        {stats.map(({ key, label, value, tone }) => (
-          <div className={'stat stat--' + tone} key={key}>
-            <div className="stat__label">{label}</div>
-            <div className="stat__value">{value}</div>
+        <div className="dash-segmentado" role="tablist" aria-label="Periodo">
+          {PERIODOS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={periodo === p.id}
+              className={'dash-segmentado__opcion' + (periodo === p.id ? ' is-activo' : '')}
+              onClick={() => setPeriodo(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* ============ KPIs ============ */}
+      <section className="dash-kpis">
+        {/* Ventas del periodo */}
+        <article className="dash-kpi">
+          <span className="dash-kpi__etiqueta">
+            {periodo === 'hoy' ? 'Ventas de hoy' : periodo === 'semana' ? 'Ventas de la semana' : 'Ventas del mes'}
+          </span>
+          <p className="dash-kpi__valor">
+            {resumen ? moneda.format(resumen.ventas) : '—'}
+          </p>
+          <p className="dash-kpi__nota">
+            <Receipt size={14} aria-hidden="true" />
+            {resumen ? `${numero.format(resumen.numVentas)} ventas registradas` : 'Sin ventas registradas'}
+          </p>
+        </article>
+
+        {/* Ganancia estimada */}
+        <article className="dash-kpi">
+          <div className="dash-kpi__fila">
+            <span className="dash-kpi__etiqueta">Ganancia estimada</span>
+            <span
+              className="dash-kpi__info"
+              title="Ventas menos lo que te costó lo vendido"
+            >
+              <Info size={14} />
+            </span>
           </div>
-        ))}
-      </div>
+          <p className={'dash-kpi__valor' + (resumen ? ' dash-kpi__valor--verde' : '')}>
+            {resumen ? moneda.format(resumen.ganancia) : '—'}
+          </p>
+          {resumen && resumen.cambio !== 0 ? (
+            <span className="dash-pastilla dash-pastilla--verde">
+              <ArrowUp size={12} strokeWidth={2.6} aria-hidden="true" />
+              {resumen.cambio}% {resumen.comparado}
+            </span>
+          ) : (
+            <span className="dash-kpi__nota">Sin comparativa disponible</span>
+          )}
+        </article>
 
-      {/* ============ MOVIMIENTOS RECIENTES ============ */}
-      <Card>
-        <div className="card__header-row">
-          <h2 className="card__title">Últimos movimientos</h2>
-          <LinkButton to="/movimientos" variant="ghost" size="sm">
-            Ver todos ↗
-          </LinkButton>
-        </div>
+        {/* Stock bajo */}
+        <article className="dash-kpi">
+          <span className="dash-kpi__etiqueta">Stock bajo</span>
+          <p className={'dash-kpi__valor' + (0 > 0 ? ' dash-kpi__valor--ambar' : '')}>
+            0
+          </p>
+          <p className="dash-kpi__nota">
+            <AlertTriangle size={14} className="dash-icono--ambar" aria-hidden="true" />
+            productos por debajo del mínimo
+          </p>
+        </article>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Tipo</th>
-              <th className="num">Cantidad</th>
-              <th>Tiempo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movimientosRecientes.map((m) => (
-              <tr key={m.id}>
-                <td>
-                  <span className="cell-with-icon">
-                    <span
-                      className={
-                        'cell-icon ' +
-                        (m.tipo === 'Entrada' ? 'is-in' : 'is-out')
-                      }
-                      aria-hidden="true"
-                    >
-                      {m.tipo === 'Entrada'
-                        ? <PackagePlus size={15} strokeWidth={2.2} />
-                        : <PackageMinus size={15} strokeWidth={2.2} />}
-                    </span>
-                    {m.producto}
+        {/* Por caducar */}
+        <article className="dash-kpi">
+          <span className="dash-kpi__etiqueta">Por caducar</span>
+          <p className="dash-kpi__valor">0</p>
+          <p className="dash-kpi__nota">
+            <CalendarX size={14} className="dash-icono--rojo" aria-hidden="true" />
+            en los próximos 30 días
+          </p>
+        </article>
+      </section>
+
+      {/* ============ GRÁFICA + TOP ============ */}
+      <section className="dash-fila">
+        <article className="dash-tarjeta">
+          <div className="dash-tarjeta__cabecera">
+            <div>
+              <h2 className="dash-tarjeta__titulo">Ganancia por día</h2>
+              <p className="dash-tarjeta__subtitulo">Últimos 7 días</p>
+            </div>
+            <span className="dash-leyenda">
+              <span className="dash-leyenda__punto" aria-hidden="true" />
+              Ganancia estimada
+            </span>
+          </div>
+
+          {sinGanancia ? (
+            <div className="dash-vacio">
+              <div className="dash-vacio__icono" aria-hidden="true">
+                <ShoppingCart size={22} strokeWidth={1.8} />
+              </div>
+              <p className="dash-vacio__titulo">Aún no hay ganancias registradas</p>
+              <p className="dash-vacio__texto">
+                Cuando registres tus primeras ventas, aparecerán aquí agrupadas por día.
+              </p>
+              <button
+                type="button"
+                className="dash-boton-chico"
+                onClick={() => navigate('/movimientos')}
+              >
+                Registrar primera venta
+              </button>
+            </div>
+          ) : (
+            <div className="dash-chart">
+              <div className="dash-chart__eje">
+                {marcasEje.map((v) => (
+                  <span key={v}>{monedaCorta.format(v)}</span>
+                ))}
+              </div>
+
+              <div className="dash-chart__area">
+                <div className="dash-chart__rejilla">
+                  {marcasEje.map((v) => (
+                    <div
+                      key={v}
+                      className="dash-chart__linea"
+                      style={{ bottom: `${(v / escalaMax) * 100}%` }}
+                    />
+                  ))}
+                </div>
+
+                <div className="dash-chart__barras">
+                  {GANANCIA_DIARIA.map((d) => {
+                    const esMax = d.valor === maxGanancia
+                    const clases =
+                      'dash-chart__barra' + (esMax ? ' is-max' : '') + (d.hoy ? ' is-hoy' : '')
+
+                    return (
+                      <div className="dash-chart__columna" key={d.dia}>
+                        <div className="dash-chart__pista">
+                          <div
+                            className={clases}
+                            style={{ height: `${(d.valor / escalaMax) * 100}%` }}
+                            title={`${d.dia}: ${moneda.format(d.valor)}`}
+                          >
+                            {esMax && (
+                              <span className="dash-chart__valor">{monedaCorta.format(d.valor)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={'dash-chart__dia' + (esMax ? ' is-max' : '')}>{d.dia}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </article>
+
+        <article className="dash-tarjeta">
+          <div className="dash-tarjeta__cabecera">
+            <h2 className="dash-tarjeta__titulo">Top productos</h2>
+
+            <div className="dash-segmentado dash-segmentado--chico" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={vistaTop === 'mas'}
+                className={'dash-segmentado__opcion' + (vistaTop === 'mas' ? ' is-activo' : '')}
+                onClick={() => setVistaTop('mas')}
+              >
+                Más vendidos
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={vistaTop === 'menos'}
+                className={'dash-segmentado__opcion' + (vistaTop === 'menos' ? ' is-activo' : '')}
+                onClick={() => setVistaTop('menos')}
+              >
+                Menos
+              </button>
+            </div>
+          </div>
+
+          {sinTopProductos ? (
+            <div className="dash-vacio">
+              <div className="dash-vacio__icono" aria-hidden="true">
+                <Package size={22} strokeWidth={1.8} />
+              </div>
+              <p className="dash-vacio__titulo">Sin productos registrados</p>
+              <p className="dash-vacio__texto">
+                Agrega productos a tu catálogo para ver cuáles se venden más.
+              </p>
+              <button
+                type="button"
+                className="dash-boton-chico"
+                onClick={() => navigate('/catalogo')}
+              >
+                Ir al catálogo
+              </button>
+            </div>
+          ) : (
+            <ol className="dash-top">
+              {topLista.map((p, i) => (
+                <li className="dash-top__item" key={p.nombre}>
+                  <span className="dash-top__posicion">{i + 1}</span>
+                  <span className="dash-placeholder" aria-hidden="true">
+                    <Candy size={15} />
                   </span>
-                </td>
-                <td>
-                  <Tag tone={m.tipo === 'Entrada' ? 'success' : 'wine'}>
-                    {m.tipo}
-                  </Tag>
-                </td>
-                <td className="num">{m.cantidad}</td>
-                <td className="muted">{m.tiempo}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+                  <div className="dash-top__info">
+                    <div className="dash-top__fila">
+                      <span className="dash-top__nombre">{p.nombre}</span>
+                      <span className="dash-top__piezas">{p.piezas} pzas</span>
+                    </div>
+                    <div className="dash-top__barra">
+                      <div
+                        className={'dash-top__relleno' + (vistaTop === 'menos' ? ' is-bajo' : '')}
+                        style={{ width: `${(p.piezas / maxTop) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </article>
+      </section>
 
-      {/* ============ STOCK BAJO ============ */}
-      <Card>
-        <div className="card__header-row">
-          <h2 className="card__title">
-            <AlertTriangle size={18} strokeWidth={2.2} aria-hidden="true" />
-            Productos con stock bajo
-          </h2>
-          <Tag tone="warning">{stockBajo.length} alertas</Tag>
-        </div>
+      {/* ============ MOVIMIENTOS + AVISOS ============ */}
+      <section className="dash-fila">
+        <article className="dash-tarjeta">
+          <div className="dash-tarjeta__cabecera">
+            <h2 className="dash-tarjeta__titulo">Últimos movimientos</h2>
+            <button type="button" className="dash-enlace" onClick={() => navigate('/movimientos')}>
+              Ver todos
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </button>
+          </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Existencia</th>
-              <th className="num">Actual / Mínimo</th>
-              <th style={{ width: 200 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {stockBajo.map((p) => (
-              <tr key={p.id}>
-                <td style={{ fontWeight: 600 }}>{p.producto}</td>
-                <td style={{ minWidth: 180 }}>
-                  <StockBar stock={p.stock} minimo={p.minimo} />
-                </td>
-                <td className="num">
-                  {p.stock} <span className="muted">/ {p.minimo}</span>
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <button type="button" className="btn btn--outline btn--sm">
-                    <MessageCircle size={15} strokeWidth={2.2} />
-                    Notificar WhatsApp
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+          {sinMovimientos ? (
+            <div className="dash-vacio">
+              <div className="dash-vacio__icono" aria-hidden="true">
+                <Receipt size={22} strokeWidth={1.8} />
+              </div>
+              <p className="dash-vacio__titulo">Sin movimientos todavía</p>
+              <p className="dash-vacio__texto">
+                Registra entradas, salidas o ajustes para ver el historial aquí.
+              </p>
+              <button
+                type="button"
+                className="dash-boton-chico"
+                onClick={() => navigate('/movimientos')}
+              >
+                Registrar movimiento
+              </button>
+            </div>
+          ) : (
+            <div className="dash-tabla-contenedor">
+              <table className="dash-tabla">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Tipo</th>
+                    <th className="is-der">Cantidad</th>
+                    <th>Usuario</th>
+                    <th className="is-der">Hace</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MOVIMIENTOS.map((m) => {
+                    const claseCantidad =
+                      m.tipo === 'correccion' ? 'is-neutra' : m.cantidad > 0 ? 'is-suma' : 'is-resta'
 
-      {/* ============ ACCIONES PRINCIPALES ============ */}
-      <div className="page-actions">
-        <LinkButton to="/movimientos" variant="primary" size="lg">
-          <Plus size={18} strokeWidth={2.4} />
-          Registrar movimiento
-        </LinkButton>
-        <LinkButton to="/catalogo" variant="outline" size="lg">
-          <Eye size={18} strokeWidth={2.2} />
-          Ver catálogo
-        </LinkButton>
-      </div>
-    </>
+                    return (
+                      <tr key={m.id}>
+                        <td>
+                          <div className="dash-tabla__producto">
+                            <span className="dash-placeholder dash-placeholder--chico" aria-hidden="true">
+                              <Candy size={13} />
+                            </span>
+                            {m.producto}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`dash-tipo dash-tipo--${m.tipo}`}>
+                            {TIPOS_MOVIMIENTO[m.tipo]}
+                          </span>
+                        </td>
+                        <td className={'is-der dash-tabla__cantidad ' + claseCantidad}>
+                          {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
+                        </td>
+                        <td>{m.usuario}</td>
+                        <td className="is-der dash-tabla__tiempo">{m.hace}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </article>
+
+        <article className="dash-tarjeta">
+          <div className="dash-tarjeta__cabecera">
+            <h2 className="dash-tarjeta__titulo">
+              <span className="dash-punto-rojo" aria-hidden="true" />
+              Requiere tu atención
+            </h2>
+          </div>
+
+          {sinAvisos ? (
+            <div className="dash-vacio">
+              <div className="dash-vacio__icono" aria-hidden="true">
+                <Bell size={22} strokeWidth={1.8} />
+              </div>
+              <p className="dash-vacio__titulo">Todo en orden</p>
+              <p className="dash-vacio__texto">
+                Aquí verás los avisos de stock bajo y productos por caducar.
+              </p>
+            </div>
+          ) : (
+            <ul className="dash-avisos">
+              {AVISOS.map((a) => {
+                const Icono = ICONOS_AVISO[a.tipo]
+
+                return (
+                  <li key={a.id} className={`dash-aviso dash-aviso--${a.tipo}`}>
+                    <span className="dash-aviso__icono" aria-hidden="true">
+                      <Icono size={15} strokeWidth={2.2} />
+                    </span>
+                    <div className="dash-aviso__info">
+                      <p className="dash-aviso__nombre">{a.nombre}</p>
+                      <p className="dash-aviso__detalle">{a.detalle}</p>
+                    </div>
+                    <button type="button" className="dash-boton-chico">
+                      {a.accion}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </article>
+      </section>
+    </div>
   )
 }

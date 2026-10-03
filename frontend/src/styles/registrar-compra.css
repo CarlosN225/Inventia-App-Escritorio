@@ -1,0 +1,688 @@
+/* ============================================================
+   REGISTRAR COMPRA — complementa a registrar-venta.css
+   ============================================================ */
+
+/* ============ DISTRIBUCIÓN ============ */
+/* La columna izquierda crece con su contenido (sin límite de altura) */
+.rv--compra .rv-izquierda {
+  max-height: none;
+  overflow: visible;
+}
+
+.rv--compra .rv-izquierda > .rv-panel {
+  flex-shrink: 0;
+}
+
+/* Por surtir llena lo que sobre, para emparejarse con la compra */
+.rv--compra .rv-izquierda > .rv-panel:last-child {
+  flex: 1 0 auto;
+}
+
+/* La compra mide lo mismo que la columna izquierda:
+   su contenido no la estira y la lista hace scroll por dentro */
+.rv--compra .rv-ticket {
+  max-height: none;
+  contain: size;
+}
+
+/* ============ DATOS DE LA COMPRA ============ */
+.rc-datos {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px 12px;
+}
+
+.rc-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rc-etiqueta {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rc-requerido { color: var(--d-rojo); }
+
+.rc-input-grupo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--d-borde);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--d-gris-2);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.rc-input-grupo:focus-within {
+  border-color: var(--d-azul);
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.12);
+}
+
+.rc-input-grupo.is-error { border-color: var(--d-rojo); }
+
+.rc-input-grupo input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+  border: none;
+  background: transparent;
+  color: var(--d-marino);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.rc-limpiar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--d-gris-2);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rc-limpiar:hover { background: #f1f4f9; color: var(--d-marino); }
+
+/* Chips de proveedores frecuentes */
+.rc-frecuentes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.rc-frecuentes--fila {
+  grid-column: 1 / -1;
+}
+
+.rc-frecuentes__titulo {
+  color: var(--d-gris);
+  font-weight: 600;
+}
+
+.rc-frecuente {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--d-borde);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--d-gris);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.rc-frecuente:hover { border-color: #c9d8ed; color: var(--d-marino); }
+
+.rc-frecuente.is-activo {
+  border-color: #b8e6d1;
+  background: #e4f7ef;
+  color: #047857;
+}
+
+.rc-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 0 6px;
+  color: var(--d-rojo);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Tip debajo del buscador */
+.rc-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #dbe7f7;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.rc-tip svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--d-azul);
+}
+
+/* ============ POR SURTIR (hasta 5 visibles) ============ */
+.rc-surtir {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  /* 5 filas de ~48px + 4 espacios de 6px; desde la 6.ª hace scroll */
+  max-height: 270px;
+  margin: 0;
+  padding: 0 4px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.rc-surtir__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--d-borde);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--d-marino);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.rc-surtir__item:hover {
+  border-color: #b9d3f5;
+  background: #f8fbff;
+}
+
+.rc-placeholder-mini {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+}
+
+.rc-surtir__info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rc-surtir__nombre {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rc-surtir__detalle {
+  overflow: hidden;
+  color: var(--d-gris);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rc-sugerido__estado {
+  font-weight: 700;
+}
+
+.rc-sugerido__estado--agotado { color: #b91c1c; }
+.rc-sugerido__estado--bajo { color: #b45309; }
+
+.rc-surtir__sugerido {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #eef3fb;
+  color: var(--d-azul);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rc-surtir__mas {
+  color: var(--d-gris-2);
+  flex-shrink: 0;
+}
+
+.rc-surtir__item:hover .rc-surtir__mas { color: var(--d-azul); }
+
+.rc-todo-surtido {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 12px;
+  color: var(--d-gris);
+  font-size: 13px;
+  text-align: center;
+}
+
+.rc-todo-surtido svg { color: #047857; }
+
+/* ============ RENGLONES DE LA COMPRA (compactos) ============ */
+.rv--compra .rv-renglones {
+  gap: 6px;
+  padding: 10px 14px;
+}
+
+.rc-renglon {
+  padding: 10px 12px;
+}
+
+.rc-renglon .rv-renglon__cuerpo {
+  gap: 6px;
+}
+
+.rc-linea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rc-linea--envuelve {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rc-borrar {
+  margin-left: auto;
+}
+
+/* Pieza / Caja */
+.rc-modo {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--d-borde);
+  border-radius: 7px;
+  background: #f1f4f9;
+}
+
+.rc-modo button {
+  padding: 3px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--d-gris);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rc-modo button.is-activo {
+  background: #ffffff;
+  color: var(--d-azul);
+  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.08);
+}
+
+.rc-solo-pieza {
+  color: var(--d-gris);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Cantidad más chica */
+.rc-renglon .rv-cantidad {
+  height: 28px;
+}
+
+.rc-renglon .rv-cantidad button {
+  width: 26px;
+}
+
+.rc-renglon .rv-cantidad input {
+  width: 38px;
+  font-size: 13px;
+}
+
+/* Costo */
+.rc-costo__grupo {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--d-borde);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.rc-costo__grupo:focus-within {
+  border-color: var(--d-azul);
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.12);
+}
+
+.rc-costo__grupo.is-error { border-color: var(--d-rojo); }
+
+.rc-costo__grupo span {
+  padding: 0 6px;
+  background: #f8fafc;
+  color: var(--d-gris);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
+.rc-costo__grupo .rc-sufijo {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.rc-costo__grupo input {
+  width: 58px;
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  color: var(--d-marino);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+/* "antes $3.00" */
+.rc-cambio {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rc-cambio--sube { background: #fdecec; color: #b91c1c; }
+.rc-cambio--baja { background: #e4f7ef; color: #047857; }
+
+/* Caducidad */
+.rc-fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--d-borde);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--d-gris-2);
+}
+
+.rc-fecha.is-error { border-color: var(--d-rojo); }
+
+.rc-fecha input {
+  width: 118px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--d-marino);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+/* Conversión + stock en una línea de texto */
+.rc-resumen-linea {
+  margin: 0;
+  color: var(--d-gris);
+  font-size: 11.5px;
+}
+
+.rc-resumen-linea strong {
+  color: #047857;
+}
+
+.rc-renglon .rv-renglon__error {
+  font-size: 11.5px;
+}
+
+/* ============ CIERRE ============ */
+.rc-piezas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--d-gris);
+  font-size: 12.5px;
+}
+
+.rc-piezas strong {
+  padding: 2px 9px;
+  border-radius: 6px;
+  background: #e4f7ef;
+  color: #047857;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ MODAL DE CONFIRMACIÓN ============ */
+.rc-modal {
+  --d-azul:    #1668e3;
+  --d-marino:  #0b1220;
+  --d-gris:    #64748b;
+  --d-gris-2:  #94a3b8;
+  --d-borde:   #e6eaf0;
+  --d-borde-2: #eef1f5;
+  --d-rojo:    #dc2626;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(11, 18, 32, 0.45);
+  animation: rc-fondo 0.15s ease-out;
+}
+
+.rc-modal__caja {
+  display: flex;
+  flex-direction: column;
+  width: min(780px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(11, 18, 32, 0.25);
+  color: var(--d-marino);
+  animation: rc-caja 0.18s ease-out;
+}
+
+@keyframes rc-fondo {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes rc-caja {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.rc-modal__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--d-borde-2);
+}
+
+.rc-modal__icono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #eef3fb;
+  color: var(--d-azul);
+  flex-shrink: 0;
+}
+
+.rc-modal__encabezado { flex: 1; }
+
+.rc-modal__titulo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.rc-modal__subtitulo {
+  margin: 2px 0 0;
+  color: var(--d-gris);
+  font-size: 12.5px;
+}
+
+.rc-modal__datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 12px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--d-borde-2);
+}
+
+.rc-modal__datos dt {
+  color: var(--d-gris);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rc-modal__datos dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rc-modal__tabla-contenedor {
+  flex: 1;
+  min-height: 0;
+  padding: 0 18px;
+  overflow-y: auto;
+}
+
+.rc-modal__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rc-modal__tabla th {
+  position: sticky;
+  top: 0;
+  padding: 11px 8px;
+  border-bottom: 1px solid var(--d-borde);
+  background: #ffffff;
+  color: var(--d-gris);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rc-modal__tabla td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--d-borde-2);
+  vertical-align: middle;
+}
+
+.rc-modal__tabla tr:last-child td { border-bottom: none; }
+
+.rc-modal__tabla .is-der {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.rc-modal__producto {
+  display: block;
+  font-weight: 600;
+}
+
+.rc-modal__cad {
+  display: block;
+  margin-top: 1px;
+  color: var(--d-gris);
+  font-size: 11.5px;
+}
+
+.rc-modal__cambio {
+  margin-left: 6px;
+  padding: 1px 4px;
+  vertical-align: middle;
+}
+
+.rc-modal__subtotal { font-weight: 700; }
+
+.rc-modal__stock strong { color: #047857; }
+
+.rc-modal__aviso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 12px;
+  padding: 9px 12px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.rc-modal__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--d-borde);
+  background: #fbfcfe;
+}
+
+.rc-modal__totales {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rc-modal__totales span {
+  color: var(--d-gris);
+  font-size: 12.5px;
+}
+
+.rc-modal__totales strong {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rc-modal__botones {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1100px) {
+  .rc-datos { grid-template-columns: minmax(0, 1fr); }
+  .rv--compra .rv-ticket { contain: none; }
+}
+
+@media (max-width: 700px) {
+  .rc-modal__datos { grid-template-columns: minmax(0, 1fr); }
+}

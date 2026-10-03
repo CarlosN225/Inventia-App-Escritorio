@@ -1,16 +1,36 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Menu, ChevronDown, User, LogOut, Settings } from 'lucide-react'
+import { Menu, ChevronDown, User, LogOut, Settings, HelpCircle } from 'lucide-react'
+
 import StatusDot from './StatusDot.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
-import { getUsuarioActual, logout as logoutApi } from '../services/auth.js'
+import { getUsuarioActual, logout } from '../services/auth'
 
 const titles = {
   '/panel': 'Panel principal',
   '/catalogo': 'Catálogo',
-  '/movimientos': 'Movimientos',
+  '/catalogo/nuevo': 'Nuevo producto',
+  '/registrar-venta': 'Registrar venta',
+  '/registrar-compra': 'Registrar compra',
+  '/registrar-merma': 'Registrar merma',
+  '/correccion-inventario': 'Corrección de inventario',
+  '/movimientos': 'Historial',
   '/alertas': 'Alertas',
   '/configuracion': 'Configuración',
+  '/ayuda': 'Ayuda',
+}
+
+// "Ana Luisa Reyes Martínez" -> "AM" (primera letra del primer y del último nombre)
+function iniciales(nombre) {
+  const partes = nombre.trim().split(/\s+/)
+  if (partes.length === 0 || !partes[0]) return '?'
+  const primera = partes[0][0]
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ''
+  return (primera + ultima).toUpperCase()
+}
+
+function capitalizar(texto) {
+  return texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : ''
 }
 
 export default function Topbar({ onOpenSidebar }) {
@@ -20,42 +40,62 @@ export default function Topbar({ onOpenSidebar }) {
   const [open, setOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [usuario, setUsuario] = useState(null)
+  const [enLinea, setEnLinea] = useState(navigator.onLine)
 
   const ref = useRef(null)
 
   const title =
     titles[pathname] ??
-    (pathname.startsWith('/catalogo') ? 'Catálogo' : 'INVENTIA')
+    (pathname.endsWith('/editar') ? 'Editar producto' : 'INVENTIA')
 
-  // Obtener los datos del usuario actual
+  // Usuario real desde el backend
   useEffect(() => {
     getUsuarioActual()
       .then(setUsuario)
-      .catch((err) => {
-        console.error('Error al obtener usuario actual:', err)
-        setUsuario(null)
-      })
+      .catch(() => setUsuario(null))
   }, [])
 
-  // Cerrar menú al hacer clic fuera
+  // Detecta si hay o no internet
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false)
-      }
-    }
+    const conectado = () => setEnLinea(true)
+    const desconectado = () => setEnLinea(false)
 
-    document.addEventListener('mousedown', handleClickOutside)
+    window.addEventListener('online', conectado)
+    window.addEventListener('offline', desconectado)
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('online', conectado)
+      window.removeEventListener('offline', desconectado)
     }
   }, [])
 
-  // Cerrar menú cuando cambia la página
+  // Cierra el menú al dar clic fuera o presionar Esc
+  useEffect(() => {
+    function alClicFuera(event) {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false)
+    }
+
+    function alPresionarEsc(event) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    document.addEventListener('mousedown', alClicFuera)
+    document.addEventListener('keydown', alPresionarEsc)
+
+    return () => {
+      document.removeEventListener('mousedown', alClicFuera)
+      document.removeEventListener('keydown', alPresionarEsc)
+    }
+  }, [])
+
   useEffect(() => {
     setOpen(false)
   }, [pathname])
+
+  function irA(ruta) {
+    setOpen(false)
+    navigate(ruta)
+  }
 
   function requestLogout() {
     setOpen(false)
@@ -66,48 +106,24 @@ export default function Topbar({ onOpenSidebar }) {
     setConfirmOpen(false)
 
     try {
-      await logoutApi()
-    } catch (err) {
-      console.error('Error al cerrar sesión:', err)
+      await logout()
+    } catch {
+      // Aunque falle (ej. backend apagado), igual lo mandamos al login
     }
 
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
-  // Crear iniciales para el avatar
-  function obtenerIniciales() {
-    if (!usuario) {
-      return '...'
-    }
-
-    const nombre =
-      usuario.nombre_completo ||
-      usuario.nombre ||
-      usuario.username ||
-      ''
-
-    const partes = nombre.trim().split(' ').filter(Boolean)
-
-    if (partes.length === 0) {
-      return 'U'
-    }
-
-    if (partes.length === 1) {
-      return partes[0].substring(0, 2).toUpperCase()
-    }
-
-    return (
-      partes[0].charAt(0) +
-      partes[partes.length - 1].charAt(0)
-    ).toUpperCase()
-  }
+  const nombre = usuario?.nombre_completo ?? 'Cargando…'
+  const correo = usuario?.correo ?? ''
+  const rol = usuario?.rol ?? ''
+  const esPropietario = rol === 'propietario'
+  const avatar = usuario ? iniciales(usuario.nombre_completo) : ''
 
   return (
     <>
       <header className="topbar">
-
         <div className="topbar__left">
-
           <button
             type="button"
             className="sidebar__mobile-toggle"
@@ -116,114 +132,66 @@ export default function Topbar({ onOpenSidebar }) {
           >
             <Menu size={20} />
           </button>
-
-          <h1 className="topbar__title">
-            {title}
-          </h1>
-
+          <h1 className="topbar__title">{title}</h1>
         </div>
 
         <div className="topbar__right">
+          <StatusDot online={enLinea} />
 
-          <StatusDot online />
-
-          <div
-            className="topbar__user-wrap"
-            ref={ref}
-          >
-
+          <div className="topbar__user-wrap" ref={ref}>
             <button
               type="button"
-              className={
-                'topbar__user' +
-                (open ? ' is-open' : '')
-              }
-              onClick={() => setOpen(v => !v)}
+              className={'topbar__user' + (open ? ' is-open' : '')}
+              onClick={() => setOpen((v) => !v)}
               aria-haspopup="menu"
               aria-expanded={open}
             >
-
-              <span className="topbar__avatar">
-                {obtenerIniciales()}
-              </span>
-
+              <span className="topbar__avatar">{avatar}</span>
               <div className="topbar__user-info">
-
-                <span className="topbar__user-name">
-                  {usuario?.nombre_completo ??
-                    usuario?.nombre ??
-                    usuario?.username ??
-                    'Cargando...'}
-                </span>
-
-                <span className="topbar__user-role">
-                  {usuario?.rol ?? ''}
-                </span>
-
+                <span className="topbar__user-name">{nombre}</span>
+                <span className="topbar__user-role">{capitalizar(rol)}</span>
               </div>
-
-              <ChevronDown
-                size={16}
-                className="topbar__chevron"
-                aria-hidden="true"
-              />
-
+              <ChevronDown size={16} className="topbar__chevron" aria-hidden="true" />
             </button>
 
             {open && (
-
-              <div
-                className="user-menu"
-                role="menu"
-              >
-
+              <div className="user-menu" role="menu">
                 <div className="user-menu__header">
-
-                  <span className="topbar__avatar">
-                    {obtenerIniciales()}
-                  </span>
-
+                  <span className="topbar__avatar">{avatar}</span>
                   <div className="topbar__user-info">
-
-                    <span className="topbar__user-name">
-                      {usuario?.nombre_completo ??
-                        usuario?.nombre ??
-                        usuario?.username ??
-                        ''}
-                    </span>
-
-                    <span className="topbar__user-role">
-                      {usuario?.correo ??
-                        usuario?.email ??
-                        ''}
-                    </span>
-
+                    <span className="topbar__user-name">{nombre}</span>
+                    <span className="topbar__user-role">{correo}</span>
                   </div>
-
                 </div>
 
                 <div className="user-menu__divider" />
 
-                <button
-                  type="button"
-                  className="user-menu__item"
-                  role="menuitem"
-                >
+                {/* TODO: pantalla de Mi perfil */}
+                <button type="button" className="user-menu__item" role="menuitem">
                   <User size={16} />
                   Mi perfil
                 </button>
+
+                {esPropietario && (
+                  <button
+                    type="button"
+                    className="user-menu__item"
+                    role="menuitem"
+                    onClick={() => irA('/configuracion')}
+                  >
+                    <Settings size={16} />
+                    Configuración
+                  </button>
+                )}
 
                 <button
                   type="button"
                   className="user-menu__item"
                   role="menuitem"
-                  onClick={() => {
-                    setOpen(false)
-                    navigate('/configuracion')
-                  }}
+                  onClick={() => irA('/ayuda')}
                 >
-                  <Settings size={16} />
-                  Configuración
+                  <HelpCircle size={16} />
+                  Ayuda
                 </button>
 
                 <div className="user-menu__divider" />
@@ -237,15 +205,10 @@ export default function Topbar({ onOpenSidebar }) {
                   <LogOut size={16} />
                   Cerrar sesión
                 </button>
-
               </div>
-
             )}
-
           </div>
-
         </div>
-
       </header>
 
       <ConfirmDialog
@@ -258,7 +221,6 @@ export default function Topbar({ onOpenSidebar }) {
         onConfirm={confirmLogout}
         onCancel={() => setConfirmOpen(false)}
       />
-
     </>
   )
 }
