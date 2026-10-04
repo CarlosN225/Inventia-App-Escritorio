@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   X,
@@ -24,12 +25,23 @@ import {
   ClipboardCheck,
   PlusCircle,
   Lock,
+  PackageOpen,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
-import { PRODUCTOS, DETALLES, PROVEEDORES_FRECUENTES } from '../data/productos'
 import '../styles/registrar-venta.css'
 import '../styles/registrar-compra.css'
+
+/* ============================================================
+   ESTADO INICIAL — Todo vacío hasta conectar el backend
+   ------------------------------------------------------------
+   PRODUCTOS:              catálogo del negocio
+   DETALLES:               info extra por producto (empaque, máximo, etc.)
+   PROVEEDORES_FRECUENTES: lista de proveedores ya usados
+   ============================================================ */
+const PRODUCTOS = []
+const DETALLES = {}
+const PROVEEDORES_FRECUENTES = []
 
 // TODO: traer de la Configuración del negocio
 const CONFIG = { maneja_caducidad: true }
@@ -39,6 +51,8 @@ const MAX_RESULTADOS = 6
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const fechaLarga = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
 const fechaCorta = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+
+/* ============ Utilidades ============ */
 
 function normalizar(texto) {
   return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -79,24 +93,38 @@ function PastillaHay({ disponible, minimo }) {
   return <span className="rv-stock rv-stock--ok">Hay {disponible} pzas</span>
 }
 
+/* ============ Pantalla ============ */
+
 export default function RegistrarCompra() {
   const inputRef = useRef(null)
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const [proveedor, setProveedor] = useState('')
   const [fecha, setFecha] = useState(hoyISO)
   const [nota, setNota] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [resaltado, setResaltado] = useState(0)
-  const [compra, setCompra] = useState([]) // [{ id, modo, cantidad, costo, caducidad }]
+  const [compra, setCompra] = useState([])
   const [stock, setStock] = useState(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p.stock])))
   const [costos, setCostos] = useState(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p.costo])))
   const [intento, setIntento] = useState(false)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [compraRegistrada, setCompraRegistrada] = useState(null)
-  const [folio, setFolio] = useState(88) // TODO: lo da el backend
+  const [folio, setFolio] = useState(88)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
 
   const productosPorId = useMemo(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p])), [])
+  const sinProductos = PRODUCTOS.length === 0
+
+  // Si viene de Alertas, agrega el producto con la cantidad sugerida
+  useEffect(() => {
+    const pedido = location.state?.agregar
+    if (!pedido) return
+    agregar(pedido.id, pedido.piezas)
+    navigate(location.pathname, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ---------- Búsqueda ---------- */
 
@@ -139,7 +167,6 @@ export default function RegistrarCompra() {
     const porEmpaque = detalles?.piezasEmpaque ?? null
     const modo = porEmpaque ? 'empaque' : 'pieza'
 
-    // Si viene de "Por surtir", convierte las piezas sugeridas a empaques completos
     const cantidad =
       cantidadPiezas === null ? 1 : porEmpaque ? Math.max(1, Math.ceil(cantidadPiezas / porEmpaque)) : cantidadPiezas
 
@@ -192,7 +219,11 @@ export default function RegistrarCompra() {
     const costoValido = item.costo !== '' && costo > 0
     const costoAnterior = costos[item.id] ?? null
     const cambioCosto =
-      costoValido && costoAnterior !== null && costo !== costoAnterior ? (costo > costoAnterior ? 'sube' : 'baja') : null
+      costoValido && costoAnterior !== null && costo !== costoAnterior
+        ? costo > costoAnterior
+          ? 'sube'
+          : 'baja'
+        : null
 
     const stockActual = stock[item.id] ?? 0
     const caducidadVencida = item.caducidad !== '' && diasHasta(item.caducidad) < 0
@@ -228,7 +259,6 @@ export default function RegistrarCompra() {
   const puedeRegistrar = renglones.length > 0 && !faltaProveedor && !!fecha && renglonesConError.length === 0
   const subieronDeCosto = renglones.filter((r) => r.cambioCosto === 'sube')
 
-  // Qué falta para poder registrar (solo se muestra después del primer intento)
   let motivoBloqueo = ''
   if (faltaProveedor) {
     motivoBloqueo = 'escribe o elige el proveedor'
@@ -239,16 +269,14 @@ export default function RegistrarCompra() {
       : `la caducidad de ${r.producto.nombre} ya pasó`
   }
 
-  /* ---------- Registrar (con modal) y cancelar ---------- */
+  /* ---------- Registrar y cancelar ---------- */
 
-  // Paso 1: valida y abre el modal de confirmación
   function pedirRegistro() {
     setIntento(true)
     if (!puedeRegistrar) return
     setModalAbierto(true)
   }
 
-  // Paso 2: ya revisado en el modal, se registra de verdad
   function confirmarRegistro() {
     if (!puedeRegistrar) return
 
@@ -314,7 +342,6 @@ export default function RegistrarCompra() {
         if (a.modalAbierto) a.confirmarRegistro()
         else a.pedirRegistro()
       } else if (event.key === 'Escape') {
-        // Con el modal abierto, Esc solo lo cierra (no cancela la compra)
         if (a.modalAbierto) setModalAbierto(false)
         else if (!a.dialogoAbierto) a.pedirCancelar()
       }
@@ -368,451 +395,527 @@ export default function RegistrarCompra() {
         </ul>
       </footer>
 
-      {/* ============ IZQUIERDA ============ */}
-      <div className="rv-izquierda">
-        {/* Datos de la compra */}
-        <section className="rv-panel">
-          <header className="rv-seccion__cabecera">
-            <span className="rv-seccion__icono" aria-hidden="true">
-              <Truck size={16} />
-            </span>
-            <div>
-              <h2 className="rv-seccion__titulo">Datos de la compra</h2>
-              <p className="rv-seccion__subtitulo">Quién te surtió y el ticket o nota que te dieron</p>
-            </div>
-          </header>
-
-          <div className="rc-datos">
-            <div className="rc-campo">
-              <label className="rc-etiqueta" htmlFor="rc-proveedor">
-                Proveedor <span className="rc-requerido">*</span>
-              </label>
-              <div className={'rc-input-grupo' + (errorProveedor ? ' is-error' : '')}>
-                <Store size={16} aria-hidden="true" />
-                <input
-                  id="rc-proveedor"
-                  placeholder="Ej. De la Rosa"
-                  value={proveedor}
-                  onChange={(e) => setProveedor(e.target.value)}
-                />
-                {proveedor && (
-                  <button type="button" className="rc-limpiar" onClick={() => setProveedor('')} aria-label="Borrar proveedor">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="rc-campo">
-              <label className="rc-etiqueta" htmlFor="rc-fecha">
-                Fecha de compra <span className="rc-requerido">*</span>
-              </label>
-              <div className="rc-input-grupo">
-                <CalendarDays size={16} aria-hidden="true" />
-                <input id="rc-fecha" type="date" max={hoyISO()} value={fecha} onChange={(e) => setFecha(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="rc-campo">
-              <label className="rc-etiqueta" htmlFor="rc-nota">
-                Folio o nota (opcional)
-              </label>
-              <div className="rc-input-grupo">
-                <FileText size={16} aria-hidden="true" />
-                <input id="rc-nota" placeholder="Ej. Nota 4521" value={nota} onChange={(e) => setNota(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="rc-frecuentes rc-frecuentes--fila">
-              <span className="rc-frecuentes__titulo">Frecuentes:</span>
-              {PROVEEDORES_FRECUENTES.map((p) => {
-                const activo = proveedor.trim() === p
-
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    className={'rc-frecuente' + (activo ? ' is-activo' : '')}
-                    onClick={() => setProveedor(p)}
-                    aria-pressed={activo}
-                  >
-                    {activo && <Check size={12} aria-hidden="true" />}
-                    {p}
-                  </button>
-                )
-              })}
-
-              {errorProveedor && (
-                <span className="rc-error">
-                  <AlertCircle size={13} aria-hidden="true" />
-                  Escribe o elige el proveedor
-                </span>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Buscador */}
-        <section className="rv-panel">
-          <div className="rv-buscador">
-            <Search size={18} className="rv-buscador__icono" aria-hidden="true" />
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Busca el producto que te llegó… (ej. mazapán)"
-              value={busqueda}
-              onChange={(e) => cambiarBusqueda(e.target.value)}
-              onKeyDown={teclaBuscador}
-              aria-label="Buscar producto"
-            />
-            {busqueda && (
-              <button
-                type="button"
-                className="rv-buscador__limpiar"
-                onClick={() => {
-                  cambiarBusqueda('')
-                  inputRef.current?.focus()
-                }}
-                aria-label="Limpiar búsqueda"
-              >
-                <X size={16} />
-              </button>
-            )}
-            <button type="button" className="rv-buscador__boton" onClick={enfocarBuscador} aria-label="Buscar">
-              <Search size={19} />
-            </button>
-          </div>
-
-          {busqueda.trim() ? (
-            <div className="rv-resultados">
-              <div className="rv-resultados__cabecera">
-                <span className="rv-resultados__titulo">
-                  <span className="rv-punto" aria-hidden="true" />
-                  Resultados para "{busqueda.trim()}"
-                  <span className="rv-resultados__conteo">
-                    ({resultados.length} {resultados.length === 1 ? 'coincidencia' : 'coincidencias'})
-                  </span>
-                </span>
-                <span className="rv-pista">Usa ↑ ↓ y Enter para elegir</span>
-              </div>
-
-              {resultados.length === 0 ? (
-                <p className="rv-vacio-texto">
-                  No encontramos ese producto. Si es nuevo, primero dalo de alta en el Catálogo.
-                </p>
-              ) : (
-                <ul className="rv-lista">
-                  {resultados.map((p, i) => {
-                    const activo = i === indiceResaltado
-
-                    return (
-                      <li
-                        key={p.id}
-                        className={'rv-resultado' + (activo ? ' is-resaltado' : '')}
-                        onMouseEnter={() => setResaltado(i)}
-                      >
-                        <span className="rv-placeholder" aria-hidden="true">
-                          <Candy size={20} />
-                        </span>
-
-                        <div className="rv-resultado__info">
-                          <p className="rv-resultado__nombre">
-                            {p.nombre}
-                            <PastillaHay disponible={stock[p.id] ?? 0} minimo={p.minimo} />
-                          </p>
-                          <p className="rv-resultado__marca">
-                            {p.marca} · {p.categoria}
-                          </p>
-                        </div>
-
-                        <div className="rv-resultado__precio">
-                          <span>Último costo</span>
-                          <strong>{moneda.format(costos[p.id])}</strong>
-                        </div>
-
-                        <button
-                          type="button"
-                          className={'rv-agregar' + (activo ? ' is-principal' : '')}
-                          onClick={() => agregarDesdeBusqueda(p.id)}
-                        >
-                          {activo ? <CornerDownLeft size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
-                          Agregar
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-          ) : (
-            compra.length === 0 && (
-              <p className="rc-tip">
-                <Lightbulb size={15} aria-hidden="true" />
-                <span>
-                  ¿Compraste por caja o bolsa? En la lista de la derecha elige <strong>Caja</strong> o{' '}
-                  <strong>Bolsa</strong> y el sistema calcula las piezas solito.
-                </span>
-              </p>
-            )
-          )}
-        </section>
-
-        {/* Por surtir */}
-        <section className="rv-panel">
-          <header className="rv-seccion__cabecera">
-            <span className="rv-seccion__icono" aria-hidden="true">
-              <ClipboardList size={16} />
-            </span>
-            <div>
-              <h2 className="rv-seccion__titulo">Por surtir</h2>
-              <p className="rv-seccion__subtitulo">Se te están acabando. Clic para agregarlos con la cantidad sugerida</p>
-            </div>
-          </header>
-
-          {porSurtir.length === 0 ? (
-            <div className="rc-todo-surtido">
-              <CheckCircle2 size={24} aria-hidden="true" />
-              Todo tu inventario está surtido.
-            </div>
-          ) : (
-            <ul className="rc-surtir">
-              {porSurtir.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className="rc-surtir__item"
-                    onClick={() => agregar(p.id, p.sugerido)}
-                    title={`Agregar ${p.nombre} con la cantidad sugerida`}
-                  >
-                    <span className="rv-placeholder rc-placeholder-mini" aria-hidden="true">
-                      <Candy size={15} />
-                    </span>
-
-                    <span className="rc-surtir__info">
-                      <span className="rc-surtir__nombre">{p.nombre}</span>
-                      <span className="rc-surtir__detalle">
-                        <span
-                          className={
-                            'rc-sugerido__estado rc-sugerido__estado--' + (p.disponible === 0 ? 'agotado' : 'bajo')
-                          }
-                        >
-                          {p.disponible === 0 ? 'Agotado' : 'Stock bajo'}
-                        </span>
-                        {' · '}Quedan {p.disponible} · mín. {p.minimo}
-                      </span>
-                    </span>
-
-                    <span className="rc-surtir__sugerido">+{p.sugerido} pzas</span>
-                    <PlusCircle size={18} className="rc-surtir__mas" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      {/* ============ COMPRA ACTUAL ============ */}
-      <aside className="rv-panel rv-ticket" aria-label="Compra actual">
-        {compraRegistrada && (
-          <div className="rv-exito" role="status">
-            <CheckCircle2 size={18} aria-hidden="true" />
-            <span>
-              <strong>Compra #{compraRegistrada.folio} registrada</strong> · {compraRegistrada.proveedor} · se sumaron{' '}
-              {compraRegistrada.piezas} piezas al inventario
-            </span>
-            <button type="button" aria-label="Cerrar aviso" onClick={() => setCompraRegistrada(null)}>
-              <X size={15} />
-            </button>
-          </div>
-        )}
-
-        <header className="rv-ticket__cabecera">
-          <span className="rv-seccion__icono" aria-hidden="true">
-            <Package size={16} />
+      {/* ============ SIN PRODUCTOS ============ */}
+      {sinProductos ? (
+        <section className="rv-panel rv-sin-productos">
+          <span className="rv-sin-productos__icono" aria-hidden="true">
+            <PackageOpen size={28} />
           </span>
-          <div className="rv-ticket__titulo-grupo">
-            <h2 className="rv-ticket__titulo">Compra actual</h2>
-            <span className="rv-contador">
-              {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {totalPiezas}{' '}
-              {totalPiezas === 1 ? 'pieza' : 'piezas'}
-            </span>
-          </div>
-          <button type="button" className="rv-enlace" disabled={compra.length === 0} onClick={pedirCancelar}>
-            Limpiar
+          <h2 className="rv-sin-productos__titulo">Aún no tienes productos</h2>
+          <p className="rv-sin-productos__texto">
+            Para registrar una compra, primero agrega productos a tu catálogo.
+          </p>
+          <button type="button" className="rv-confirmar" onClick={() => navigate('/catalogo/nuevo')}>
+            <Plus size={16} aria-hidden="true" />
+            Nuevo producto
           </button>
-        </header>
+        </section>
+      ) : (
+        <>
+          {/* ============ IZQUIERDA ============ */}
+          <div className="rv-izquierda">
+            {/* Datos de la compra */}
+            <section className="rv-panel">
+              <header className="rv-seccion__cabecera">
+                <span className="rv-seccion__icono" aria-hidden="true">
+                  <Truck size={16} />
+                </span>
+                <div>
+                  <h2 className="rv-seccion__titulo">Datos de la compra</h2>
+                  <p className="rv-seccion__subtitulo">Quién te surtió y el ticket o nota que te dieron</p>
+                </div>
+              </header>
 
-        {renglones.length === 0 ? (
-          <div className="rv-vacio">
-            <span className="rv-vacio__icono" aria-hidden="true">
-              <Truck size={22} />
-            </span>
-            <p className="rv-vacio__titulo">Aún no hay productos</p>
-            <p className="rv-vacio__texto">Busca lo que te llegó o agrega algo de "Por surtir".</p>
-          </div>
-        ) : (
-          <ul className="rv-renglones">
-            {renglones.map((r) => (
-              <li key={r.id} className={'rv-renglon rc-renglon' + (r.conError ? ' is-error' : '')}>
-                <div className="rv-renglon__cuerpo">
-                  {/* Línea 1: nombre + subtotal */}
-                  <div className="rv-renglon__arriba">
-                    <p className="rv-renglon__nombre">{r.producto.nombre}</p>
-                    <span className="rv-renglon__subtotal">{r.costoValido ? moneda.format(r.subtotal) : '—'}</span>
-                  </div>
-
-                  {/* Línea 2: pieza/caja + cantidad + borrar */}
-                  <div className="rc-linea">
-                    {r.porEmpaque ? (
-                      <div className="rc-modo" role="group" aria-label="Comprar por">
-                        <button
-                          type="button"
-                          aria-pressed={r.modo === 'pieza'}
-                          className={r.modo === 'pieza' ? 'is-activo' : ''}
-                          onClick={() => actualizar(r.id, { modo: 'pieza' })}
-                        >
-                          Pieza
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={r.modo === 'empaque'}
-                          className={r.modo === 'empaque' ? 'is-activo' : ''}
-                          onClick={() => actualizar(r.id, { modo: 'empaque' })}
-                        >
-                          {capitalizar(r.empaque)}
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="rc-solo-pieza">Por pieza</span>
-                    )}
-
-                    <div className="rv-cantidad">
+              <div className="rc-datos">
+                <div className="rc-campo">
+                  <label className="rc-etiqueta" htmlFor="rc-proveedor">
+                    Proveedor <span className="rc-requerido">*</span>
+                  </label>
+                  <div className={'rc-input-grupo' + (errorProveedor ? ' is-error' : '')}>
+                    <Store size={16} aria-hidden="true" />
+                    <input
+                      id="rc-proveedor"
+                      placeholder="Ej. De la Rosa"
+                      value={proveedor}
+                      onChange={(e) => setProveedor(e.target.value)}
+                    />
+                    {proveedor && (
                       <button
                         type="button"
-                        onClick={() => cambiarCantidad(r.id, r.cantidad - 1)}
-                        disabled={r.cantidad <= 1}
-                        aria-label="Quitar uno"
+                        className="rc-limpiar"
+                        onClick={() => setProveedor('')}
+                        aria-label="Borrar proveedor"
                       >
-                        <Minus size={13} />
+                        <X size={14} />
                       </button>
-                      <input
-                        type="number"
-                        min="1"
-                        inputMode="numeric"
-                        value={r.cantidad}
-                        onChange={(e) => cambiarCantidad(r.id, parseInt(e.target.value, 10))}
-                        aria-label={`Cantidad de ${r.producto.nombre}`}
-                      />
-                      <button type="button" onClick={() => cambiarCantidad(r.id, r.cantidad + 1)} aria-label="Agregar uno">
-                        <Plus size={13} />
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="rv-icono rv-icono--borrar rc-borrar"
-                      onClick={() => quitar(r.id)}
-                      aria-label={`Quitar ${r.producto.nombre} de la compra`}
-                      title="Quitar de la compra"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    )}
                   </div>
+                </div>
 
-                  {/* Línea 3: costo + cambio de costo + caducidad */}
-                  <div className="rc-linea rc-linea--envuelve">
-                    <span className={'rc-costo__grupo' + (!r.costoValido ? ' is-error' : '')}>
-                      <span>$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        inputMode="decimal"
-                        value={r.costo}
-                        onChange={(e) => actualizar(r.id, { costo: e.target.value })}
-                        aria-label={`Costo por pieza de ${r.producto.nombre}`}
-                      />
-                      <span className="rc-sufijo">/pza</span>
-                    </span>
+                <div className="rc-campo">
+                  <label className="rc-etiqueta" htmlFor="rc-fecha">
+                    Fecha de compra <span className="rc-requerido">*</span>
+                  </label>
+                  <div className="rc-input-grupo">
+                    <CalendarDays size={16} aria-hidden="true" />
+                    <input
+                      id="rc-fecha"
+                      type="date"
+                      max={hoyISO()}
+                      value={fecha}
+                      onChange={(e) => setFecha(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-                    {r.cambioCosto && (
-                      <span className={`rc-cambio rc-cambio--${r.cambioCosto}`}>
-                        {r.cambioCosto === 'sube' ? (
-                          <ArrowUp size={11} aria-hidden="true" />
-                        ) : (
-                          <ArrowDown size={11} aria-hidden="true" />
-                        )}
-                        antes {moneda.format(r.costoAnterior)}
+                <div className="rc-campo">
+                  <label className="rc-etiqueta" htmlFor="rc-nota">
+                    Folio o nota (opcional)
+                  </label>
+                  <div className="rc-input-grupo">
+                    <FileText size={16} aria-hidden="true" />
+                    <input
+                      id="rc-nota"
+                      placeholder="Ej. Nota 4521"
+                      value={nota}
+                      onChange={(e) => setNota(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {PROVEEDORES_FRECUENTES.length > 0 && (
+                  <div className="rc-frecuentes rc-frecuentes--fila">
+                    <span className="rc-frecuentes__titulo">Frecuentes:</span>
+                    {PROVEEDORES_FRECUENTES.map((p) => {
+                      const activo = proveedor.trim() === p
+
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          className={'rc-frecuente' + (activo ? ' is-activo' : '')}
+                          onClick={() => setProveedor(p)}
+                          aria-pressed={activo}
+                        >
+                          {activo && <Check size={12} aria-hidden="true" />}
+                          {p}
+                        </button>
+                      )
+                    })}
+
+                    {errorProveedor && (
+                      <span className="rc-error">
+                        <AlertCircle size={13} aria-hidden="true" />
+                        Escribe o elige el proveedor
                       </span>
                     )}
+                  </div>
+                )}
 
-                    {CONFIG.maneja_caducidad && (
-                      <label className={'rc-fecha' + (r.caducidadVencida ? ' is-error' : '')} title="Caducidad (opcional)">
-                        <CalendarDays size={13} aria-hidden="true" />
-                        <input
-                          type="date"
-                          value={r.caducidad}
-                          onChange={(e) => actualizar(r.id, { caducidad: e.target.value })}
-                          aria-label={`Caducidad de ${r.producto.nombre} (opcional)`}
-                        />
-                      </label>
-                    )}
+                {PROVEEDORES_FRECUENTES.length === 0 && errorProveedor && (
+                  <div className="rc-frecuentes rc-frecuentes--fila">
+                    <span className="rc-error">
+                      <AlertCircle size={13} aria-hidden="true" />
+                      Escribe o elige el proveedor
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Buscador */}
+            <section className="rv-panel">
+              <div className="rv-buscador">
+                <Search size={18} className="rv-buscador__icono" aria-hidden="true" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Busca el producto que te llegó… (ej. mazapán)"
+                  value={busqueda}
+                  onChange={(e) => cambiarBusqueda(e.target.value)}
+                  onKeyDown={teclaBuscador}
+                  aria-label="Buscar producto"
+                />
+                {busqueda && (
+                  <button
+                    type="button"
+                    className="rv-buscador__limpiar"
+                    onClick={() => {
+                      cambiarBusqueda('')
+                      inputRef.current?.focus()
+                    }}
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+                <button type="button" className="rv-buscador__boton" onClick={enfocarBuscador} aria-label="Buscar">
+                  <Search size={19} />
+                </button>
+              </div>
+
+              {busqueda.trim() ? (
+                <div className="rv-resultados">
+                  <div className="rv-resultados__cabecera">
+                    <span className="rv-resultados__titulo">
+                      <span className="rv-punto" aria-hidden="true" />
+                      Resultados para "{busqueda.trim()}"
+                      <span className="rv-resultados__conteo">
+                        ({resultados.length} {resultados.length === 1 ? 'coincidencia' : 'coincidencias'})
+                      </span>
+                    </span>
+                    <span className="rv-pista">Usa ↑ ↓ y Enter para elegir</span>
                   </div>
 
-                  {/* Línea 4: conversión + stock en una sola línea */}
-                  <p className="rc-resumen-linea">
-                    {r.conversion}
-                    {' · '}Stock {r.stockActual} → <strong>{r.nuevoStock}</strong>
-                  </p>
-
-                  {r.conError && (
-                    <p className="rv-renglon__error">
-                      <AlertTriangle size={12} aria-hidden="true" />
-                      {!r.costoValido ? 'Escribe el costo por pieza' : 'Esa fecha de caducidad ya pasó'}
+                  {resultados.length === 0 ? (
+                    <p className="rv-vacio-texto">
+                      No encontramos ese producto. Si es nuevo, primero dalo de alta en el Catálogo.
                     </p>
+                  ) : (
+                    <ul className="rv-lista">
+                      {resultados.map((p, i) => {
+                        const activo = i === indiceResaltado
+
+                        return (
+                          <li
+                            key={p.id}
+                            className={'rv-resultado' + (activo ? ' is-resaltado' : '')}
+                            onMouseEnter={() => setResaltado(i)}
+                          >
+                            <span className="rv-placeholder" aria-hidden="true">
+                              <Candy size={20} />
+                            </span>
+
+                            <div className="rv-resultado__info">
+                              <p className="rv-resultado__nombre">
+                                {p.nombre}
+                                <PastillaHay disponible={stock[p.id] ?? 0} minimo={p.minimo} />
+                              </p>
+                              <p className="rv-resultado__marca">
+                                {p.marca} · {p.categoria}
+                              </p>
+                            </div>
+
+                            <div className="rv-resultado__precio">
+                              <span>Último costo</span>
+                              <strong>{moneda.format(costos[p.id] ?? 0)}</strong>
+                            </div>
+
+                            <button
+                              type="button"
+                              className={'rv-agregar' + (activo ? ' is-principal' : '')}
+                              onClick={() => agregarDesdeBusqueda(p.id)}
+                            >
+                              {activo ? (
+                                <CornerDownLeft size={14} aria-hidden="true" />
+                              ) : (
+                                <Plus size={14} aria-hidden="true" />
+                              )}
+                              Agregar
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
                   )}
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
+              ) : (
+                compra.length === 0 && (
+                  <p className="rc-tip">
+                    <Lightbulb size={15} aria-hidden="true" />
+                    <span>
+                      ¿Compraste por caja o bolsa? En la lista de la derecha elige <strong>Caja</strong> o{' '}
+                      <strong>Bolsa</strong> y el sistema calcula las piezas solito.
+                    </span>
+                  </p>
+                )
+              )}
+            </section>
 
-        {/* ============ CIERRE ============ */}
-        <div className="rv-cierre">
-          <div className="rc-piezas">
-            <span>Piezas que entran al inventario</span>
-            <strong>{totalPiezas}</strong>
+            {/* Por surtir */}
+            <section className="rv-panel">
+              <header className="rv-seccion__cabecera">
+                <span className="rv-seccion__icono" aria-hidden="true">
+                  <ClipboardList size={16} />
+                </span>
+                <div>
+                  <h2 className="rv-seccion__titulo">Por surtir</h2>
+                  <p className="rv-seccion__subtitulo">
+                    Se te están acabando. Clic para agregarlos con la cantidad sugerida
+                  </p>
+                </div>
+              </header>
+
+              {porSurtir.length === 0 ? (
+                <div className="rc-todo-surtido">
+                  <CheckCircle2 size={24} aria-hidden="true" />
+                  Todo tu inventario está surtido.
+                </div>
+              ) : (
+                <ul className="rc-surtir">
+                  {porSurtir.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className="rc-surtir__item"
+                        onClick={() => agregar(p.id, p.sugerido)}
+                        title={`Agregar ${p.nombre} con la cantidad sugerida`}
+                      >
+                        <span className="rv-placeholder rc-placeholder-mini" aria-hidden="true">
+                          <Candy size={15} />
+                        </span>
+
+                        <span className="rc-surtir__info">
+                          <span className="rc-surtir__nombre">{p.nombre}</span>
+                          <span className="rc-surtir__detalle">
+                            <span
+                              className={
+                                'rc-sugerido__estado rc-sugerido__estado--' +
+                                (p.disponible === 0 ? 'agotado' : 'bajo')
+                              }
+                            >
+                              {p.disponible === 0 ? 'Agotado' : 'Stock bajo'}
+                            </span>
+                            {' · '}Quedan {p.disponible} · mín. {p.minimo}
+                          </span>
+                        </span>
+
+                        <span className="rc-surtir__sugerido">+{p.sugerido} pzas</span>
+                        <PlusCircle size={18} className="rc-surtir__mas" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
 
-          <div className="rv-cierre__fila">
-            <div className="rv-resumen__total">
-              <span>Total de la compra</span>
-              <strong>{moneda.format(total)}</strong>
-            </div>
+          {/* ============ COMPRA ACTUAL ============ */}
+          <aside className="rv-panel rv-ticket" aria-label="Compra actual">
+            {compraRegistrada && (
+              <div className="rv-exito" role="status">
+                <CheckCircle2 size={18} aria-hidden="true" />
+                <span>
+                  <strong>Compra #{compraRegistrada.folio} registrada</strong> · {compraRegistrada.proveedor} · se
+                  sumaron {compraRegistrada.piezas} piezas al inventario
+                </span>
+                <button type="button" aria-label="Cerrar aviso" onClick={() => setCompraRegistrada(null)}>
+                  <X size={15} />
+                </button>
+              </div>
+            )}
 
-            <div className="rv-cierre__botones">
-              <button type="button" className="rv-cancelar" disabled={compra.length === 0} onClick={pedirCancelar}>
-                <X size={15} aria-hidden="true" />
-                Cancelar
-              </button>
-              <button type="button" className="rv-confirmar" disabled={compra.length === 0} onClick={pedirRegistro}>
-                {intento && !puedeRegistrar ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
-                Registrar
-              </button>
-            </div>
-          </div>
-
-          {intento && motivoBloqueo && (
-            <div className="rv-aviso-error" role="alert">
-              <Lock size={15} aria-hidden="true" />
-              <span>
-                <strong>Falta un dato:</strong> {motivoBloqueo}
+            <header className="rv-ticket__cabecera">
+              <span className="rv-seccion__icono" aria-hidden="true">
+                <Package size={16} />
               </span>
+              <div className="rv-ticket__titulo-grupo">
+                <h2 className="rv-ticket__titulo">Compra actual</h2>
+                <span className="rv-contador">
+                  {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {totalPiezas}{' '}
+                  {totalPiezas === 1 ? 'pieza' : 'piezas'}
+                </span>
+              </div>
+              <button type="button" className="rv-enlace" disabled={compra.length === 0} onClick={pedirCancelar}>
+                Limpiar
+              </button>
+            </header>
+
+            {renglones.length === 0 ? (
+              <div className="rv-vacio">
+                <span className="rv-vacio__icono" aria-hidden="true">
+                  <Truck size={22} />
+                </span>
+                <p className="rv-vacio__titulo">Aún no hay productos</p>
+                <p className="rv-vacio__texto">Busca lo que te llegó o agrega algo de "Por surtir".</p>
+              </div>
+            ) : (
+              <ul className="rv-renglones">
+                {renglones.map((r) => (
+                  <li key={r.id} className={'rv-renglon rc-renglon' + (r.conError ? ' is-error' : '')}>
+                    <div className="rv-renglon__cuerpo">
+                      {/* Línea 1: nombre + subtotal */}
+                      <div className="rv-renglon__arriba">
+                        <p className="rv-renglon__nombre">{r.producto.nombre}</p>
+                        <span className="rv-renglon__subtotal">
+                          {r.costoValido ? moneda.format(r.subtotal) : '—'}
+                        </span>
+                      </div>
+
+                      {/* Línea 2: pieza/caja + cantidad + borrar */}
+                      <div className="rc-linea">
+                        {r.porEmpaque ? (
+                          <div className="rc-modo" role="group" aria-label="Comprar por">
+                            <button
+                              type="button"
+                              aria-pressed={r.modo === 'pieza'}
+                              className={r.modo === 'pieza' ? 'is-activo' : ''}
+                              onClick={() => actualizar(r.id, { modo: 'pieza' })}
+                            >
+                              Pieza
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={r.modo === 'empaque'}
+                              className={r.modo === 'empaque' ? 'is-activo' : ''}
+                              onClick={() => actualizar(r.id, { modo: 'empaque' })}
+                            >
+                              {capitalizar(r.empaque)}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="rc-solo-pieza">Por pieza</span>
+                        )}
+
+                        <div className="rv-cantidad">
+                          <button
+                            type="button"
+                            onClick={() => cambiarCantidad(r.id, r.cantidad - 1)}
+                            disabled={r.cantidad <= 1}
+                            aria-label="Quitar uno"
+                          >
+                            <Minus size={13} />
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            inputMode="numeric"
+                            value={r.cantidad}
+                            onChange={(e) => cambiarCantidad(r.id, parseInt(e.target.value, 10))}
+                            aria-label={`Cantidad de ${r.producto.nombre}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => cambiarCantidad(r.id, r.cantidad + 1)}
+                            aria-label="Agregar uno"
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="rv-icono rv-icono--borrar rc-borrar"
+                          onClick={() => quitar(r.id)}
+                          aria-label={`Quitar ${r.producto.nombre} de la compra`}
+                          title="Quitar de la compra"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+
+                      {/* Línea 3: costo + cambio + caducidad */}
+                      <div className="rc-linea rc-linea--envuelve">
+                        <span className={'rc-costo__grupo' + (!r.costoValido ? ' is-error' : '')}>
+                          <span>$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={r.costo}
+                            onChange={(e) => actualizar(r.id, { costo: e.target.value })}
+                            aria-label={`Costo por pieza de ${r.producto.nombre}`}
+                          />
+                          <span className="rc-sufijo">/pza</span>
+                        </span>
+
+                        {r.cambioCosto && (
+                          <span className={`rc-cambio rc-cambio--${r.cambioCosto}`}>
+                            {r.cambioCosto === 'sube' ? (
+                              <ArrowUp size={11} aria-hidden="true" />
+                            ) : (
+                              <ArrowDown size={11} aria-hidden="true" />
+                            )}
+                            antes {moneda.format(r.costoAnterior)}
+                          </span>
+                        )}
+
+                        {CONFIG.maneja_caducidad && (
+                          <label
+                            className={'rc-fecha' + (r.caducidadVencida ? ' is-error' : '')}
+                            title="Caducidad (opcional)"
+                          >
+                            <CalendarDays size={13} aria-hidden="true" />
+                            <input
+                              type="date"
+                              value={r.caducidad}
+                              onChange={(e) => actualizar(r.id, { caducidad: e.target.value })}
+                              aria-label={`Caducidad de ${r.producto.nombre} (opcional)`}
+                            />
+                          </label>
+                        )}
+                      </div>
+
+                      {/* Línea 4: conversión + stock */}
+                      <p className="rc-resumen-linea">
+                        {r.conversion}
+                        {' · '}Stock {r.stockActual} → <strong>{r.nuevoStock}</strong>
+                      </p>
+
+                      {r.conError && (
+                        <p className="rv-renglon__error">
+                          <AlertTriangle size={12} aria-hidden="true" />
+                          {!r.costoValido ? 'Escribe el costo por pieza' : 'Esa fecha de caducidad ya pasó'}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* ============ CIERRE ============ */}
+            <div className="rv-cierre">
+              <div className="rc-piezas">
+                <span>Piezas que entran al inventario</span>
+                <strong>{totalPiezas}</strong>
+              </div>
+
+              <div className="rv-cierre__fila">
+                <div className="rv-resumen__total">
+                  <span>Total de la compra</span>
+                  <strong>{moneda.format(total)}</strong>
+                </div>
+
+                <div className="rv-cierre__botones">
+                  <button
+                    type="button"
+                    className="rv-cancelar"
+                    disabled={compra.length === 0}
+                    onClick={pedirCancelar}
+                  >
+                    <X size={15} aria-hidden="true" />
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="rv-confirmar"
+                    disabled={compra.length === 0}
+                    onClick={pedirRegistro}
+                  >
+                    {intento && !puedeRegistrar ? (
+                      <Lock size={16} aria-hidden="true" />
+                    ) : (
+                      <Check size={16} aria-hidden="true" />
+                    )}
+                    Registrar
+                  </button>
+                </div>
+              </div>
+
+              {intento && motivoBloqueo && (
+                <div className="rv-aviso-error" role="alert">
+                  <Lock size={15} aria-hidden="true" />
+                  <span>
+                    <strong>Falta un dato:</strong> {motivoBloqueo}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </aside>
+          </aside>
+        </>
+      )}
 
       {/* ============ MODAL DE CONFIRMACIÓN ============ */}
       {modalAbierto &&
@@ -911,8 +1014,8 @@ export default function RegistrarCompra() {
               <footer className="rc-modal__pie">
                 <div className="rc-modal__totales">
                   <span>
-                    {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {totalPiezas} piezas entran al
-                    inventario
+                    {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {totalPiezas} piezas entran
+                    al inventario
                   </span>
                   <strong>{moneda.format(total)}</strong>
                 </div>

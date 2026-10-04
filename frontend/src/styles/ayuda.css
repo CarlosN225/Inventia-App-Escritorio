@@ -1,0 +1,495 @@
+/* ============================================================
+   AYUDA — estilo minimalista
+   ============================================================ */
+
+.ay {
+  --d-azul:      #1668e3;
+  --d-marino:    #0b1220;
+  --d-gris:      #64748b;
+  --d-gris-2:    #94a3b8;
+  --d-gris-3:    #cbd5e1;
+  --d-borde:     #e6eaf0;
+  --d-borde-2:   #eef1f5;
+  --d-verde:     #14a06b;
+  --d-morado:    #7c3aed;
+
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  color: var(--d-marino);
+}
+
+.ay-panel {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--d-borde);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* ============ ENCABEZADO CON BUSCADOR ============ */
+.ay-encabezado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 20px 24px;
+  border: 1px solid var(--d-borde);
+  border-radius: 12px;
+  background: linear-gradient(90deg, #eef8fc 0%, #f5faff 50%, #eef2fd 100%);
+  text-align: center;
+}
+
+.ay-titulo {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ay-subtitulo {
+  margin: 0;
+  color: var(--d-gris);
+  font-size: 14.5px;
+}
+
+.ay-buscador {
+  position: relative;
+  width: min(560px, 100%);
+  margin-top: 6px;
+}
+
+.ay-buscador__icono {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--d-gris-2);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.ay-buscador input {
+  width: 100%;
+  padding: 12px 40px 12px 42px;
+  border: 1.5px solid var(--d-borde);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--d-marino);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(11, 18, 32, 0.04);
+}
+
+.ay-buscador input:focus {
+  border-color: var(--d-azul);
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.12);
+}
+
+.ay-buscador__limpiar {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--d-gris-2);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.ay-buscador__limpiar:hover { background: #f1f4f9; color: var(--d-marino); }
+
+/* ============ TÍTULOS DE SECCIÓN ============ */
+.ay-seccion__titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ay-seccion__icono {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #eef3fb;
+  color: var(--d-azul);
+}
+
+/* ============ GUÍAS ============ */
+.ay-guias {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ay-guia {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--d-borde);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--d-marino);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.ay-guia:hover {
+  border-color: #b9d3f5;
+  box-shadow: 0 6px 16px rgba(11, 18, 32, 0.06);
+  transform: translateY(-1px);
+}
+
+.ay-guia.is-activa {
+  border-color: var(--d-azul);
+  background: #f5f9ff;
+}
+
+.ay-guia__icono {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eef3fb;
+  color: var(--d-azul);
+  flex-shrink: 0;
+}
+
+.ay-guia.is-activa .ay-guia__icono {
+  background: var(--d-azul);
+  color: #ffffff;
+}
+
+.ay-guia__titulo {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ay-guia__desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--d-gris);
+  font-size: 12.5px;
+}
+
+.ay-propietario {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 6px;
+  padding: 1px 7px;
+  border: 1px solid #ddd6fe;
+  border-radius: 6px;
+  background: #f5f3ff;
+  color: var(--d-morado);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* Pasos de la guía abierta */
+.ay-detalle {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid #c9d8ed;
+  border-radius: 10px;
+  background: #f8fbff;
+  animation: ay-aparecer 0.15s ease-out;
+}
+
+@keyframes ay-aparecer {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ay-detalle__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ay-detalle__titulo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ay-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: paso;
+}
+
+.ay-pasos li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  counter-increment: paso;
+}
+
+.ay-pasos li::before {
+  content: counter(paso);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--d-azul);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ay-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--d-azul);
+  border-radius: 8px;
+  background: var(--d-azul);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ay-boton:hover { background: #1257c2; }
+
+.ay-boton--secundario {
+  border-color: var(--d-borde);
+  background: #ffffff;
+  color: var(--d-marino);
+}
+
+.ay-boton--secundario:hover { background: #ffffff; border-color: #c9d8ed; color: var(--d-azul); }
+
+/* ============ FILA: ATAJOS + CONTACTO ============ */
+.ay-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.ay-atajos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ay-atajos li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--d-borde-2);
+  font-size: 13.5px;
+}
+
+.ay-atajos li:first-child { padding-top: 0; }
+.ay-atajos li:last-child { border-bottom: none; }
+
+.ay-teclas {
+  display: flex;
+  gap: 4px;
+  min-width: 82px;
+}
+
+.ay-tecla {
+  display: inline-block;
+  min-width: 30px;
+  padding: 3px 8px;
+  border: 1px solid #c9d1dc;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6fa 100%);
+  box-shadow: 0 2px 0 #c9d1dc;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.ay-atajos__texto { color: #475569; }
+
+/* Contacto */
+.ay-contacto__texto {
+  margin: 0 0 14px;
+  color: #475569;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ay-contacto__datos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.ay-contacto__datos li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.ay-contacto__datos svg { color: var(--d-azul); }
+
+.ay-version {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--d-borde-2);
+  color: var(--d-gris-2);
+  font-size: 12px;
+}
+
+/* ============ PREGUNTAS FRECUENTES ============ */
+.ay-faq {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ay-faq li {
+  border-bottom: 1px solid var(--d-borde-2);
+}
+
+.ay-faq li:last-child { border-bottom: none; }
+
+.ay-faq__pregunta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 2px;
+  border: none;
+  background: none;
+  color: var(--d-marino);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ay-faq__pregunta:hover { color: var(--d-azul); }
+
+.ay-faq__chevron {
+  color: var(--d-gris-2);
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.ay-faq li.is-abierta .ay-faq__chevron {
+  color: var(--d-azul);
+  transform: rotate(180deg);
+}
+
+.ay-faq__respuesta {
+  margin: 0;
+  padding: 0 2px 14px;
+  color: #475569;
+  font-size: 13.5px;
+  line-height: 1.55;
+  animation: ay-aparecer 0.15s ease-out;
+}
+
+/* ============ SIN RESULTADOS ============ */
+.ay-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 16px;
+  color: var(--d-gris);
+  font-size: 14px;
+  text-align: center;
+}
+
+.ay-vacio svg { color: var(--d-gris-2); }
+/* ============ AJUSTES: atajos visibles y tarjetas parejas ============ */
+/* ============ AJUSTES: atajos visibles y tarjetas parejas ============ */
+
+/* Le gana a los estilos globales que dejaban el texto invisible */
+.ay .ay-atajos li,
+.ay .ay-atajos .ay-atajos__texto {
+  color: #334155 !important;
+  background: transparent !important;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+/* 🔥 Arreglo del bug: la tecla necesita color y fondo explícitos */
+.ay .ay-tecla,
+.ay kbd.ay-tecla {
+  display: inline-block;
+  min-width: 32px;
+  padding: 4px 9px;
+  border: 1px solid #c9d1dc !important;
+  border-radius: 6px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6fa 100%) !important;
+  box-shadow: 0 2px 0 #c9d1dc !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace !important;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Las dos tarjetas de la fila miden lo mismo */
+.ay-fila > .ay-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* El "INVENTIA v1.0" se va hasta abajo de su tarjeta */
+.ay-fila .ay-version {
+  margin-top: auto;
+}
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1100px) {
+  .ay-guias { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ay-fila { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .ay-guias { grid-template-columns: minmax(0, 1fr); }
+}

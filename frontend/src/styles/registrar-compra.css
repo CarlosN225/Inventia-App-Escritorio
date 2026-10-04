@@ -677,6 +677,50 @@
   gap: 8px;
 }
 
+/* ============ ESTADO VACÍO: sin productos ============ */
+.rc-sin-productos {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 24px;
+  text-align: center;
+}
+
+.rc-sin-productos__icono {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 14px;
+  background: #eef3fb;
+  color: var(--d-azul);
+  margin-bottom: 4px;
+}
+
+.rc-sin-productos__titulo {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--d-marino);
+  letter-spacing: -0.02em;
+}
+
+.rc-sin-productos__texto {
+  margin: 0 0 8px;
+  color: var(--d-gris);
+  font-size: 14px;
+  max-width: 380px;
+  line-height: 1.55;
+}
+
+.rc-sin-productos .rv-confirmar {
+  height: 46px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 1100px) {
   .rc-datos { grid-template-columns: minmax(0, 1fr); }

@@ -28,10 +28,12 @@ export default function Layout() {
         (mobileOpen ? ' is-mobile-open' : '')
       }
     >
+   {/* Cuando el backend esté listo, alertasPendientes vendrá de un hook o contexto */}
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed(v => !v)}
         onClose={() => setMobileOpen(false)}
+        alertasPendientes={0}
       />
       <div
         className="sidebar__backdrop"

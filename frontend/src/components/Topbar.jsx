@@ -1,29 +1,37 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Menu, ChevronDown, User, LogOut, Settings, HelpCircle } from 'lucide-react'
+import {
+  Menu,
+  User,
+  LogOut,
+  Settings,
+  HelpCircle,
+  Store,
+  CalendarDays,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react'
 
-import StatusDot from './StatusDot.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import { getUsuarioActual, logout } from '../services/auth'
+import '../styles/topbar.css'
 
-const titles = {
-  '/panel': 'Panel principal',
-  '/catalogo': 'Catálogo',
-  '/catalogo/nuevo': 'Nuevo producto',
-  '/registrar-venta': 'Registrar venta',
-  '/registrar-compra': 'Registrar compra',
-  '/registrar-merma': 'Registrar merma',
-  '/correccion-inventario': 'Corrección de inventario',
-  '/movimientos': 'Historial',
-  '/alertas': 'Alertas',
-  '/configuracion': 'Configuración',
-  '/ayuda': 'Ayuda',
-}
+// TODO: traer el nombre de Configuración > Negocio (backend)
+const NOMBRE_NEGOCIO = 'Los Querubines'
 
-// "Ana Luisa Reyes Martínez" -> "AM" (primera letra del primer y del último nombre)
+const formatoFecha = new Intl.DateTimeFormat('es-MX', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
+// "Ana Luisa Reyes Martínez" -> "AM"
 function iniciales(nombre) {
   const partes = nombre.trim().split(/\s+/)
-  if (partes.length === 0 || !partes[0]) return '?'
+  if (!partes[0]) return '?'
   const primera = partes[0][0]
   const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ''
   return (primera + ultima).toUpperCase()
@@ -31,6 +39,10 @@ function iniciales(nombre) {
 
 function capitalizar(texto) {
   return texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : ''
+}
+
+function horaActual() {
+  return new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 export default function Topbar({ onOpenSidebar }) {
@@ -41,12 +53,11 @@ export default function Topbar({ onOpenSidebar }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [usuario, setUsuario] = useState(null)
   const [enLinea, setEnLinea] = useState(navigator.onLine)
+  const [hoy, setHoy] = useState(() => new Date())
+  const [sincronizando, setSincronizando] = useState(false)
+  const [ultimaSync, setUltimaSync] = useState(() => horaActual())
 
   const ref = useRef(null)
-
-  const title =
-    titles[pathname] ??
-    (pathname.endsWith('/editar') ? 'Editar producto' : 'INVENTIA')
 
   // Usuario real desde el backend
   useEffect(() => {
@@ -67,6 +78,12 @@ export default function Topbar({ onOpenSidebar }) {
       window.removeEventListener('online', conectado)
       window.removeEventListener('offline', desconectado)
     }
+  }, [])
+
+  // Revisa la fecha cada minuto, para que cambie sola a medianoche
+  useEffect(() => {
+    const intervalo = setInterval(() => setHoy(new Date()), 60000)
+    return () => clearInterval(intervalo)
   }, [])
 
   // Cierra el menú al dar clic fuera o presionar Esc
@@ -97,6 +114,16 @@ export default function Topbar({ onOpenSidebar }) {
     navigate(ruta)
   }
 
+  function sincronizar() {
+    if (!enLinea || sincronizando) return
+    // TODO: mandar al backend lo que se guardó sin conexión
+    setSincronizando(true)
+    setTimeout(() => {
+      setSincronizando(false)
+      setUltimaSync(horaActual())
+    }, 1200)
+  }
+
   function requestLogout() {
     setOpen(false)
     setConfirmOpen(true)
@@ -123,6 +150,7 @@ export default function Topbar({ onOpenSidebar }) {
   return (
     <>
       <header className="topbar">
+        {/* ============ IZQUIERDA: negocio + fecha ============ */}
         <div className="topbar__left">
           <button
             type="button"
@@ -132,26 +160,59 @@ export default function Topbar({ onOpenSidebar }) {
           >
             <Menu size={20} />
           </button>
-          <h1 className="topbar__title">{title}</h1>
+
+          <span className="topbar__negocio">
+            <span className="topbar__negocio-icono" aria-hidden="true">
+              <Store size={17} />
+            </span>
+            <span className="topbar__negocio-texto">
+              <span className="topbar__negocio-prefijo">Dulcería: </span>
+              <strong>{NOMBRE_NEGOCIO}</strong>
+            </span>
+          </span>
+
+          <span className="topbar__separador" aria-hidden="true" />
+
+          <span className="topbar__fecha">
+            <CalendarDays size={15} aria-hidden="true" />
+            {capitalizar(formatoFecha.format(hoy))}
+          </span>
         </div>
 
+        {/* ============ DERECHA: internet + sincronizar + perfil ============ */}
         <div className="topbar__right">
-          <StatusDot online={enLinea} />
+          <span
+            className={'topbar__conexion ' + (enLinea ? 'is-en-linea' : 'is-sin-conexion')}
+            role="status"
+            title={enLinea ? 'Tienes internet' : 'Sin internet: todo se guarda en la compu y se sincroniza al volver'}
+          >
+            {enLinea ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}
+            {enLinea ? 'En línea' : 'Sin conexión · tus datos se guardan'}
+          </span>
 
+          <button
+            type="button"
+            className={'topbar__sync' + (sincronizando ? ' is-girando' : '')}
+            onClick={sincronizar}
+            disabled={!enLinea}
+            title={enLinea ? `Sincronizar ahora · última vez: ${ultimaSync}` : 'Necesitas internet para sincronizar'}
+            aria-label="Sincronizar"
+          >
+            <RefreshCw size={16} />
+          </button>
+
+          {/* Solo el monito de perfil */}
           <div className="topbar__user-wrap" ref={ref}>
             <button
               type="button"
-              className={'topbar__user' + (open ? ' is-open' : '')}
+              className={'topbar__perfil' + (open ? ' is-open' : '')}
               onClick={() => setOpen((v) => !v)}
               aria-haspopup="menu"
               aria-expanded={open}
+              aria-label={`Menú de ${nombre}`}
+              title={nombre}
             >
               <span className="topbar__avatar">{avatar}</span>
-              <div className="topbar__user-info">
-                <span className="topbar__user-name">{nombre}</span>
-                <span className="topbar__user-role">{capitalizar(rol)}</span>
-              </div>
-              <ChevronDown size={16} className="topbar__chevron" aria-hidden="true" />
             </button>
 
             {open && (
@@ -161,13 +222,23 @@ export default function Topbar({ onOpenSidebar }) {
                   <div className="topbar__user-info">
                     <span className="topbar__user-name">{nombre}</span>
                     <span className="topbar__user-role">{correo}</span>
+                    {rol && (
+                      <span className={'topbar__rol ' + (esPropietario ? 'is-propietario' : 'is-encargado')}>
+                        {esPropietario && <ShieldCheck size={11} aria-hidden="true" />}
+                        {capitalizar(rol)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <div className="user-menu__divider" />
 
-                {/* TODO: pantalla de Mi perfil */}
-                <button type="button" className="user-menu__item" role="menuitem">
+                <button
+                  type="button"
+                  className="user-menu__item"
+                  role="menuitem"
+                  onClick={() => irA('/perfil')}
+                >
                   <User size={16} />
                   Mi perfil
                 </button>

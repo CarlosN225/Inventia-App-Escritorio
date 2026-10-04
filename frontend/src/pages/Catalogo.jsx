@@ -26,12 +26,11 @@ import '../styles/catalogo.css'
 /* ============================================================
    ESTADO INICIAL — Todo vacío hasta conectar el backend
    ------------------------------------------------------------
-   PRODUCTOS: array de productos del negocio actual
-   CATEGORIAS: se puede calcular o recibir del backend
+   PRODUCTOS:  catálogo del negocio
+   CATEGORIAS: categorías disponibles (o se calculan de PRODUCTOS)
    ============================================================ */
-
-import { PRODUCTOS, CATEGORIAS } from '../data/productos'
-   
+const PRODUCTOS = []
+const CATEGORIAS = []
 
 const POR_PAGINA = 15
 const DIAS_AVISO_CADUCIDAD = 30
@@ -109,7 +108,6 @@ export default function Catalogo() {
 
   const menuRef = useRef(null)
 
-  // Cierra el menú de tres puntos al dar clic fuera o presionar Esc
   useEffect(() => {
     if (menuAbierto === null) return
 
@@ -203,52 +201,50 @@ export default function Catalogo() {
   }
 
   const chipsResumen = [
-    { id: 'todos', icono: Package, texto: `${resumen.total} productos`, clase: '' },
-    { id: 'bajo', icono: AlertTriangle, texto: `${resumen.bajo} stock bajo`, clase: 'cat-resumen__chip--bajo' },
-    { id: 'agotado', icono: XCircle, texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`, clase: 'cat-resumen__chip--agotado' },
+    { id: 'todos',   icono: Package,       texto: `${resumen.total} productos`, clase: '' },
+    { id: 'bajo',    icono: AlertTriangle, texto: `${resumen.bajo} stock bajo`, clase: 'cat-resumen__chip--bajo' },
+    { id: 'agotado', icono: XCircle,       texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`, clase: 'cat-resumen__chip--agotado' },
     { id: 'caducar', icono: CalendarClock, texto: `${resumen.caducar} por caducar`, clase: 'cat-resumen__chip--caducar' },
   ]
 
   return (
     <div className="cat">
       {/* ============ ENCABEZADO ============ */}
-      
       <header className="cat-encabezado">
-  <div>
-    <h1 className="cat-encabezado__titulo">Catálogo</h1>
-    <p className="cat-encabezado__subtitulo">
-      {sinProductos
-        ? 'Aún no tienes productos registrados'
-        : `Todos los productos de tu negocio`}
-    </p>
+        <div>
+          <h1 className="cat-encabezado__titulo">Catálogo</h1>
+          <p className="cat-encabezado__subtitulo">
+            {sinProductos
+              ? 'Aún no tienes productos registrados'
+              : `Todos los productos de tu negocio`}
+          </p>
 
-    <div className="cat-resumen">
-      {chipsResumen.map(({ id, icono: Icono, texto, clase }) => (
-        <button
-          key={id}
-          type="button"
-          className={`cat-resumen__chip ${clase}` + (estado === id ? ' is-activo' : '')}
-          onClick={() => cambiarEstado(id)}
-        >
-          <Icono size={14} aria-hidden="true" />
-          {texto}
-        </button>
-      ))}
-    </div>
-  </div>
+          <div className="cat-resumen">
+            {chipsResumen.map(({ id, icono: Icono, texto, clase }) => (
+              <button
+                key={id}
+                type="button"
+                className={`cat-resumen__chip ${clase}` + (estado === id ? ' is-activo' : '')}
+                onClick={() => cambiarEstado(id)}
+              >
+                <Icono size={14} aria-hidden="true" />
+                {texto}
+              </button>
+            ))}
+          </div>
+        </div>
 
-  {/* El botón de "Nuevo producto" solo aparece si YA hay productos registrados */}
-  {!sinProductos && (
-    <button
-      type="button"
-      className="cat-boton-primario"
-      onClick={() => navigate('/catalogo/nuevo')}
-    >
-      <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
-      Nuevo producto
-    </button>
-  )}
-</header>
+        {!sinProductos && (
+          <button
+            type="button"
+            className="cat-boton-primario"
+            onClick={() => navigate('/catalogo/nuevo')}
+          >
+            <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+            Nuevo producto
+          </button>
+        )}
+      </header>
 
       {/* ============ FILTROS ============ */}
       <section className="cat-panel">
@@ -318,7 +314,8 @@ export default function Catalogo() {
               Todas<span className="cat-categoria__conteo">({PRODUCTOS.length})</span>
             </button>
 
-          {CATEGORIAS.filter((c) => conteoCategorias[c]).map((c) => (              <button
+            {CATEGORIAS.filter((c) => conteoCategorias[c]).map((c) => (
+              <button
                 key={c}
                 type="button"
                 className={'cat-categoria' + (categoria === c ? ' is-activa' : '')}

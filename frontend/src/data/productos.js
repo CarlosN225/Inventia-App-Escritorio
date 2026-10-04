@@ -43,7 +43,9 @@ export const PRODUCTOS = [
 // Datos extra que solo usa la pantalla de edición (los demás productos usan valores por defecto)
 
 export const DETALLES = {
-
+  1: { unidad: 'bolsa' },
+  8: { unidad: 'paquete' },
+  17: { unidad: 'paquete' },
       2: {
     vendidasMes: 198,
     promociones: [
@@ -70,6 +72,27 @@ export const DETALLES = {
   9: { piezasEmpaque: 50, empaque: 'bolsa' },
   11: { piezasEmpaque: 20, empaque: 'caja' },
   15: { piezasEmpaque: 24, empaque: 'caja', maximo: 30 },
+}
+
+// Cómo se escribe cada unidad: corto para tablas, largo para textos
+const TEXTO_UNIDAD = {
+  pieza: { uno: 'pza', varios: 'pzas', unoLargo: 'pieza', variosLargo: 'piezas' },
+  bolsa: { uno: 'bolsa', varios: 'bolsas', unoLargo: 'bolsa', variosLargo: 'bolsas' },
+  caja: { uno: 'caja', varios: 'cajas', unoLargo: 'caja', variosLargo: 'cajas' },
+  paquete: { uno: 'paq.', varios: 'paqs.', unoLargo: 'paquete', variosLargo: 'paquetes' },
+}
+
+// Unidad en que se vende (y se cuenta) un producto
+export function unidadDe(id) {
+  return DETALLES[id]?.unidad ?? 'pieza'
+}
+
+// textoUnidad('bolsa', 3) -> "bolsas" · textoUnidad('pieza', 1, true) -> "pieza"
+export function textoUnidad(unidad, cantidad, largo = false) {
+  const t = TEXTO_UNIDAD[unidad] ?? TEXTO_UNIDAD.pieza
+  const uno = Math.abs(cantidad) === 1
+  if (largo) return uno ? t.unoLargo : t.variosLargo
+  return uno ? t.uno : t.varios
 }
 
 // Los que salen en "Más vendidos" de Registrar venta

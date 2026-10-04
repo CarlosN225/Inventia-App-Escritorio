@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Search,
   X,
@@ -17,15 +18,28 @@ import {
   CornerDownLeft,
   RotateCcw,
   PlusCircle,
+  PackageOpen,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
-import { PRODUCTOS, DETALLES, MAS_VENDIDOS_IDS } from '../data/productos'
 import '../styles/registrar-venta.css'
+
+/* ============================================================
+   ESTADO INICIAL — Todo vacío hasta conectar el backend
+   ------------------------------------------------------------
+   PRODUCTOS:         catálogo real del negocio
+   DETALLES:          info extra por producto (promos, mayoreo, etc.)
+   MAS_VENDIDOS_IDS:  ids de los productos más vendidos (ranking)
+   ============================================================ */
+const PRODUCTOS = []
+const DETALLES = {}
+const MAS_VENDIDOS_IDS = []
 
 const MAX_RESULTADOS = 6
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+
+/* ============ Utilidades ============ */
 
 function normalizar(texto) {
   return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -78,7 +92,10 @@ function PastillaStock({ disponible, minimo }) {
   return <span className="rv-stock rv-stock--ok">Quedan {disponible} pzas</span>
 }
 
+/* ============ Pantalla ============ */
+
 export default function RegistrarVenta() {
+  const navigate = useNavigate()
   const inputRef = useRef(null)
 
   const [busqueda, setBusqueda] = useState('')
@@ -92,6 +109,8 @@ export default function RegistrarVenta() {
 
   const productosPorId = useMemo(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p])), [])
   const masVendidos = MAS_VENDIDOS_IDS.map((id) => productosPorId[id]).filter(Boolean)
+
+  const sinProductos = PRODUCTOS.length === 0
 
   /* ---------- Búsqueda ---------- */
 
@@ -220,6 +239,7 @@ export default function RegistrarVenta() {
   function confirmarVenta() {
     if (!puedeConfirmar) return
 
+    // TODO: mandar al backend (él genera las salidas de inventario)
     setStock((s) => {
       const copia = { ...s }
       renglones.forEach((r) => {
@@ -312,369 +332,412 @@ export default function RegistrarVenta() {
         </ul>
       </footer>
 
-      {/* ============ IZQUIERDA ============ */}
-      <div className="rv-izquierda">
-        <section className="rv-panel">
-          <div className="rv-buscador">
-            <Search size={18} className="rv-buscador__icono" aria-hidden="true" />
-            <input
-              ref={inputRef}
-              autoFocus
-              type="text"
-              placeholder="Busca un producto… (ej. cheto, paleta)"
-              value={busqueda}
-              onChange={(e) => cambiarBusqueda(e.target.value)}
-              onKeyDown={teclaBuscador}
-              aria-label="Buscar producto"
-            />
-            {busqueda && (
-              <button
-                type="button"
-                className="rv-buscador__limpiar"
-                onClick={() => {
-                  cambiarBusqueda('')
-                  inputRef.current?.focus()
-                }}
-                aria-label="Limpiar búsqueda"
-              >
-                <X size={16} />
-              </button>
-            )}
-            <button type="button" className="rv-buscador__boton" onClick={enfocarBuscador} aria-label="Buscar">
-              <Search size={19} />
-            </button>
-          </div>
-
-          {busqueda.trim() && (
-            <div className="rv-resultados">
-              <div className="rv-resultados__cabecera">
-                <span className="rv-resultados__titulo">
-                  <span className="rv-punto" aria-hidden="true" />
-                  Resultados para "{busqueda.trim()}"
-                  <span className="rv-resultados__conteo">
-                    ({resultados.length} {resultados.length === 1 ? 'coincidencia' : 'coincidencias'})
-                  </span>
-                </span>
-                <span className="rv-pista">Usa ↑ ↓ y Enter para elegir</span>
+      {/* ============ SIN PRODUCTOS — empty state ============ */}
+      {sinProductos ? (
+        <section className="rv-panel rv-sin-productos">
+          <span className="rv-sin-productos__icono" aria-hidden="true">
+            <PackageOpen size={28} />
+          </span>
+          <h2 className="rv-sin-productos__titulo">Aún no tienes productos</h2>
+          <p className="rv-sin-productos__texto">
+            Para registrar ventas, primero agrega productos a tu catálogo.
+          </p>
+          <button
+            type="button"
+            className="rv-confirmar"
+            onClick={() => navigate('/catalogo/nuevo')}
+          >
+            <Plus size={16} aria-hidden="true" />
+            Nuevo producto
+          </button>
+        </section>
+      ) : (
+        <>
+          {/* ============ IZQUIERDA ============ */}
+          <div className="rv-izquierda">
+            <section className="rv-panel">
+              <div className="rv-buscador">
+                <Search size={18} className="rv-buscador__icono" aria-hidden="true" />
+                <input
+                  ref={inputRef}
+                  autoFocus
+                  type="text"
+                  placeholder="Busca un producto… (ej. cheto, paleta)"
+                  value={busqueda}
+                  onChange={(e) => cambiarBusqueda(e.target.value)}
+                  onKeyDown={teclaBuscador}
+                  aria-label="Buscar producto"
+                />
+                {busqueda && (
+                  <button
+                    type="button"
+                    className="rv-buscador__limpiar"
+                    onClick={() => {
+                      cambiarBusqueda('')
+                      inputRef.current?.focus()
+                    }}
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+                <button type="button" className="rv-buscador__boton" onClick={enfocarBuscador} aria-label="Buscar">
+                  <Search size={19} />
+                </button>
               </div>
 
-              {resultados.length === 0 ? (
-                <p className="rv-vacio-texto">No encontramos productos con ese nombre.</p>
+              {busqueda.trim() && (
+                <div className="rv-resultados">
+                  <div className="rv-resultados__cabecera">
+                    <span className="rv-resultados__titulo">
+                      <span className="rv-punto" aria-hidden="true" />
+                      Resultados para "{busqueda.trim()}"
+                      <span className="rv-resultados__conteo">
+                        ({resultados.length} {resultados.length === 1 ? 'coincidencia' : 'coincidencias'})
+                      </span>
+                    </span>
+                    <span className="rv-pista">Usa ↑ ↓ y Enter para elegir</span>
+                  </div>
+
+                  {resultados.length === 0 ? (
+                    <p className="rv-vacio-texto">No encontramos productos con ese nombre.</p>
+                  ) : (
+                    <ul className="rv-lista">
+                      {resultados.map((p, i) => {
+                        const disponible = stock[p.id] ?? 0
+                        const agotado = disponible === 0
+                        const activo = i === indiceResaltado
+
+                        return (
+                          <li
+                            key={p.id}
+                            className={
+                              'rv-resultado' + (activo ? ' is-resaltado' : '') + (agotado ? ' is-agotado' : '')
+                            }
+                            onMouseEnter={() => setResaltado(i)}
+                          >
+                            <span className="rv-placeholder" aria-hidden="true">
+                              <Candy size={20} />
+                            </span>
+
+                            <div className="rv-resultado__info">
+                              <p className="rv-resultado__nombre">
+                                {p.nombre}
+                                <PastillaStock disponible={disponible} minimo={p.minimo} />
+                              </p>
+                              <p className="rv-resultado__marca">
+                                {p.marca} · {p.categoria}
+                              </p>
+                            </div>
+
+                            <div className="rv-resultado__precio">
+                              <strong>{moneda.format(p.precio)}</strong>
+                              <span>c/u</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              className={'rv-agregar' + (activo && !agotado ? ' is-principal' : '')}
+                              disabled={agotado}
+                              onClick={() => agregarDesdeBusqueda(p.id)}
+                            >
+                              {activo && !agotado ? (
+                                <CornerDownLeft size={14} aria-hidden="true" />
+                              ) : (
+                                <Plus size={14} aria-hidden="true" />
+                              )}
+                              Agregar
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="rv-panel">
+              <header className="rv-seccion__cabecera">
+                <span className="rv-seccion__icono" aria-hidden="true">
+                  <Zap size={16} />
+                </span>
+                <div>
+                  <h2 className="rv-seccion__titulo">Más vendidos</h2>
+                  <p className="rv-seccion__subtitulo">
+                    {masVendidos.length > 0
+                      ? 'Haz clic en cualquier producto para sumar 1 pieza al ticket'
+                      : 'Cuando tengas ventas registradas, aquí verás tus más vendidos'}
+                  </p>
+                </div>
+              </header>
+
+              {masVendidos.length === 0 ? (
+                <div className="rv-vacio-seccion">
+                  <span className="rv-vacio-seccion__icono" aria-hidden="true">
+                    <Zap size={22} />
+                  </span>
+                  <p className="rv-vacio-seccion__texto">
+                    Aún no hay suficientes ventas para calcular tus productos más vendidos.
+                  </p>
+                </div>
               ) : (
-                <ul className="rv-lista">
-                  {resultados.map((p, i) => {
-                    const disponible = stock[p.id] ?? 0
-                    const agotado = disponible === 0
-                    const activo = i === indiceResaltado
+                <div className="rv-rapidos">
+                  {masVendidos.map((p) => {
+                    const agotado = (stock[p.id] ?? 0) === 0
 
                     return (
-                      <li
+                      <button
                         key={p.id}
-                        className={'rv-resultado' + (activo ? ' is-resaltado' : '') + (agotado ? ' is-agotado' : '')}
-                        onMouseEnter={() => setResaltado(i)}
+                        type="button"
+                        className="rv-rapido"
+                        disabled={agotado}
+                        onClick={() => agregar(p.id)}
+                        title={agotado ? 'Agotado' : `Agregar ${p.nombre}`}
                       >
+                        <PlusCircle size={18} className="rv-rapido__mas" aria-hidden="true" />
                         <span className="rv-placeholder" aria-hidden="true">
                           <Candy size={20} />
                         </span>
-
-                        <div className="rv-resultado__info">
-                          <p className="rv-resultado__nombre">
-                            {p.nombre}
-                            <PastillaStock disponible={disponible} minimo={p.minimo} />
-                          </p>
-                          <p className="rv-resultado__marca">
-                            {p.marca} · {p.categoria}
-                          </p>
-                        </div>
-
-                        <div className="rv-resultado__precio">
-                          <strong>{moneda.format(p.precio)}</strong>
-                          <span>c/u</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          className={'rv-agregar' + (activo && !agotado ? ' is-principal' : '')}
-                          disabled={agotado}
-                          onClick={() => agregarDesdeBusqueda(p.id)}
-                        >
-                          {activo && !agotado ? (
-                            <CornerDownLeft size={14} aria-hidden="true" />
-                          ) : (
-                            <Plus size={14} aria-hidden="true" />
-                          )}
-                          Agregar
-                        </button>
-                      </li>
+                        <span className="rv-chip rv-chip--marca">{p.marca}</span>
+                        <span className="rv-rapido__nombre">{p.nombre}</span>
+                        <span className="rv-rapido__precio">{moneda.format(p.precio)}</span>
+                      </button>
                     )
                   })}
-                </ul>
+                </div>
               )}
-            </div>
-          )}
-        </section>
-
-        <section className="rv-panel">
-          <header className="rv-seccion__cabecera">
-            <span className="rv-seccion__icono" aria-hidden="true">
-              <Zap size={16} />
-            </span>
-            <div>
-              <h2 className="rv-seccion__titulo">Más vendidos</h2>
-              <p className="rv-seccion__subtitulo">Haz clic en cualquier dulce para sumar 1 pieza al ticket</p>
-            </div>
-          </header>
-
-          <div className="rv-rapidos">
-            {masVendidos.map((p) => {
-              const agotado = (stock[p.id] ?? 0) === 0
-
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="rv-rapido"
-                  disabled={agotado}
-                  onClick={() => agregar(p.id)}
-                  title={agotado ? 'Agotado' : `Agregar ${p.nombre}`}
-                >
-                  <PlusCircle size={18} className="rv-rapido__mas" aria-hidden="true" />
-                  <span className="rv-placeholder" aria-hidden="true">
-                    <Candy size={20} />
-                  </span>
-                  <span className="rv-chip rv-chip--marca">{p.marca}</span>
-                  <span className="rv-rapido__nombre">{p.nombre}</span>
-                  <span className="rv-rapido__precio">{moneda.format(p.precio)}</span>
-                </button>
-              )
-            })}
+            </section>
           </div>
-        </section>
-      </div>
 
-      {/* ============ TICKET ============ */}
-      <aside className="rv-panel rv-ticket" aria-label="Venta actual">
-        {ventaRegistrada && (
-          <div className="rv-exito" role="status">
-            <CheckCircle2 size={18} aria-hidden="true" />
-            <span>
-              <strong>Venta #{ventaRegistrada.folio} registrada</strong> · {moneda.format(ventaRegistrada.total)} · el
-              inventario ya se actualizó
-            </span>
-            <button type="button" aria-label="Cerrar aviso" onClick={() => setVentaRegistrada(null)}>
-              <X size={15} />
-            </button>
-          </div>
-        )}
-
-        <header className="rv-ticket__cabecera">
-          <span className="rv-seccion__icono" aria-hidden="true">
-            <Receipt size={16} />
-          </span>
-          <div className="rv-ticket__titulo-grupo">
-            <h2 className="rv-ticket__titulo">Venta actual</h2>
-            <span className="rv-contador">
-              {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {piezas}{' '}
-              {piezas === 1 ? 'pieza' : 'piezas'}
-            </span>
-          </div>
-          <button type="button" className="rv-enlace" disabled={ticket.length === 0} onClick={pedirCancelar}>
-            Limpiar
-          </button>
-        </header>
-
-        {renglones.length === 0 ? (
-          <div className="rv-vacio">
-            <span className="rv-vacio__icono" aria-hidden="true">
-              <ShoppingCart size={22} />
-            </span>
-            <p className="rv-vacio__titulo">Aún no hay productos</p>
-            <p className="rv-vacio__texto">Busca un producto o toca uno de los más vendidos para empezar.</p>
-          </div>
-        ) : (
-          <ul className="rv-renglones">
-            {renglones.map((r) => (
-              <li key={r.id} className={'rv-renglon' + (r.faltan ? ' is-error' : '')}>
-                <span className="rv-placeholder rv-placeholder--chico" aria-hidden="true">
-                  <Candy size={16} />
+          {/* ============ TICKET ============ */}
+          <aside className="rv-panel rv-ticket" aria-label="Venta actual">
+            {ventaRegistrada && (
+              <div className="rv-exito" role="status">
+                <CheckCircle2 size={18} aria-hidden="true" />
+                <span>
+                  <strong>Venta #{ventaRegistrada.folio} registrada</strong> · {moneda.format(ventaRegistrada.total)} · el
+                  inventario ya se actualizó
                 </span>
+                <button type="button" aria-label="Cerrar aviso" onClick={() => setVentaRegistrada(null)}>
+                  <X size={15} />
+                </button>
+              </div>
+            )}
 
-                <div className="rv-renglon__cuerpo">
-                  <div className="rv-renglon__arriba">
-                    <p className="rv-renglon__nombre">{r.producto.nombre}</p>
-                    <span className="rv-renglon__subtotal">
-                      {r.faltan ? <span className="rv-espera">En espera</span> : moneda.format(r.subtotal)}
+            <header className="rv-ticket__cabecera">
+              <span className="rv-seccion__icono" aria-hidden="true">
+                <Receipt size={16} />
+              </span>
+              <div className="rv-ticket__titulo-grupo">
+                <h2 className="rv-ticket__titulo">Venta actual</h2>
+                <span className="rv-contador">
+                  {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {piezas}{' '}
+                  {piezas === 1 ? 'pieza' : 'piezas'}
+                </span>
+              </div>
+              <button type="button" className="rv-enlace" disabled={ticket.length === 0} onClick={pedirCancelar}>
+                Limpiar
+              </button>
+            </header>
+
+            {renglones.length === 0 ? (
+              <div className="rv-vacio">
+                <span className="rv-vacio__icono" aria-hidden="true">
+                  <ShoppingCart size={22} />
+                </span>
+                <p className="rv-vacio__titulo">Aún no hay productos</p>
+                <p className="rv-vacio__texto">
+                  Busca un producto o toca uno de los más vendidos para empezar.
+                </p>
+              </div>
+            ) : (
+              <ul className="rv-renglones">
+                {renglones.map((r) => (
+                  <li key={r.id} className={'rv-renglon' + (r.faltan ? ' is-error' : '')}>
+                    <span className="rv-placeholder rv-placeholder--chico" aria-hidden="true">
+                      <Candy size={16} />
                     </span>
-                  </div>
 
-                  <div className="rv-renglon__fila">
-                    <div className="rv-renglon__precio">
-                      {editando?.id === r.id ? (
-                        <div className="rv-editar-precio">
-                          <span>$</span>
-                          <input
-                            autoFocus
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            value={editando.valor}
-                            onChange={(e) => setEditando({ ...editando, valor: e.target.value })}
-                            onKeyDown={teclaPrecio}
-                            onBlur={guardarPrecio}
-                            aria-label={`Precio de ${r.producto.nombre}`}
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          {r.motivo !== 'normal' && <s className="rv-tachado">{moneda.format(r.producto.precio)}</s>}
-                          <span className="rv-unitario">{moneda.format(r.precio)} c/u</span>
+                    <div className="rv-renglon__cuerpo">
+                      <div className="rv-renglon__arriba">
+                        <p className="rv-renglon__nombre">{r.producto.nombre}</p>
+                        <span className="rv-renglon__subtotal">
+                          {r.faltan ? <span className="rv-espera">En espera</span> : moneda.format(r.subtotal)}
+                        </span>
+                      </div>
 
-                          {r.motivo === 'mayoreo' && <span className="rv-chip rv-chip--verde">Mayoreo</span>}
-                          {r.motivo === 'promo' && (
-                            <span className="rv-chip rv-chip--azul">Promo {etiquetaPromo(r.promo)}</span>
+                      <div className="rv-renglon__fila">
+                        <div className="rv-renglon__precio">
+                          {editando?.id === r.id ? (
+                            <div className="rv-editar-precio">
+                              <span>$</span>
+                              <input
+                                autoFocus
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                inputMode="decimal"
+                                value={editando.valor}
+                                onChange={(e) => setEditando({ ...editando, valor: e.target.value })}
+                                onKeyDown={teclaPrecio}
+                                onBlur={guardarPrecio}
+                                aria-label={`Precio de ${r.producto.nombre}`}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              {r.motivo !== 'normal' && (
+                                <s className="rv-tachado">{moneda.format(r.producto.precio)}</s>
+                              )}
+                              <span className="rv-unitario">{moneda.format(r.precio)} c/u</span>
+
+                              {r.motivo === 'mayoreo' && <span className="rv-chip rv-chip--verde">Mayoreo</span>}
+                              {r.motivo === 'promo' && (
+                                <span className="rv-chip rv-chip--azul">Promo {etiquetaPromo(r.promo)}</span>
+                              )}
+                              {r.motivo === 'editado' && <span className="rv-chip rv-chip--gris">Precio editado</span>}
+
+                              <button
+                                type="button"
+                                className="rv-icono"
+                                onClick={() => empezarEdicion(r)}
+                                aria-label={`Editar precio de ${r.producto.nombre}`}
+                                title="Editar precio"
+                              >
+                                <Pencil size={13} />
+                              </button>
+
+                              {r.motivo === 'editado' && (
+                                <button type="button" className="rv-enlace" onClick={() => restablecerPrecio(r.id)}>
+                                  <RotateCcw size={12} aria-hidden="true" />
+                                  Restablecer
+                                </button>
+                              )}
+                            </>
                           )}
-                          {r.motivo === 'editado' && <span className="rv-chip rv-chip--gris">Precio editado</span>}
+                        </div>
+
+                        <div className="rv-renglon__acciones">
+                          {r.faltan && r.disponible > 0 && (
+                            <button
+                              type="button"
+                              className="rv-boton-chico"
+                              onClick={() => cambiarCantidad(r.id, r.disponible)}
+                            >
+                              Ajustar a {r.disponible}
+                            </button>
+                          )}
+
+                          <div className="rv-cantidad">
+                            <button
+                              type="button"
+                              onClick={() => cambiarCantidad(r.id, r.cantidad - 1)}
+                              disabled={r.cantidad <= 1}
+                              aria-label="Quitar una pieza"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              inputMode="numeric"
+                              value={r.cantidad}
+                              onChange={(e) => cambiarCantidad(r.id, parseInt(e.target.value, 10))}
+                              aria-label={`Cantidad de ${r.producto.nombre}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => cambiarCantidad(r.id, r.cantidad + 1)}
+                              aria-label="Agregar una pieza"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
 
                           <button
                             type="button"
-                            className="rv-icono"
-                            onClick={() => empezarEdicion(r)}
-                            aria-label={`Editar precio de ${r.producto.nombre}`}
-                            title="Editar precio"
+                            className="rv-icono rv-icono--borrar"
+                            onClick={() => quitar(r.id)}
+                            aria-label={`Quitar ${r.producto.nombre} del ticket`}
+                            title="Quitar del ticket"
                           >
-                            <Pencil size={13} />
+                            <Trash2 size={15} />
                           </button>
-
-                          {r.motivo === 'editado' && (
-                            <button type="button" className="rv-enlace" onClick={() => restablecerPrecio(r.id)}>
-                              <RotateCcw size={12} aria-hidden="true" />
-                              Restablecer
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    <div className="rv-renglon__acciones">
-                      {r.faltan && r.disponible > 0 && (
-                        <button
-                          type="button"
-                          className="rv-boton-chico"
-                          onClick={() => cambiarCantidad(r.id, r.disponible)}
-                        >
-                          Ajustar a {r.disponible}
-                        </button>
-                      )}
-
-                      <div className="rv-cantidad">
-                        <button
-                          type="button"
-                          onClick={() => cambiarCantidad(r.id, r.cantidad - 1)}
-                          disabled={r.cantidad <= 1}
-                          aria-label="Quitar una pieza"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          inputMode="numeric"
-                          value={r.cantidad}
-                          onChange={(e) => cambiarCantidad(r.id, parseInt(e.target.value, 10))}
-                          aria-label={`Cantidad de ${r.producto.nombre}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => cambiarCantidad(r.id, r.cantidad + 1)}
-                          aria-label="Agregar una pieza"
-                        >
-                          <Plus size={14} />
-                        </button>
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        className="rv-icono rv-icono--borrar"
-                        onClick={() => quitar(r.id)}
-                        aria-label={`Quitar ${r.producto.nombre} del ticket`}
-                        title="Quitar del ticket"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {r.faltan && (
+                        <p className="rv-renglon__error">
+                          <AlertTriangle size={13} aria-hidden="true" />
+                          {r.disponible === 0
+                            ? 'Ya no quedan piezas en inventario'
+                            : `Solo quedan ${r.disponible} en inventario`}
+                        </p>
+                      )}
+
+                      {!r.faltan && r.faltanMayoreo !== null && (
+                        <p className="rv-renglon__sugerencia">
+                          Lleva {r.faltanMayoreo} más y paga {moneda.format(r.precioMayoreo)} c/u
+                        </p>
+                      )}
                     </div>
-                  </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-                  {r.faltan && (
-                    <p className="rv-renglon__error">
-                      <AlertTriangle size={13} aria-hidden="true" />
-                      {r.disponible === 0
-                        ? 'Ya no quedan piezas en inventario'
-                        : `Solo quedan ${r.disponible} en inventario`}
-                    </p>
-                  )}
-
-                  {!r.faltan && r.faltanMayoreo !== null && (
-                    <p className="rv-renglon__sugerencia">
-                      Lleva {r.faltanMayoreo} más y paga {moneda.format(r.precioMayoreo)} c/u
-                    </p>
-                  )}
+            <div className="rv-cierre">
+              {hayErrores && (
+                <div className="rv-resumen__fila">
+                  <span>Subtotal de productos válidos</span>
+                  <span>{moneda.format(total)}</span>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
+              )}
 
-        {/* ============ CIERRE (TOTAL + BOTONES) ============ */}
-        <div className="rv-cierre">
-          {hayErrores && (
-            <div className="rv-resumen__fila">
-              <span>Subtotal de productos válidos</span>
-              <span>{moneda.format(total)}</span>
-            </div>
-          )}
+              <div className="rv-cierre__fila">
+                <div className="rv-resumen__total">
+                  <span>Total de la venta</span>
+                  <strong>{moneda.format(total)}</strong>
+                </div>
 
-          <div className="rv-cierre__fila">
-            <div className="rv-resumen__total">
-              <span>Total de la venta</span>
-              <strong>{moneda.format(total)}</strong>
-            </div>
+                <div className="rv-cierre__botones">
+                  <button
+                    type="button"
+                    className="rv-cancelar"
+                    disabled={ticket.length === 0}
+                    onClick={pedirCancelar}
+                  >
+                    <X size={15} aria-hidden="true" />
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="rv-confirmar"
+                    disabled={!puedeConfirmar}
+                    onClick={confirmarVenta}
+                  >
+                    {hayErrores ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
+                    Confirmar
+                  </button>
+                </div>
+              </div>
 
-            <div className="rv-cierre__botones">
-              <button
-                type="button"
-                className="rv-cancelar"
-                disabled={ticket.length === 0}
-                onClick={pedirCancelar}
-              >
-                <X size={15} aria-hidden="true" />
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="rv-confirmar"
-                disabled={!puedeConfirmar}
-                onClick={confirmarVenta}
-              >
-                {hayErrores ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
-                Confirmar
-              </button>
+              {hayErrores && (
+                <div className="rv-aviso-error" role="alert">
+                  <Lock size={15} aria-hidden="true" />
+                  <span>
+                    <strong>Venta pausada:</strong>{' '}
+                    {conError.length === 1
+                      ? `corrige la cantidad de ${conError[0].producto.nombre} para poder confirmar`
+                      : `corrige ${conError.length} productos para poder confirmar`}
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
-
-          {hayErrores && (
-            <div className="rv-aviso-error" role="alert">
-              <Lock size={15} aria-hidden="true" />
-              <span>
-                <strong>Venta pausada:</strong>{' '}
-                {conError.length === 1
-                  ? `corrige la cantidad de ${conError[0].producto.nombre} para poder confirmar`
-                  : `corrige ${conError.length} productos para poder confirmar`}
-              </span>
-            </div>
-          )}
-        </div>
-      </aside>
+          </aside>
+        </>
+      )}
 
       <ConfirmDialog
         open={dialogoCancelar}
