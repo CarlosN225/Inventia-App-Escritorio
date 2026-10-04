@@ -1,0 +1,74 @@
+/* ============ PANTALLA EN CONSTRUCCIÓN ============ */
+.obra {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+}
+
+.obra__tarjeta {
+  max-width: 440px;
+  padding: 40px 32px;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.obra__icono {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 14px;
+  background: #eef3fb;
+  color: #1668e3;
+}
+
+.obra__etiqueta {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.obra__titulo {
+  margin: 12px 0 6px;
+  color: #0b1220;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.obra__texto {
+  margin: 0 0 22px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.obra__boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #e6eaf0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0b1220;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.obra__boton:hover {
+  border-color: #c9d8ed;
+  color: #1668e3;
+}

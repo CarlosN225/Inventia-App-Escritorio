@@ -8,6 +8,13 @@ import Movimientos from './pages/Movimientos.jsx'
 import Alertas from './pages/Alertas.jsx'
 import Configuracion from './pages/Configuracion.jsx'
 import ProductoForm from './pages/ProductoForm.jsx'
+import EnConstruccion from './pages/EnConstruccion.jsx'
+import RegistrarVenta from './pages/RegistrarVenta.jsx'
+import RegistrarCompra from './pages/RegistrarCompra.jsx'
+import RegistrarMerma from './pages/RegistrarMerma.jsx'
+import CorreccionInventario from './pages/CorreccionInventario.jsx'
+import MiPerfil from './pages/MiPerfil.jsx'
+import Ayuda from './pages/Ayuda.jsx'
 
 export default function App() {
   return (
@@ -25,6 +32,12 @@ export default function App() {
           <Route path="/movimientos" element={<Movimientos />} />
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/registrar-venta" element={<RegistrarVenta />} />
+          <Route path="/registrar-compra" element={<RegistrarCompra />} />
+          <Route path="/registrar-merma" element={<RegistrarMerma />} />
+          <Route path="/correccion-inventario" element={<CorreccionInventario />} />
+          <Route path="/perfil" element={<MiPerfil />} />         
+          <Route path="/ayuda" element={<Ayuda />} />
         </Route>
       </Route>
 
