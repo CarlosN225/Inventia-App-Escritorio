@@ -1,21 +1,22 @@
+
 /* ============================================================
    DASHBOARD — Estilo Stitch (Linear/Vercel)
    ============================================================ */
 
 .dash {
-  --d-azul:        #1668e3;
-  --d-azul-2:      #2aa9e0;
-  --d-turquesa:    #22c5b8;
-  --d-marino:      #0b1220;
-  --d-gris:        #64748b;
-  --d-gris-2:      #94a3b8;
-  --d-gris-3:      #cbd5e1;
-  --d-borde:       #e6eaf0;
-  --d-borde-2:     #eef1f5;
-  --d-verde:       #14a06b;
-  --d-ambar:       #d97706;
-  --d-rojo:        #dc2626;
-  --d-vino:        #8a1f34;
+  --d-azul: #1668e3;
+  --d-azul-2: #2aa9e0;
+  --d-turquesa: #22c5b8;
+  --d-marino: #0b1220;
+  --d-gris: #64748b;
+  --d-gris-2: #94a3b8;
+  --d-gris-3: #cbd5e1;
+  --d-borde: #e6eaf0;
+  --d-borde-2: #eef1f5;
+  --d-verde: #14a06b;
+  --d-ambar: #d97706;
+  --d-rojo: #dc2626;
+  --d-vino: #8a1f34;
 
   display: flex;
   flex-direction: column;
@@ -24,6 +25,7 @@
 }
 
 /* ============ ENCABEZADO ============ */
+
 .dash-encabezado {
   display: flex;
   align-items: center;
@@ -40,6 +42,7 @@
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
+
 .dash-encabezado__subtitulo {
   margin: 4px 0 0;
   color: var(--d-gris);
@@ -47,6 +50,7 @@
 }
 
 /* ============ SEGMENTADO (pill sutil) ============ */
+
 .dash-segmentado {
   display: inline-flex;
   gap: 2px;
@@ -70,21 +74,30 @@
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }
-.dash-segmentado__opcion:hover { color: var(--d-marino); }
+
+.dash-segmentado__opcion:hover {
+  color: var(--d-marino);
+}
+
 .dash-segmentado__opcion.is-activo {
   background: #ffffff;
   color: var(--d-marino);
   box-shadow: 0 1px 2px rgba(11, 18, 32, 0.06);
 }
 
-.dash-segmentado--chico { padding: 2px; border-radius: 8px; }
+.dash-segmentado--chico {
+  padding: 2px;
+  border-radius: 8px;
+}
+
 .dash-segmentado--chico .dash-segmentado__opcion {
   padding: 5px 11px;
   border-radius: 6px;
   font-size: 12px;
 }
 
-/* ============ KPIs — franja horizontal con separadores ============ */
+/* ============ KPIs — FRANJA HORIZONTAL ============ */
+
 .dash-kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -94,6 +107,14 @@
   overflow: hidden;
 }
 
+/*
+   Cuando solo quedan 2 KPIs, se acomodan
+   automáticamente en dos columnas iguales.
+*/
+.dash-kpis:has(.dash-kpi:nth-child(2):last-child) {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .dash-kpi {
   display: flex;
   flex-direction: column;
@@ -101,7 +122,10 @@
   padding: 20px 22px;
   border-right: 1px solid var(--d-borde);
 }
-.dash-kpi:last-child { border-right: none; }
+
+.dash-kpi:last-child {
+  border-right: none;
+}
 
 .dash-kpi__fila {
   display: flex;
@@ -124,7 +148,10 @@
   cursor: help;
   transition: color 120ms ease;
 }
-.dash-kpi__info:hover { color: var(--d-gris); }
+
+.dash-kpi__info:hover {
+  color: var(--d-gris);
+}
 
 .dash-kpi__valor {
   margin: 0;
@@ -135,9 +162,18 @@
   color: var(--d-marino);
   font-variant-numeric: tabular-nums;
 }
-.dash-kpi__valor--verde { color: var(--d-verde); }
-.dash-kpi__valor--ambar { color: var(--d-ambar); }
-.dash-kpi__valor--rojo  { color: var(--d-rojo);  }
+
+.dash-kpi__valor--verde {
+  color: var(--d-verde);
+}
+
+.dash-kpi__valor--ambar {
+  color: var(--d-ambar);
+}
+
+.dash-kpi__valor--rojo {
+  color: var(--d-rojo);
+}
 
 .dash-kpi__nota {
   display: flex;
@@ -148,12 +184,21 @@
   font-size: 12.5px;
   line-height: 1.4;
 }
-.dash-kpi__nota svg { flex-shrink: 0; }
 
-.dash-icono--ambar { color: var(--d-ambar); }
-.dash-icono--rojo  { color: var(--d-rojo);  }
+.dash-kpi__nota svg {
+  flex-shrink: 0;
+}
+
+.dash-icono--ambar {
+  color: var(--d-ambar);
+}
+
+.dash-icono--rojo {
+  color: var(--d-rojo);
+}
 
 /* Pastilla sutil (KPI ganancia) */
+
 .dash-pastilla {
   display: inline-flex;
   align-items: center;
@@ -165,6 +210,7 @@
   font-weight: 700;
   letter-spacing: 0.01em;
 }
+
 .dash-pastilla--verde {
   background: #e4f7ef;
   color: var(--d-verde);
@@ -172,13 +218,23 @@
 }
 
 /* ============ FILAS ============ */
+
 .dash-fila {
   display: grid;
   grid-template-columns: 1.55fr 1fr;
   gap: 20px;
 }
 
-/* ============ PANELES (reemplazan a las "tarjetas") ============ */
+/*
+   Si una fila tiene solamente una tarjeta,
+   ocupa todo el ancho disponible.
+*/
+.dash-fila > .dash-tarjeta:only-child {
+  grid-column: 1 / -1;
+}
+
+/* ============ PANELES ============ */
+
 .dash-tarjeta {
   min-width: 0;
   padding: 20px 22px;
@@ -230,6 +286,7 @@
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }
+
 .dash-enlace:hover {
   background: #eef3fb;
   color: var(--d-azul);
@@ -245,6 +302,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
 .dash-leyenda__punto {
   width: 8px;
   height: 8px;
@@ -260,6 +318,7 @@
   position: relative;
   flex-shrink: 0;
 }
+
 .dash-punto-rojo::after {
   content: '';
   position: absolute;
@@ -271,11 +330,13 @@
 }
 
 /* ============ GRÁFICA ============ */
+
 .dash-chart {
   display: flex;
   gap: 14px;
   padding-top: 20px;
 }
+
 .dash-chart__eje {
   display: flex;
   flex-direction: column;
@@ -288,31 +349,40 @@
   font-weight: 500;
   text-align: right;
 }
+
 .dash-chart__area {
   position: relative;
   flex: 1;
 }
+
 .dash-chart__rejilla {
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 204px;
 }
+
 .dash-chart__linea {
   position: absolute;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   border-top: 1px dashed #e8edf3;
 }
+
 .dash-chart__barras {
   position: relative;
   display: flex;
   gap: 16px;
 }
+
 .dash-chart__columna {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: center;
 }
+
 .dash-chart__pista {
   display: flex;
   align-items: flex-end;
@@ -320,6 +390,7 @@
   width: 100%;
   height: 204px;
 }
+
 .dash-chart__barra {
   position: relative;
   width: min(36px, 60%);
@@ -327,12 +398,15 @@
   background: linear-gradient(180deg, #bfe4f2, #a4d8ee);
   transition: height 320ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .dash-chart__barra.is-max {
   background: linear-gradient(180deg, #2aa9e0, #1668e3);
 }
+
 .dash-chart__barra.is-hoy {
   background: linear-gradient(180deg, #7ce7d8, #22c5b8);
 }
+
 .dash-chart__valor {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -347,26 +421,31 @@
   transform: translateX(-50%);
   font-variant-numeric: tabular-nums;
 }
+
 .dash-chart__valor::after {
   content: '';
   position: absolute;
-  top: 100%; left: 50%;
+  top: 100%;
+  left: 50%;
   transform: translateX(-50%);
   border: 3px solid transparent;
   border-top-color: var(--d-marino);
 }
+
 .dash-chart__dia {
   margin-top: 10px;
   color: var(--d-gris);
   font-size: 12px;
   font-weight: 500;
 }
+
 .dash-chart__dia.is-max {
   color: var(--d-azul);
   font-weight: 700;
 }
 
 /* ============ TOP PRODUCTOS ============ */
+
 .dash-top {
   display: flex;
   flex-direction: column;
@@ -383,8 +462,14 @@
   padding: 11px 0;
   border-bottom: 1px solid var(--d-borde-2);
 }
-.dash-top__item:last-child { border-bottom: none; }
-.dash-top__item:first-child { padding-top: 0; }
+
+.dash-top__item:last-child {
+  border-bottom: none;
+}
+
+.dash-top__item:first-child {
+  padding-top: 0;
+}
 
 .dash-top__posicion {
   display: grid;
@@ -404,6 +489,7 @@
   flex: 1;
   min-width: 0;
 }
+
 .dash-top__fila {
   display: flex;
   justify-content: space-between;
@@ -411,6 +497,7 @@
   gap: 8px;
   margin-bottom: 6px;
 }
+
 .dash-top__nombre {
   overflow: hidden;
   font-size: 13.5px;
@@ -418,6 +505,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .dash-top__piezas {
   font-size: 12.5px;
   font-weight: 600;
@@ -445,6 +533,7 @@
 }
 
 /* ============ PLACEHOLDER DE PRODUCTO ============ */
+
 .dash-placeholder {
   display: grid;
   place-items: center;
@@ -455,6 +544,7 @@
   color: var(--d-azul);
   flex-shrink: 0;
 }
+
 .dash-placeholder--chico {
   width: 26px;
   height: 26px;
@@ -462,14 +552,17 @@
 }
 
 /* ============ TABLA MOVIMIENTOS ============ */
+
 .dash-tabla-contenedor {
   overflow-x: auto;
 }
+
 .dash-tabla {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
+
 .dash-tabla th {
   padding: 10px 14px;
   background: transparent;
@@ -482,7 +575,10 @@
   white-space: nowrap;
   border-bottom: 1px solid var(--d-borde);
 }
-.dash-tabla th.is-der { text-align: right; }
+
+.dash-tabla th.is-der {
+  text-align: right;
+}
 
 .dash-tabla td {
   padding: 12px 14px;
@@ -491,21 +587,40 @@
   color: var(--d-marino);
   font-size: 13.5px;
 }
-.dash-tabla tr:last-child td { border-bottom: none; }
 
-.dash-tabla tbody tr { transition: background 120ms ease; }
-.dash-tabla tbody tr:hover { background: #f8fafc; }
+.dash-tabla tr:last-child td {
+  border-bottom: none;
+}
 
-.dash-tabla .is-der { text-align: right; }
+.dash-tabla tbody tr {
+  transition: background 120ms ease;
+}
+
+.dash-tabla tbody tr:hover {
+  background: #f8fafc;
+}
+
+.dash-tabla .is-der {
+  text-align: right;
+}
 
 .dash-tabla__cantidad {
   font-size: 13.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.dash-tabla__cantidad.is-suma   { color: #059669; }
-.dash-tabla__cantidad.is-resta  { color: var(--d-vino); }
-.dash-tabla__cantidad.is-neutra { color: #374151; }
+
+.dash-tabla__cantidad.is-suma {
+  color: #059669;
+}
+
+.dash-tabla__cantidad.is-resta {
+  color: var(--d-vino);
+}
+
+.dash-tabla__cantidad.is-neutra {
+  color: #374151;
+}
 
 .dash-tabla__producto {
   display: flex;
@@ -513,12 +628,14 @@
   gap: 10px;
   font-weight: 600;
 }
+
 .dash-tabla__tiempo {
   color: var(--d-gris);
   font-weight: 500;
 }
 
-/* Chips de tipo (más sutiles) */
+/* Chips de tipo */
+
 .dash-tipo {
   display: inline-block;
   padding: 3px 9px;
@@ -528,12 +645,33 @@
   letter-spacing: 0.02em;
   border: 1px solid transparent;
 }
-.dash-tipo--venta      { background: #e6f2fc; color: #0369a1; border-color: #c9e4f8; }
-.dash-tipo--compra     { background: #e4f7ef; color: #047857; border-color: #b8e6d1; }
-.dash-tipo--merma      { background: #fdecec; color: #b91c1c; border-color: #f7c9c9; }
-.dash-tipo--correccion { background: #eceefe; color: #4338ca; border-color: #c7d2fe; }
 
-/* ============ AVISOS (Requiere tu atención) — estilo lista ============ */
+.dash-tipo--venta {
+  background: #e6f2fc;
+  color: #0369a1;
+  border-color: #c9e4f8;
+}
+
+.dash-tipo--compra {
+  background: #e4f7ef;
+  color: #047857;
+  border-color: #b8e6d1;
+}
+
+.dash-tipo--merma {
+  background: #fdecec;
+  color: #b91c1c;
+  border-color: #f7c9c9;
+}
+
+.dash-tipo--correccion {
+  background: #eceefe;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+/* ============ AVISOS ============ */
+
 .dash-avisos {
   display: flex;
   flex-direction: column;
@@ -551,10 +689,17 @@
   border-bottom: 1px solid var(--d-borde-2);
   transition: background 120ms ease;
 }
-.dash-aviso:last-child { border-bottom: none; }
-.dash-aviso:first-child { padding-top: 0; }
+
+.dash-aviso:last-child {
+  border-bottom: none;
+}
+
+.dash-aviso:first-child {
+  padding-top: 0;
+}
 
 /* Icono cuadrado sutil */
+
 .dash-aviso__icono {
   display: grid;
   place-items: center;
@@ -563,11 +708,13 @@
   border-radius: 7px;
   flex-shrink: 0;
 }
+
 .dash-aviso--stock .dash-aviso__icono,
 .dash-aviso--caducidad .dash-aviso__icono {
   background: #fef3c7;
   color: #b45309;
 }
+
 .dash-aviso--urgente .dash-aviso__icono {
   background: #fdecec;
   color: var(--d-rojo);
@@ -595,11 +742,18 @@
   font-weight: 500;
   color: var(--d-gris);
 }
+
 .dash-aviso--stock .dash-aviso__detalle,
-.dash-aviso--caducidad .dash-aviso__detalle { color: #b45309; }
-.dash-aviso--urgente .dash-aviso__detalle   { color: #b91c1c; }
+.dash-aviso--caducidad .dash-aviso__detalle {
+  color: #b45309;
+}
+
+.dash-aviso--urgente .dash-aviso__detalle {
+  color: #b91c1c;
+}
 
 /* Botón fantasma */
+
 .dash-boton-chico {
   padding: 5px 11px;
   border: 1px solid var(--d-borde);
@@ -611,8 +765,12 @@
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
+
 .dash-boton-chico:hover {
   color: var(--d-azul);
   border-color: #c9d8ed;
@@ -620,21 +778,49 @@
 }
 
 /* ============ RESPONSIVE ============ */
+
 @media (max-width: 1280px) {
-  .dash-kpis { grid-template-columns: repeat(2, 1fr); }
-  .dash-kpi:nth-child(2) { border-right: none; }
+
+  .dash-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dash-kpi:nth-child(2) {
+    border-right: none;
+  }
+
   .dash-kpi:nth-child(1),
-  .dash-kpi:nth-child(2) { border-bottom: 1px solid var(--d-borde); }
-  .dash-fila { grid-template-columns: 1fr; }
+  .dash-kpi:nth-child(2) {
+    border-bottom: 1px solid var(--d-borde);
+  }
+
+  .dash-fila {
+    grid-template-columns: 1fr;
+  }
 }
+
 @media (max-width: 640px) {
-  .dash-kpis { grid-template-columns: 1fr; }
-  .dash-kpi { border-right: none; border-bottom: 1px solid var(--d-borde); }
-  .dash-kpi:last-child { border-bottom: none; }
-  .dash-encabezado { align-items: flex-start; }
+
+  .dash-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-kpi {
+    border-right: none;
+    border-bottom: 1px solid var(--d-borde);
+  }
+
+  .dash-kpi:last-child {
+    border-bottom: none;
+  }
+
+  .dash-encabezado {
+    align-items: flex-start;
+  }
 }
 
 /* ============ EMPTY STATES ============ */
+
 .dash-vacio {
   display: flex;
   flex-direction: column;
@@ -676,3 +862,4 @@
 .dash-vacio .dash-boton-chico {
   margin-top: 8px;
 }
+

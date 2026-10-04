@@ -21,6 +21,7 @@ import {
   PackageOpen,
 } from 'lucide-react'
 
+import { getUsuarioActual } from '../services/auth'
 import '../styles/catalogo.css'
 
 /* ============================================================
@@ -98,6 +99,16 @@ function Caducidad({ producto }) {
 
 export default function Catalogo() {
   const navigate = useNavigate()
+
+  const [usuarioActual, setUsuarioActual] = useState(null)
+
+  useEffect(() => {
+    getUsuarioActual()
+      .then(setUsuarioActual)
+      .catch(() => setUsuarioActual(null))
+  }, [])
+
+  const esPropietario = usuarioActual?.rol === 'propietario'
 
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState('Todas')
@@ -234,7 +245,7 @@ export default function Catalogo() {
           </div>
         </div>
 
-        {!sinProductos && (
+        {!sinProductos && esPropietario && (
           <button
             type="button"
             className="cat-boton-primario"
@@ -340,16 +351,20 @@ export default function Catalogo() {
             </span>
             <p className="cat-vacio-estado__titulo">Aún no tienes productos</p>
             <p className="cat-vacio-estado__texto">
-              Agrega tu primer producto para empezar a controlar tu inventario.
+              {esPropietario
+                ? 'Agrega tu primer producto para empezar a controlar tu inventario.'
+                : 'Pídele al propietario que agregue los productos del negocio.'}
             </p>
-            <button
-              type="button"
-              className="cat-boton-primario"
-              onClick={() => navigate('/catalogo/nuevo')}
-            >
-              <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
-              Nuevo producto
-            </button>
+            {esPropietario && (
+              <button
+                type="button"
+                className="cat-boton-primario"
+                onClick={() => navigate('/catalogo/nuevo')}
+              >
+                <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+                Nuevo producto
+              </button>
+            )}
           </div>
         ) : sinResultados ? (
           /* --- Sin resultados por filtros --- */
@@ -374,8 +389,8 @@ export default function Catalogo() {
                 <th>Producto</th>
                 <th>Categoría</th>
                 <th className="is-der">Precio</th>
-                <th className="is-der">Último costo</th>
-                <th className="is-der">Margen</th>
+                {esPropietario && <th className="is-der">Último costo</th>}
+                {esPropietario && <th className="is-der">Margen</th>}
                 <th>Stock</th>
                 <th>Caducidad</th>
                 <th className="is-der">Acciones</th>
@@ -405,8 +420,12 @@ export default function Catalogo() {
                       <span className="cat-chip">{p.categoria}</span>
                     </td>
                     <td className="is-der cat-precio">{moneda.format(p.precio)}</td>
-                    <td className="is-der cat-costo">{moneda.format(p.costo)}</td>
-                    <td className={'is-der cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}%</td>
+                    {esPropietario && (
+                      <td className="is-der cat-costo">{moneda.format(p.costo)}</td>
+                    )}
+                    {esPropietario && (
+                      <td className={'is-der cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}%</td>
+                    )}
                     <td>
                       <PastillaStock producto={p} />
                     </td>
@@ -415,15 +434,17 @@ export default function Catalogo() {
                     </td>
                     <td className="is-der">
                       <div className="cat-acciones" ref={menuAbierto === p.id ? menuRef : null}>
-                        <button
-                          type="button"
-                          className="cat-icono-boton"
-                          title="Editar"
-                          aria-label={`Editar ${p.nombre}`}
-                          onClick={() => irAEditar(p.id)}
-                        >
-                          <Pencil size={16} />
-                        </button>
+                        {esPropietario && (
+                          <button
+                            type="button"
+                            className="cat-icono-boton"
+                            title="Editar"
+                            aria-label={`Editar ${p.nombre}`}
+                            onClick={() => irAEditar(p.id)}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="cat-icono-boton"
@@ -437,24 +458,28 @@ export default function Catalogo() {
 
                         {menuAbierto === p.id && (
                           <div className={'cat-menu' + (abreArriba ? ' cat-menu--arriba' : '')} role="menu">
-                            <button type="button" role="menuitem" onClick={() => irAEditar(p.id)}>
-                              <Pencil size={14} aria-hidden="true" />
-                              Editar producto
-                            </button>
+                            {esPropietario && (
+                              <button type="button" role="menuitem" onClick={() => irAEditar(p.id)}>
+                                <Pencil size={14} aria-hidden="true" />
+                                Editar producto
+                              </button>
+                            )}
                             <button type="button" role="menuitem" onClick={() => navigate('/movimientos')}>
                               <History size={14} aria-hidden="true" />
                               Ver movimientos
                             </button>
                             {/* TODO: conectar con el backend (desactivar, no borrar) */}
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="is-peligro"
-                              onClick={() => setMenuAbierto(null)}
-                            >
-                              <EyeOff size={14} aria-hidden="true" />
-                              Desactivar
-                            </button>
+                            {esPropietario && (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="is-peligro"
+                                onClick={() => setMenuAbierto(null)}
+                              >
+                                <EyeOff size={14} aria-hidden="true" />
+                                Desactivar
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -486,7 +511,9 @@ export default function Catalogo() {
 
                   <div className="cat-tarjeta__precio">
                     <span className="cat-precio">{moneda.format(p.precio)}</span>
-                    <span className={'cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}% margen</span>
+                    {esPropietario && (
+                      <span className={'cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}% margen</span>
+                    )}
                   </div>
 
                   <div className="cat-tarjeta__pie">
@@ -494,10 +521,12 @@ export default function Catalogo() {
                     {porCaducar(p) && <Caducidad producto={p} />}
                   </div>
 
-                  <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
-                    <Pencil size={14} aria-hidden="true" />
-                    Editar
-                  </button>
+                  {esPropietario && (
+                    <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
+                      <Pencil size={14} aria-hidden="true" />
+                      Editar
+                    </button>
+                  )}
                 </article>
               )
             })}
