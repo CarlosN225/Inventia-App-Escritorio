@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -26,16 +25,22 @@ import {
   ShieldCheck,
   RefreshCw,
   ArrowLeft,
+  Edit,
+  Trash2,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+
 import {
   getUsuarioActual,
   listarUsuarios,
   registrarUsuario,
   cambiarEstadoUsuario,
   restablecerContrasena,
+  editarUsuario,
+  eliminarUsuario,
 } from '../services/auth'
+
 import '../styles/configuracion.css'
 
 /* ============================================================
@@ -48,6 +53,7 @@ const AJUSTES_INICIALES = {
     direccion: '',
     telefono: '',
   },
+
   preferencias: {
     maneja_caducidad: true,
     vende_mayoreo: false,
@@ -55,6 +61,7 @@ const AJUSTES_INICIALES = {
     usa_codigo_barras: false,
     alertas_activas: false,
   },
+
   whatsapp: {
     numero: '',
     hora: '20:00',
@@ -188,17 +195,25 @@ const PERMISOS = [
   },
 ]
 
-/* ============ Utilidades ============ */
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
 
 function soloDigitos(texto) {
-  return texto.replace(/\D/g, '')
+  return String(texto ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 10)
 }
 
 function iniciales(nombre) {
   const partes = (nombre ?? '').trim().split(/\s+/)
+
   const primera = partes[0]?.[0] ?? ''
+
   const ultima =
-    partes.length > 1 ? partes[partes.length - 1][0] : ''
+    partes.length > 1
+      ? partes[partes.length - 1][0]
+      : ''
 
   return (primera + ultima).toUpperCase() || '?'
 }
@@ -218,13 +233,60 @@ function generarContrasena() {
   return Array.from(
     { length: 8 },
     () =>
-      caracteres[Math.floor(Math.random() * caracteres.length)]
+      caracteres[
+        Math.floor(
+          Math.random() * caracteres.length
+        )
+      ]
   ).join('')
 }
 
 function correoValido(correo) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)
 }
+
+/*
+ * Convierte los errores del backend en mensajes
+ * entendibles para el usuario.
+ */
+function obtenerMensajeError(
+  error,
+  mensajePorDefecto
+) {
+  const mensaje =
+    error?.response?.data?.correo?.[0] ||
+    error?.response?.data?.detail ||
+    error?.response?.data?.error ||
+    mensajePorDefecto
+
+  const texto = String(mensaje)
+
+  const textoNormalizado =
+    texto.toLowerCase()
+
+  if (
+    textoNormalizado.includes(
+      'already exists'
+    ) ||
+    textoNormalizado.includes(
+      'ya existe'
+    ) ||
+    textoNormalizado.includes(
+      'ya está registrado'
+    ) ||
+    textoNormalizado.includes(
+      'unique'
+    )
+  ) {
+    return 'Ese correo ya está registrado'
+  }
+
+  return texto
+}
+
+/* ============================================================
+   INTERRUPTOR
+   ============================================================ */
 
 function Interruptor({
   encendido,
@@ -239,39 +301,111 @@ function Interruptor({
       aria-checked={encendido}
       aria-label={etiqueta}
       disabled={deshabilitado}
-      className={'cf-switch' + (encendido ? ' is-on' : '')}
+      className={
+        'cf-switch' +
+        (encendido ? ' is-on' : '')
+      }
       onClick={onCambiar}
     />
   )
 }
 
-/* ============ Pantalla ============ */
+/* ============================================================
+   PANTALLA
+   ============================================================ */
 
 export default function Configuracion() {
-  console.log('CONFIGURACION.JSX SE ESTA EJECUTANDO')
   const navigate = useNavigate()
 
-  const [usuarioActual, setUsuarioActual] = useState(null)
-  const [cargando, setCargando] = useState(true)
+  const [usuarioActual, setUsuarioActual] =
+    useState(null)
 
-  const [seccion, setSeccion] = useState('preferencias')
+  const [cargando, setCargando] =
+    useState(true)
 
-  const [ajustes, setAjustes] = useState(AJUSTES_INICIALES)
-  const [guardados, setGuardados] = useState(AJUSTES_INICIALES)
+  const [seccion, setSeccion] =
+    useState('preferencias')
 
-  const [ultimoGuardado, setUltimoGuardado] = useState(null)
-  const [aviso, setAviso] = useState(null)
+  const [ajustes, setAjustes] =
+    useState(AJUSTES_INICIALES)
 
-  const [usuarios, setUsuarios] = useState(USUARIOS_INICIALES)
+  const [guardados, setGuardados] =
+    useState(AJUSTES_INICIALES)
 
-  const [nuevo, setNuevo] = useState(null)
-  const [intentoNuevo, setIntentoNuevo] = useState(false)
+  const [ultimoGuardado, setUltimoGuardado] =
+    useState(null)
 
-  const [restablecer, setRestablecer] = useState(null)
+  const [aviso, setAviso] =
+    useState(null)
 
-  const [enLinea, setEnLinea] = useState(navigator.onLine)
+  const [usuarios, setUsuarios] =
+    useState(USUARIOS_INICIALES)
 
-  /* ---------- Usuario actual ---------- */
+  const [nuevo, setNuevo] =
+    useState(null)
+
+  const [intentoNuevo, setIntentoNuevo] =
+    useState(false)
+
+  const [restablecer, setRestablecer] =
+    useState(null)
+
+  const [editar, setEditar] =
+    useState(null)
+
+  const [intentoEditar, setIntentoEditar] =
+    useState(false)
+
+  const [confirmarBaja, setConfirmarBaja] =
+    useState(null)
+
+  const [confirmarEliminar, setConfirmarEliminar] =
+    useState(null)
+
+  /*
+   * Recuerda la preferencia de mostrar inactivos.
+   *
+   * IMPORTANTE:
+   * Aquí NO guardamos usuarios.
+   * Los usuarios siempre vienen de la BD.
+   */
+  const [mostrarInactivos, setMostrarInactivos] =
+    useState(() => {
+      try {
+        return (
+          localStorage.getItem(
+            'inventia_mostrar_inactivos'
+          ) === 'true'
+        )
+      } catch {
+        return false
+      }
+    })
+
+  const [menuUsuarioAbierto, setMenuUsuarioAbierto] =
+    useState(null)
+
+  const [enLinea, setEnLinea] =
+    useState(navigator.onLine)
+
+  /* ============================================================
+     GUARDAR PREFERENCIA DE INACTIVOS
+     ============================================================ */
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'inventia_mostrar_inactivos',
+        String(mostrarInactivos)
+      )
+    } catch {
+      // No hacemos nada si localStorage no está disponible.
+    }
+  }, [mostrarInactivos])
+
+  /* ============================================================
+     USUARIO ACTUAL
+     ============================================================ */
 
   useEffect(() => {
     getUsuarioActual()
@@ -280,67 +414,135 @@ export default function Configuracion() {
       .finally(() => setCargando(false))
   }, [])
 
-  /* ---------- Cargar usuarios desde backend ---------- */
+  /* ============================================================
+     CARGAR USUARIOS
+     ============================================================ */
 
   useEffect(() => {
-  console.log('SECCION:', seccion)
-  console.log('USUARIO ACTUAL:', usuarioActual)
-  console.log('ROL:', usuarioActual?.rol)
+    if (
+      seccion !== 'usuarios' ||
+      usuarioActual?.rol !== 'propietario'
+    ) {
+      return
+    }
 
-  if (
-    seccion !== 'usuarios' ||
-    usuarioActual?.rol !== 'propietario'
-  ) {
-    return
-  }
+    /*
+     * false = solo usuarios activos
+     * true  = usuarios activos + inactivos
+     *
+     * Los usuarios siempre vienen de la BD.
+     */
+    listarUsuarios(mostrarInactivos)
+      .then((data) => {
+        const usuariosFormateados =
+          Array.isArray(data)
+            ? data.map((u) => ({
+                id: u.id,
+                nombre: u.nombre_completo,
+                correo: u.correo,
+                rol: u.rol,
+                activo: u.activo,
+                telefono_whatsapp:
+                  u.telefono_whatsapp ?? '',
+              }))
+            : []
 
-  console.log('CARGANDO USUARIOS...')
-
-  listarUsuarios()
-    .then((data) => {
-      console.log('USUARIOS RECIBIDOS:', data)
-
-      const usuariosFormateados = data.map((u) => ({
-        id: u.id,
-        nombre: u.nombre_completo,
-        correo: u.correo,
-        rol: u.rol,
-        activo: u.activo,
-      }))
-
-      setUsuarios(usuariosFormateados)
-    })
-    .catch((error) => {
-      console.error(
-        'ERROR AL CARGAR USUARIOS:',
-        error
-      )
-
-      setAviso({
-        texto: 'No se pudieron cargar los usuarios',
+        setUsuarios(
+          usuariosFormateados
+        )
       })
-    })
-}, [seccion, usuarioActual])
-  /* ---------- Estado de conexión ---------- */
+      .catch((error) => {
+        console.error(
+          'ERROR AL CARGAR USUARIOS:',
+          error
+        )
+
+        setAviso({
+          tipo: 'error',
+          texto:
+            'No se pudieron cargar los usuarios',
+        })
+      })
+  }, [
+    seccion,
+    usuarioActual,
+    mostrarInactivos,
+  ])
+
+  /* ============================================================
+     CERRAR MENÚ DE TRES PUNTOS AL HACER CLIC AFUERA
+     ============================================================ */
 
   useEffect(() => {
-    const conectado = () => setEnLinea(true)
-    const desconectado = () => setEnLinea(false)
+    function cerrarMenu(event) {
+      if (
+        !event.target.closest(
+          '.cf-menu-acciones-usuario'
+        )
+      ) {
+        setMenuUsuarioAbierto(null)
+      }
+    }
 
-    window.addEventListener('online', conectado)
-    window.addEventListener('offline', desconectado)
+    document.addEventListener(
+      'mousedown',
+      cerrarMenu
+    )
 
     return () => {
-      window.removeEventListener('online', conectado)
-      window.removeEventListener('offline', desconectado)
+      document.removeEventListener(
+        'mousedown',
+        cerrarMenu
+      )
     }
   }, [])
 
-  /* ---------- Ajustes ---------- */
+  /* ============================================================
+     ESTADO DE CONEXIÓN
+     ============================================================ */
 
-  function cambiar(grupo, campo, valor) {
+  useEffect(() => {
+    const conectado = () =>
+      setEnLinea(true)
+
+    const desconectado = () =>
+      setEnLinea(false)
+
+    window.addEventListener(
+      'online',
+      conectado
+    )
+
+    window.addEventListener(
+      'offline',
+      desconectado
+    )
+
+    return () => {
+      window.removeEventListener(
+        'online',
+        conectado
+      )
+
+      window.removeEventListener(
+        'offline',
+        desconectado
+      )
+    }
+  }, [])
+
+  /* ============================================================
+     AJUSTES
+     ============================================================ */
+
+  function cambiar(
+    grupo,
+    campo,
+    valor
+  ) {
     setAjustes((a) => ({
       ...a,
+
       [grupo]: {
         ...a[grupo],
         [campo]: valor,
@@ -349,39 +551,49 @@ export default function Configuracion() {
   }
 
   const hayCambios =
-    JSON.stringify(ajustes) !== JSON.stringify(guardados)
+    JSON.stringify(ajustes) !==
+    JSON.stringify(guardados)
 
   const errores = {}
 
   if (!ajustes.negocio.nombre.trim()) {
-    errores.nombre = 'Escribe el nombre de tu negocio'
+    errores.nombre =
+      'Escribe el nombre de tu negocio'
   }
 
   if (
     ajustes.negocio.telefono &&
-    soloDigitos(ajustes.negocio.telefono).length !== 10
+    soloDigitos(
+      ajustes.negocio.telefono
+    ).length !== 10
   ) {
-    errores.telefono = 'Deben ser 10 dígitos'
+    errores.telefono =
+      'Deben ser 10 dígitos'
   }
 
   if (
-    ajustes.preferencias.alertas_activas &&
-    soloDigitos(ajustes.whatsapp.numero).length !== 10
+    ajustes.preferencias
+      .alertas_activas &&
+    soloDigitos(
+      ajustes.whatsapp.numero
+    ).length !== 10
   ) {
-    errores.numero = 'Escribe un WhatsApp de 10 dígitos'
+    errores.numero =
+      'Escribe un WhatsApp de 10 dígitos'
   }
 
-  const hayErrores = Object.keys(errores).length > 0
+  const hayErrores =
+    Object.keys(errores).length > 0
 
   function guardar() {
     if (hayErrores) return
 
-    // TODO: mandar los ajustes al backend
     setGuardados(ajustes)
 
     setUltimoGuardado({
       hora: horaActual(),
-      nombre: usuarioActual?.nombre_completo ?? '',
+      nombre:
+        usuarioActual?.nombre_completo ?? '',
     })
 
     setAviso({
@@ -393,17 +605,22 @@ export default function Configuracion() {
     setAjustes(guardados)
   }
 
-  const activas = Object.values(
-    ajustes.preferencias
-  ).filter(Boolean).length
+  const activas =
+    Object.values(
+      ajustes.preferencias
+    ).filter(Boolean).length
 
-  /* ---------- Usuarios ---------- */
+  /* ============================================================
+     NUEVO USUARIO
+     ============================================================ */
 
   function abrirNuevo() {
     setNuevo({
       nombre: '',
       correo: '',
-      contrasena: generarContrasena(),
+      telefono_whatsapp: '',
+      contrasena:
+        generarContrasena(),
     })
 
     setIntentoNuevo(false)
@@ -413,23 +630,59 @@ export default function Configuracion() {
 
   if (nuevo) {
     if (!nuevo.nombre.trim()) {
-      erroresNuevo.nombre = 'Escribe su nombre'
+      erroresNuevo.nombre =
+        'Escribe su nombre'
     }
 
-    if (!correoValido(nuevo.correo.trim())) {
-      erroresNuevo.correo = 'Escribe un correo válido'
+    const correoNuevo =
+      nuevo.correo
+        .trim()
+        .toLowerCase()
+
+    if (!correoNuevo) {
+      erroresNuevo.correo =
+        'Escribe un correo'
+    } else if (
+      !correoValido(
+        correoNuevo
+      )
+    ) {
+      erroresNuevo.correo =
+        'Escribe un correo válido'
     } else if (
       usuarios.some(
         (u) =>
-          u.correo ===
-          nuevo.correo.trim().toLowerCase()
+          (u.correo ?? '')
+            .trim()
+            .toLowerCase() ===
+          correoNuevo
       )
     ) {
       erroresNuevo.correo =
         'Ese correo ya está registrado'
     }
 
-    if (nuevo.contrasena.length < 6) {
+    const telefonoNuevo =
+      soloDigitos(
+        nuevo.telefono_whatsapp
+      )
+
+    if (!telefonoNuevo) {
+      erroresNuevo.telefono_whatsapp =
+        'Escribe un número de WhatsApp'
+    } else if (
+      telefonoNuevo.length !== 10
+    ) {
+      erroresNuevo.telefono_whatsapp =
+        'El número debe tener 10 dígitos'
+    }
+
+    if (!nuevo.contrasena.trim()) {
+      erroresNuevo.contrasena =
+        'La contraseña es obligatoria'
+    } else if (
+      nuevo.contrasena.length < 6
+    ) {
       erroresNuevo.contrasena =
         'Mínimo 6 caracteres'
     }
@@ -438,38 +691,62 @@ export default function Configuracion() {
   async function agregarEncargado() {
     setIntentoNuevo(true)
 
-    if (Object.keys(erroresNuevo).length > 0) {
+    if (
+      Object.keys(erroresNuevo)
+        .length > 0
+    ) {
       return
     }
 
     const correo =
-      nuevo.correo.trim().toLowerCase()
+      nuevo.correo
+        .trim()
+        .toLowerCase()
+
+    const telefono =
+      soloDigitos(
+        nuevo.telefono_whatsapp
+      )
 
     try {
-      const data = await registrarUsuario({
-        nombre_completo: nuevo.nombre.trim(),
-        correo: correo,
-        contrasena: nuevo.contrasena,
-        telefono_whatsapp: '',
-      })
+      const data =
+        await registrarUsuario({
+          nombre_completo:
+            nuevo.nombre.trim(),
+
+          correo,
+
+          contrasena:
+            nuevo.contrasena,
+
+          telefono_whatsapp:
+            telefono,
+        })
 
       setUsuarios((lista) => [
         ...lista,
+
         {
           id: data.id,
-          nombre: data.nombre_completo,
+          nombre:
+            data.nombre_completo,
           correo: data.correo,
           rol: data.rol,
           activo: data.activo,
+          telefono_whatsapp:
+            data.telefono_whatsapp ??
+            telefono,
         },
       ])
 
       setAviso({
         texto: `${nuevo.nombre.trim()} ya puede entrar con ${correo} y la contraseña`,
-        codigo: nuevo.contrasena,
+        codigo:
+          nuevo.contrasena,
       })
 
       setNuevo(null)
+      setIntentoNuevo(false)
     } catch (error) {
       console.error(
         'Error al registrar usuario:',
@@ -477,61 +754,346 @@ export default function Configuracion() {
       )
 
       const mensaje =
-        error.response?.data?.correo?.[0] ||
-        error.response?.data?.detail ||
-        'No se pudo registrar el usuario'
+        obtenerMensajeError(
+          error,
+          'No se pudo registrar el usuario'
+        )
 
       setAviso({
+        tipo: 'error',
         texto: mensaje,
       })
     }
   }
 
-  async function alternarActivo(usuario) {
-    try {
-      const data = await cambiarEstadoUsuario(
-        usuario.id,
-        !usuario.activo
+  /* ============================================================
+     EDITAR USUARIO
+     ============================================================ */
+
+  function abrirEditar(usuario) {
+    if (
+      usuario.rol ===
+      'propietario'
+    ) {
+      return
+    }
+
+    setEditar({
+      id: usuario.id,
+
+      nombre:
+        usuario.nombre ?? '',
+
+      correo:
+        usuario.correo ?? '',
+
+      telefono_whatsapp:
+        soloDigitos(
+          usuario.telefono_whatsapp ?? ''
+        ),
+    })
+
+    setIntentoEditar(false)
+    setMenuUsuarioAbierto(null)
+  }
+
+  const erroresEditar = {}
+
+  if (editar) {
+    if (!editar.nombre.trim()) {
+      erroresEditar.nombre =
+        'Escribe el nombre completo'
+    }
+
+    const correoEditar =
+      editar.correo
+        .trim()
+        .toLowerCase()
+
+    if (!correoEditar) {
+      erroresEditar.correo =
+        'Escribe un correo'
+    } else if (
+      !correoValido(
+        correoEditar
+      )
+    ) {
+      erroresEditar.correo =
+        'Escribe un correo válido'
+    } else if (
+      usuarios.some(
+        (u) =>
+          u.id !== editar.id &&
+          (u.correo ?? '')
+            .trim()
+            .toLowerCase() ===
+            correoEditar
+      )
+    ) {
+      erroresEditar.correo =
+        'Ese correo ya está registrado'
+    }
+
+    const telefonoEditar =
+      soloDigitos(
+        editar.telefono_whatsapp
       )
 
+    if (!telefonoEditar) {
+      erroresEditar.telefono_whatsapp =
+        'Escribe un número de WhatsApp'
+    } else if (
+      telefonoEditar.length !== 10
+    ) {
+      erroresEditar.telefono_whatsapp =
+        'El número debe tener 10 dígitos'
+    }
+  }
+
+  async function guardarEdicion() {
+    setIntentoEditar(true)
+
+    if (
+      Object.keys(erroresEditar)
+        .length > 0
+    ) {
+      return
+    }
+
+    try {
+      const data =
+        await editarUsuario(
+          editar.id,
+          {
+            nombre_completo:
+              editar.nombre.trim(),
+
+            correo:
+              editar.correo
+                .trim()
+                .toLowerCase(),
+
+            telefono_whatsapp:
+              soloDigitos(
+                editar.telefono_whatsapp
+              ),
+          }
+        )
+
       const usuarioActualizado =
-        data.usuario
+        data.usuario ?? data
 
       setUsuarios((lista) =>
         lista.map((u) =>
-          u.id === usuario.id
+          u.id === editar.id
             ? {
                 ...u,
+
                 nombre:
-                  usuarioActualizado.nombre_completo,
+                  usuarioActualizado.nombre_completo ??
+                  editar.nombre.trim(),
+
                 correo:
-                  usuarioActualizado.correo,
-                rol:
-                  usuarioActualizado.rol,
+                  usuarioActualizado.correo ??
+                  editar.correo
+                    .trim()
+                    .toLowerCase(),
+
                 activo:
-                  usuarioActualizado.activo,
+                  usuarioActualizado.activo ??
+                  u.activo,
+
+                rol:
+                  usuarioActualizado.rol ??
+                  u.rol,
+
+                telefono_whatsapp:
+                  usuarioActualizado.telefono_whatsapp ??
+                  soloDigitos(
+                    editar.telefono_whatsapp
+                  ),
+              }
+            : u
+        )
+      )
+
+      setEditar(null)
+      setIntentoEditar(false)
+
+      setAviso({
+        texto:
+          'Usuario actualizado correctamente',
+      })
+    } catch (error) {
+      console.error(
+        'Error al editar usuario:',
+        error
+      )
+
+      const mensaje =
+        obtenerMensajeError(
+          error,
+          'No se pudo actualizar el usuario'
+        )
+
+      setAviso({
+        tipo: 'error',
+        texto: mensaje,
+      })
+    }
+  }
+
+  /* ============================================================
+     DAR DE BAJA / REACTIVAR
+     ============================================================ */
+
+  function pedirBaja(usuario) {
+    setConfirmarBaja(usuario)
+    setMenuUsuarioAbierto(null)
+  }
+
+  async function ejecutarBaja() {
+    if (!confirmarBaja) return
+
+    try {
+      const data =
+        await cambiarEstadoUsuario(
+          confirmarBaja.id,
+          false
+        )
+
+      const usuarioActualizado =
+        data.usuario ?? data
+
+      setUsuarios((lista) =>
+        lista.map((u) =>
+          u.id === confirmarBaja.id
+            ? {
+                ...u,
+                activo:
+                  usuarioActualizado.activo ??
+                  false,
               }
             : u
         )
       )
 
       setAviso({
-        texto: usuario.activo
-          ? `${usuario.nombre} ya no podrá entrar a INVENTIA`
-          : `${usuario.nombre} puede volver a entrar a INVENTIA`,
+        texto: `${confirmarBaja.nombre} ya no podrá entrar a INVENTIA`,
       })
+
+      setConfirmarBaja(null)
     } catch (error) {
       console.error(
-        'Error al cambiar estado:',
+        'Error al dar de baja:',
         error
       )
 
       setAviso({
+        tipo: 'error',
         texto:
           'No se pudo cambiar el estado del usuario',
       })
     }
   }
+
+  async function reactivarUsuario(usuario) {
+    setMenuUsuarioAbierto(null)
+
+    try {
+      const data =
+        await cambiarEstadoUsuario(
+          usuario.id,
+          true
+        )
+
+      const usuarioActualizado =
+        data.usuario ?? data
+
+      setUsuarios((lista) =>
+        lista.map((u) =>
+          u.id === usuario.id
+            ? {
+                ...u,
+                activo:
+                  usuarioActualizado.activo ??
+                  true,
+              }
+            : u
+        )
+      )
+
+      setAviso({
+        texto: `${usuario.nombre} puede volver a entrar a INVENTIA`,
+      })
+    } catch (error) {
+      console.error(
+        'Error al reactivar usuario:',
+        error
+      )
+
+      setAviso({
+        tipo: 'error',
+        texto:
+          'No se pudo reactivar el usuario',
+      })
+    }
+  }
+
+  /* ============================================================
+     ELIMINAR USUARIO
+     ============================================================ */
+
+  function pedirEliminar(usuario) {
+    setConfirmarEliminar(usuario)
+    setMenuUsuarioAbierto(null)
+  }
+
+  async function ejecutarEliminar() {
+    if (!confirmarEliminar) {
+      return
+    }
+
+    try {
+      await eliminarUsuario(
+        confirmarEliminar.id
+      )
+
+      setUsuarios((lista) =>
+        lista.filter(
+          (u) =>
+            u.id !==
+            confirmarEliminar.id
+        )
+      )
+
+      setAviso({
+        texto: `${confirmarEliminar.nombre} fue eliminado definitivamente`,
+      })
+
+      setConfirmarEliminar(null)
+    } catch (error) {
+      console.error(
+        'Error al eliminar usuario:',
+        error
+      )
+
+      const mensaje =
+        obtenerMensajeError(
+          error,
+          'No se pudo eliminar el usuario'
+        )
+
+      setAviso({
+        tipo: 'error',
+        texto: mensaje,
+      })
+    }
+  }
+
+  /* ============================================================
+     RESTABLECER CONTRASEÑA
+     ============================================================ */
 
   async function confirmarRestablecer() {
     if (!restablecer) return
@@ -544,7 +1106,8 @@ export default function Configuracion() {
 
       setAviso({
         texto: `Contraseña temporal de ${restablecer.nombre}:`,
-        codigo: data.contrasena_temporal,
+        codigo:
+          data.contrasena_temporal,
       })
 
       setRestablecer(null)
@@ -555,17 +1118,29 @@ export default function Configuracion() {
       )
 
       setAviso({
+        tipo: 'error',
         texto:
           'No se pudo restablecer la contraseña',
       })
     }
   }
 
-  /* ---------- Sin permiso ---------- */
+  /* ============================================================
+     CARGANDO
+     ============================================================ */
 
-  if (cargando) return null
+  if (cargando) {
+    return null
+  }
 
-  if (usuarioActual?.rol !== 'propietario') {
+  /* ============================================================
+     SIN PERMISO
+     ============================================================ */
+
+  if (
+    usuarioActual?.rol !==
+    'propietario'
+  ) {
     return (
       <div className="cf">
         <div className="cf-panel cf-bloqueado">
@@ -577,24 +1152,28 @@ export default function Configuracion() {
           </span>
 
           <h1>
-            Solo el propietario puede cambiar la
-            configuración
+            Solo el propietario puede
+            cambiar la configuración
           </h1>
 
           <p>
-            Si necesitas cambiar algo del negocio o
-            de tu usuario, pídeselo al dueño.
+            Si necesitas cambiar algo
+            del negocio o de tu usuario,
+            pídeselo al dueño.
           </p>
 
           <button
             type="button"
             className="cf-boton"
-            onClick={() => navigate('/panel')}
+            onClick={() =>
+              navigate('/panel')
+            }
           >
             <ArrowLeft
               size={16}
               aria-hidden="true"
             />
+
             Volver al panel
           </button>
         </div>
@@ -602,11 +1181,19 @@ export default function Configuracion() {
     )
   }
 
-  const correoActual = usuarioActual?.correo
+  const correoActual =
+    usuarioActual?.correo
+
+  /* ============================================================
+     RENDER
+     ============================================================ */
 
   return (
     <div className="cf">
-      {/* ============ ENCABEZADO ============ */}
+
+      {/* ========================================================
+          ENCABEZADO
+          ======================================================== */}
 
       <header>
         <div className="cf-encabezado__fila">
@@ -619,37 +1206,63 @@ export default function Configuracion() {
               size={13}
               aria-hidden="true"
             />
+
             Solo propietario
           </span>
         </div>
 
         <p className="cf-subtitulo">
-          Ajusta INVENTIA a la forma en que trabaja tu
-          negocio
+          Ajusta INVENTIA a la forma en que
+          trabaja tu negocio
         </p>
       </header>
 
+      {/* ========================================================
+          AVISO
+          ======================================================== */}
+
       {aviso && (
         <div
-          className="cf-aviso"
-          role="status"
+          className={
+            'cf-aviso' +
+            (aviso.tipo === 'error'
+              ? ' is-error'
+              : '')
+          }
+          role={
+            aviso.tipo === 'error'
+              ? 'alert'
+              : 'status'
+          }
         >
-          <CheckCircle2
-            size={18}
-            aria-hidden="true"
-          />
+          {aviso.tipo === 'error' ? (
+            <AlertCircle
+              size={18}
+              aria-hidden="true"
+            />
+          ) : (
+            <CheckCircle2
+              size={18}
+              aria-hidden="true"
+            />
+          )}
 
           <span>
             {aviso.texto}{' '}
+
             {aviso.codigo && (
-              <code>{aviso.codigo}</code>
+              <code>
+                {aviso.codigo}
+              </code>
             )}
           </span>
 
           <button
             type="button"
             aria-label="Cerrar aviso"
-            onClick={() => setAviso(null)}
+            onClick={() =>
+              setAviso(null)
+            }
           >
             <X size={15} />
           </button>
@@ -657,7 +1270,10 @@ export default function Configuracion() {
       )}
 
       <div className="cf-grid">
-        {/* ============ MENÚ DE SECCIONES ============ */}
+
+        {/* ======================================================
+            MENÚ DE SECCIONES
+            ====================================================== */}
 
         <nav
           className="cf-menu"
@@ -683,9 +1299,10 @@ export default function Configuracion() {
                     ? ' is-activo'
                     : '')
                 }
-                onClick={() =>
+                onClick={() => {
                   setSeccion(s.id)
-                }
+                  setMenuUsuarioAbierto(null)
+                }}
                 aria-current={
                   seccion === s.id
                     ? 'page'
@@ -720,7 +1337,10 @@ export default function Configuracion() {
         </nav>
 
         <div className="cf-seccion">
-          {/* ============ NEGOCIO ============ */}
+
+          {/* ====================================================
+              NEGOCIO
+              ==================================================== */}
 
           {seccion === 'negocio' && (
             <section className="cf-panel cf-seccion">
@@ -730,12 +1350,13 @@ export default function Configuracion() {
                 </h2>
 
                 <p className="cf-seccion__sub">
-                  Así aparece tu negocio en el inicio de
-                  sesión y en los mensajes.
+                  Así aparece tu negocio en el
+                  inicio de sesión y en los mensajes.
                 </p>
               </header>
 
               <div className="cf-campos">
+
                 <div className="cf-campo cf-campo--ancho">
                   <label
                     className="cf-etiqueta"
@@ -755,7 +1376,9 @@ export default function Configuracion() {
                         ? ' is-error'
                         : '')
                     }
-                    value={ajustes.negocio.nombre}
+                    value={
+                      ajustes.negocio.nombre
+                    }
                     onChange={(e) =>
                       cambiar(
                         'negocio',
@@ -772,6 +1395,7 @@ export default function Configuracion() {
                         size={13}
                         aria-hidden="true"
                       />
+
                       {errores.nombre}
                     </p>
                   )}
@@ -789,7 +1413,8 @@ export default function Configuracion() {
                     id="cf-direccion"
                     className="cf-input"
                     value={
-                      ajustes.negocio.direccion
+                      ajustes.negocio
+                        .direccion
                     }
                     onChange={(e) =>
                       cambiar(
@@ -813,6 +1438,7 @@ export default function Configuracion() {
                   <input
                     id="cf-telefono"
                     inputMode="tel"
+                    maxLength={10}
                     className={
                       'cf-input' +
                       (errores.telefono
@@ -820,13 +1446,16 @@ export default function Configuracion() {
                         : '')
                     }
                     value={
-                      ajustes.negocio.telefono
+                      ajustes.negocio
+                        .telefono
                     }
                     onChange={(e) =>
                       cambiar(
                         'negocio',
                         'telefono',
-                        e.target.value
+                        soloDigitos(
+                          e.target.value
+                        )
                       )
                     }
                     placeholder="10 dígitos"
@@ -838,6 +1467,7 @@ export default function Configuracion() {
                         size={13}
                         aria-hidden="true"
                       />
+
                       {errores.telefono}
                     </p>
                   ) : (
@@ -846,14 +1476,18 @@ export default function Configuracion() {
                     </p>
                   )}
                 </div>
+
               </div>
             </section>
           )}
 
-          {/* ============ PREFERENCIAS ============ */}
+          {/* ====================================================
+              PREFERENCIAS
+              ==================================================== */}
 
           {seccion === 'preferencias' && (
             <section className="cf-panel cf-seccion">
+
               <header className="cf-seccion__cabecera">
                 <div>
                   <h2 className="cf-seccion__titulo">
@@ -861,8 +1495,8 @@ export default function Configuracion() {
                   </h2>
 
                   <p className="cf-seccion__sub">
-                    Activa solo lo que usas. Puedes
-                    cambiarlo cuando quieras.
+                    Activa solo lo que usas.
+                    Puedes cambiarlo cuando quieras.
                   </p>
                 </div>
 
@@ -871,6 +1505,7 @@ export default function Configuracion() {
                     size={13}
                     aria-hidden="true"
                   />
+
                   {activas} de 5 activas
                 </span>
               </header>
@@ -882,22 +1517,27 @@ export default function Configuracion() {
                 />
 
                 <span>
-                  Lo que apagues se esconde de las
-                  pantallas para que todo se vea más
-                  sencillo.{' '}
+                  Lo que apagues se esconde de
+                  las pantallas para que todo se
+                  vea más sencillo.{' '}
+
                   <strong>
                     No se borra ningún dato:
                   </strong>{' '}
-                  si lo vuelves a prender, todo sigue
-                  ahí.
+
+                  si lo vuelves a prender, todo
+                  sigue ahí.
                 </span>
               </p>
 
               <ul className="cf-prefs">
                 {PREFERENCIAS.map((p) => {
                   const Icono = p.icono
+
                   const encendido =
-                    ajustes.preferencias[p.id]
+                    ajustes.preferencias[
+                      p.id
+                    ]
 
                   return (
                     <li
@@ -938,7 +1578,9 @@ export default function Configuracion() {
                       </div>
 
                       <Interruptor
-                        encendido={encendido}
+                        encendido={
+                          encendido
+                        }
                         etiqueta={p.titulo}
                         onCambiar={() =>
                           cambiar(
@@ -952,15 +1594,21 @@ export default function Configuracion() {
                   )
                 })}
               </ul>
+
             </section>
           )}
 
-          {/* ============ USUARIOS ============ */}
+          {/* ====================================================
+              USUARIOS
+              ==================================================== */}
 
           {seccion === 'usuarios' && (
             <>
+
               <section className="cf-panel cf-seccion">
+
                 <header className="cf-seccion__cabecera">
+
                   <div>
                     <h2 className="cf-seccion__titulo">
                       Usuarios
@@ -968,8 +1616,8 @@ export default function Configuracion() {
 
                     <p className="cf-seccion__sub">
                       Cada quien entra con su propia
-                      contraseña. Así el historial siempre
-                      dice quién hizo cada cosa.
+                      contraseña. Así el historial
+                      siempre dice quién hizo cada cosa.
                     </p>
                   </div>
 
@@ -983,23 +1631,35 @@ export default function Configuracion() {
                         size={16}
                         aria-hidden="true"
                       />
+
                       Agregar encargado
                     </button>
                   )}
+
                 </header>
+
+                {/* ==================================================
+                    NUEVO ENCARGADO
+                    ================================================== */}
 
                 {nuevo && (
                   <div className="cf-nuevo">
+
                     <p className="cf-nuevo__titulo">
                       <UserPlus
                         size={17}
                         aria-hidden="true"
                       />
+
                       Nuevo encargado
                     </p>
 
                     <div className="cf-campos">
+
+                      {/* NOMBRE */}
+
                       <div className="cf-campo">
+
                         <label
                           className="cf-etiqueta"
                           htmlFor="cf-nuevo-nombre"
@@ -1020,7 +1680,9 @@ export default function Configuracion() {
                               ? ' is-error'
                               : '')
                           }
-                          value={nuevo.nombre}
+                          value={
+                            nuevo.nombre
+                          }
                           onChange={(e) =>
                             setNuevo({
                               ...nuevo,
@@ -1038,6 +1700,7 @@ export default function Configuracion() {
                                 size={13}
                                 aria-hidden="true"
                               />
+
                               {
                                 erroresNuevo.nombre
                               }
@@ -1045,7 +1708,10 @@ export default function Configuracion() {
                           )}
                       </div>
 
+                      {/* CORREO */}
+
                       <div className="cf-campo">
+
                         <label
                           className="cf-etiqueta"
                           htmlFor="cf-nuevo-correo"
@@ -1066,7 +1732,9 @@ export default function Configuracion() {
                               ? ' is-error'
                               : '')
                           }
-                          value={nuevo.correo}
+                          value={
+                            nuevo.correo
+                          }
                           onChange={(e) =>
                             setNuevo({
                               ...nuevo,
@@ -1084,19 +1752,83 @@ export default function Configuracion() {
                               size={13}
                               aria-hidden="true"
                             />
+
                             {
                               erroresNuevo.correo
                             }
                           </p>
                         ) : (
                           <p className="cf-ayuda">
-                            Con este correo va a iniciar
-                            sesión
+                            Con este correo va a
+                            iniciar sesión
                           </p>
                         )}
                       </div>
 
+                      {/* WHATSAPP */}
+
+                      <div className="cf-campo">
+
+                        <label
+                          className="cf-etiqueta"
+                          htmlFor="cf-nuevo-whatsapp"
+                        >
+                          Número de WhatsApp{' '}
+                          <span className="cf-requerido">
+                            *
+                          </span>
+                        </label>
+
+                        <input
+                          id="cf-nuevo-whatsapp"
+                          inputMode="numeric"
+                          maxLength={10}
+                          className={
+                            'cf-input' +
+                            (intentoNuevo &&
+                            erroresNuevo.telefono_whatsapp
+                              ? ' is-error'
+                              : '')
+                          }
+                          value={
+                            nuevo.telefono_whatsapp
+                          }
+                          onChange={(e) =>
+                            setNuevo({
+                              ...nuevo,
+                              telefono_whatsapp:
+                                soloDigitos(
+                                  e.target.value
+                                ),
+                            })
+                          }
+                          placeholder="Ej. 5512345678"
+                        />
+
+                        {intentoNuevo &&
+                        erroresNuevo.telefono_whatsapp ? (
+                          <p className="cf-error">
+                            <AlertCircle
+                              size={13}
+                              aria-hidden="true"
+                            />
+
+                            {
+                              erroresNuevo.telefono_whatsapp
+                            }
+                          </p>
+                        ) : (
+                          <p className="cf-ayuda">
+                            Debe tener exactamente 10 dígitos
+                          </p>
+                        )}
+
+                      </div>
+
+                      {/* CONTRASEÑA */}
+
                       <div className="cf-campo cf-campo--ancho">
+
                         <label
                           className="cf-etiqueta"
                           htmlFor="cf-nuevo-contrasena"
@@ -1108,6 +1840,7 @@ export default function Configuracion() {
                         </label>
 
                         <div className="cf-input-grupo">
+
                           <input
                             id="cf-nuevo-contrasena"
                             className={
@@ -1144,8 +1877,10 @@ export default function Configuracion() {
                               size={14}
                               aria-hidden="true"
                             />
+
                             Generar otra
                           </button>
+
                         </div>
 
                         {intentoNuevo &&
@@ -1155,26 +1890,31 @@ export default function Configuracion() {
                               size={13}
                               aria-hidden="true"
                             />
+
                             {
                               erroresNuevo.contrasena
                             }
                           </p>
                         ) : (
                           <p className="cf-ayuda">
-                            Compártesela en persona. Podrá
-                            cambiarla después.
+                            Compártesela en persona.
+                            Podrá cambiarla después.
                           </p>
                         )}
+
                       </div>
+
                     </div>
 
                     <div className="cf-nuevo__botones">
+
                       <button
                         type="button"
                         className="cf-boton"
-                        onClick={() =>
+                        onClick={() => {
                           setNuevo(null)
-                        }
+                          setIntentoNuevo(false)
+                        }}
                       >
                         Cancelar
                       </button>
@@ -1190,14 +1930,22 @@ export default function Configuracion() {
                           size={16}
                           aria-hidden="true"
                         />
+
                         Agregar
                       </button>
+
                     </div>
                   </div>
                 )}
 
+                {/* ==================================================
+                    LISTA DE USUARIOS
+                    ================================================== */}
+
                 {usuarios.length === 0 ? (
+
                   <div className="cf-vacio-usuarios">
+
                     <span
                       className="cf-vacio-usuarios__icono"
                       aria-hidden="true"
@@ -1211,188 +1959,387 @@ export default function Configuracion() {
 
                     <p className="cf-vacio-usuarios__texto">
                       Agrega encargados para que cada
-                      quien registre sus movimientos con su
-                      propio usuario.
+                      quien registre sus movimientos
+                      con su propio usuario.
                     </p>
+
                   </div>
+
                 ) : (
+
                   <div className="cf-tabla-contenedor">
+
                     <table className="cf-tabla">
+
                       <thead>
                         <tr>
-                          <th>Usuario</th>
-                          <th>Rol</th>
-                          <th>Estado</th>
-                          <th className="is-centro">
-                            Acceso
+                          <th>
+                            Usuario
                           </th>
-                          <th aria-label="Acciones" />
+
+                          <th>
+                            Rol
+                          </th>
+
+                          <th>
+                            Estado
+                          </th>
+
+                          <th className="is-centro">
+                            Acciones
+                          </th>
                         </tr>
                       </thead>
 
                       <tbody>
-                        {usuarios.map((u) => {
-                          const esPropietario =
-                            u.rol === 'propietario'
 
-                          const esYo =
-                            u.correo === correoActual
+                        {usuarios
+                          .filter(
+                            (u) =>
+                              mostrarInactivos ||
+                              u.activo
+                          )
+                          .map((u) => {
 
-                          return (
-                            <tr key={u.id}>
-                              <td>
-                                <div
-                                  className={
-                                    'cf-usuario' +
-                                    (u.activo
-                                      ? ''
-                                      : ' is-inactivo')
-                                  }
-                                >
-                                  <span
-                                    className="cf-avatar"
-                                    aria-hidden="true"
+                            const esPropietario =
+                              u.rol ===
+                              'propietario'
+
+                            const esYo =
+                              u.correo ===
+                              correoActual
+
+                            const menuAbierto =
+                              menuUsuarioAbierto ===
+                              u.id
+
+                            return (
+                              <tr
+                                key={u.id}
+                              >
+
+                                {/* USUARIO */}
+
+                                <td>
+                                  <div
+                                    className={
+                                      'cf-usuario' +
+                                      (u.activo
+                                        ? ''
+                                        : ' is-inactivo')
+                                    }
                                   >
-                                    {iniciales(
-                                      u.nombre
-                                    )}
-                                  </span>
 
-                                  <div>
-                                    <p className="cf-usuario__nombre">
-                                      {u.nombre}
-
-                                      {esYo && (
-                                        <span className="cf-tu">
-                                          Tú
-                                        </span>
-                                      )}
-                                    </p>
-
-                                    <p className="cf-usuario__correo">
-                                      {u.correo}
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td>
-                                <span
-                                  className={`cf-rol cf-rol--${u.rol}`}
-                                >
-                                  {esPropietario && (
-                                    <ShieldCheck
-                                      size={12}
+                                    <span
+                                      className="cf-avatar"
                                       aria-hidden="true"
-                                    />
-                                  )}
-
-                                  {esPropietario
-                                    ? 'Propietario'
-                                    : 'Encargado'}
-                                </span>
-                              </td>
-
-                              <td>
-                                <span
-                                  className={
-                                    'cf-estado ' +
-                                    (u.activo
-                                      ? 'cf-estado--activo'
-                                      : 'cf-estado--inactivo')
-                                  }
-                                >
-                                  {u.activo
-                                    ? 'Activo'
-                                    : 'Inactivo'}
-                                </span>
-                              </td>
-
-                              <td className="is-centro">
-                                <Interruptor
-                                  encendido={
-                                    u.activo
-                                  }
-                                  etiqueta={`Acceso de ${u.nombre}`}
-                                  deshabilitado={
-                                    esPropietario
-                                  }
-                                  onCambiar={() =>
-                                    alternarActivo(
-                                      u
-                                    )
-                                  }
-                                />
-                              </td>
-
-                              <td>
-                                <div className="cf-acciones">
-                                  {!esPropietario && (
-                                    <button
-                                      type="button"
-                                      className="cf-boton cf-boton--chico"
-                                      onClick={() =>
-                                        setRestablecer(
-                                          u
-                                        )
-                                      }
                                     >
-                                      <KeyRound
-                                        size={13}
+                                      {iniciales(
+                                        u.nombre
+                                      )}
+                                    </span>
+
+                                    <div>
+
+                                      <p className="cf-usuario__nombre">
+
+                                        {u.nombre}
+
+                                        {esYo && (
+                                          <span className="cf-tu">
+                                            Tú
+                                          </span>
+                                        )}
+
+                                      </p>
+
+                                      <p className="cf-usuario__correo">
+                                        {u.correo}
+                                      </p>
+
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* ROL */}
+
+                                <td>
+                                  <span
+                                    className={`cf-rol cf-rol--${u.rol}`}
+                                  >
+                                    {esPropietario && (
+                                      <ShieldCheck
+                                        size={12}
                                         aria-hidden="true"
                                       />
-                                      Restablecer
-                                      contraseña
-                                    </button>
+                                    )}
+
+                                    {esPropietario
+                                      ? 'Propietario'
+                                      : 'Encargado'}
+                                  </span>
+                                </td>
+
+                                {/* ESTADO */}
+
+                                <td>
+                                  <span
+                                    className={
+                                      'cf-estado ' +
+                                      (u.activo
+                                        ? 'cf-estado--activo'
+                                        : 'cf-estado--inactivo')
+                                    }
+                                  >
+                                    {u.activo
+                                      ? 'Activo'
+                                      : 'Inactivo'}
+                                  </span>
+                                </td>
+
+                                {/* ACCIONES */}
+
+                                <td className="is-centro">
+
+                                  {esPropietario ? (
+
+                                    <span
+                                      aria-hidden="true"
+                                      style={{
+                                        opacity: 0.5,
+                                      }}
+                                    >
+                                      —
+                                    </span>
+
+                                  ) : (
+
+                                    <div className="cf-menu-acciones-usuario">
+
+                                      <button
+                                        type="button"
+                                        className="cf-boton cf-boton--chico"
+                                        aria-label={`Acciones de ${u.nombre}`}
+                                        aria-expanded={
+                                          menuAbierto
+                                        }
+                                        onClick={() =>
+                                          setMenuUsuarioAbierto(
+                                            menuAbierto
+                                              ? null
+                                              : u.id
+                                          )
+                                        }
+                                      >
+                                        <span
+                                          style={{
+                                            fontSize:
+                                              '22px',
+                                            lineHeight:
+                                              1,
+                                            fontWeight:
+                                              700,
+                                          }}
+                                        >
+                                          ⋮
+                                        </span>
+                                      </button>
+
+                                      {menuAbierto && (
+                                        <div className="cf-menu-acciones-usuario__dropdown">
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              abrirEditar(u)
+                                            }
+                                          >
+                                            <Edit
+                                              size={14}
+                                              aria-hidden="true"
+                                            />
+
+                                            <span>
+                                              Editar usuario
+                                            </span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setRestablecer(u)
+                                              setMenuUsuarioAbierto(null)
+                                            }}
+                                          >
+                                            <KeyRound
+                                              size={14}
+                                              aria-hidden="true"
+                                            />
+
+                                            <span>
+                                              Restablecer contraseña
+                                            </span>
+                                          </button>
+
+                                          <div className="cf-menu-acciones-usuario__separador" />
+
+                                          {u.activo ? (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                pedirBaja(u)
+                                              }
+                                            >
+                                              <X
+                                                size={14}
+                                                aria-hidden="true"
+                                              />
+
+                                              <span>
+                                                Dar de baja
+                                              </span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                reactivarUsuario(u)
+                                              }
+                                            >
+                                              <Check
+                                                size={14}
+                                                aria-hidden="true"
+                                              />
+
+                                              <span>
+                                                Reactivar usuario
+                                              </span>
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            className="is-danger"
+                                            onClick={() =>
+                                              pedirEliminar(u)
+                                            }
+                                          >
+                                            <Trash2
+                                              size={14}
+                                              aria-hidden="true"
+                                            />
+
+                                            <span>
+                                              Eliminar definitivamente
+                                            </span>
+                                          </button>
+
+                                        </div>
+                                      )}
+
+                                    </div>
                                   )}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
+
+                                </td>
+
+                              </tr>
+                            )
+                          })}
+
                       </tbody>
                     </table>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent:
+                          'flex-end',
+                        marginTop: '12px',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="cf-boton"
+                        onClick={() => {
+                          setMostrarInactivos(
+                            (actual) =>
+                              !actual
+                          )
+                        }}
+                      >
+                        {mostrarInactivos
+                          ? 'Ocultar inactivos'
+                          : 'Mostrar inactivos'}
+                      </button>
+                    </div>
+
                   </div>
                 )}
+
               </section>
 
+              {/* ==================================================
+                  PERMISOS
+                  ================================================== */}
+
               <section className="cf-panel">
+
                 <h3 className="cf-permisos__titulo">
+
                   <ShieldCheck
                     size={17}
                     aria-hidden="true"
                   />
+
                   Qué puede hacer cada rol
+
                 </h3>
 
                 <div className="cf-tabla-contenedor">
+
                   <table className="cf-tabla">
+
                     <thead>
                       <tr>
-                        <th>Función</th>
+
+                        <th>
+                          Función
+                        </th>
+
                         <th className="is-centro">
                           Propietario
                         </th>
+
                         <th className="is-centro">
                           Encargado
                         </th>
+
                       </tr>
                     </thead>
 
                     <tbody>
+
                       {PERMISOS.map((p) => (
-                        <tr key={p.funcion}>
-                          <td>{p.funcion}</td>
+                        <tr
+                          key={p.funcion}
+                        >
+
+                          <td>
+                            {p.funcion}
+                          </td>
 
                           {[
                             'propietario',
                             'encargado',
                           ].map((rol) => (
+
                             <td
                               key={rol}
                               className="is-centro"
                             >
+
                               {p[rol] ? (
+
                                 <span
                                   className="cf-si"
                                   aria-label="Sí"
@@ -1402,7 +2349,9 @@ export default function Configuracion() {
                                     strokeWidth={3}
                                   />
                                 </span>
+
                               ) : (
+
                                 <span
                                   className="cf-no"
                                   aria-label="No"
@@ -1412,32 +2361,46 @@ export default function Configuracion() {
                                     strokeWidth={3}
                                   />
                                 </span>
+
                               )}
+
                             </td>
+
                           ))}
+
                         </tr>
                       ))}
+
                     </tbody>
+
                   </table>
+
                 </div>
               </section>
+
             </>
           )}
 
-          {/* ============ WHATSAPP ============ */}
+          {/* ====================================================
+              WHATSAPP
+              ==================================================== */}
 
           {seccion === 'whatsapp' && (
             <section className="cf-panel cf-seccion">
+
               <header className="cf-seccion__cabecera">
+
                 <div>
+
                   <h2 className="cf-seccion__titulo">
                     WhatsApp y alertas
                   </h2>
 
                   <p className="cf-seccion__sub">
-                    Un solo mensaje al día con lo que se
-                    acaba y lo que caduca.
+                    Un solo mensaje al día con lo
+                    que se acaba y lo que caduca.
                   </p>
+
                 </div>
 
                 <Interruptor
@@ -1450,31 +2413,38 @@ export default function Configuracion() {
                     cambiar(
                       'preferencias',
                       'alertas_activas',
-                      !ajustes.preferencias
+                      !ajustes
+                        .preferencias
                         .alertas_activas
                     )
                   }
                 />
+
               </header>
 
               {!ajustes.preferencias
                 .alertas_activas && (
+
                 <p className="cf-info">
+
                   <Info
                     size={16}
                     aria-hidden="true"
                   />
 
                   <span>
-                    Las alertas están apagadas. Préndelas
-                    con el interruptor de arriba para
-                    recibir el resumen.
+                    Las alertas están apagadas.
+                    Préndelas con el interruptor
+                    de arriba para recibir el resumen.
                   </span>
+
                 </p>
               )}
 
               <div className="cf-campos">
+
                 <div className="cf-campo">
+
                   <label
                     className="cf-etiqueta"
                     htmlFor="cf-whatsapp"
@@ -1488,6 +2458,7 @@ export default function Configuracion() {
                   <input
                     id="cf-whatsapp"
                     inputMode="tel"
+                    maxLength={10}
                     className={
                       'cf-input' +
                       (errores.numero
@@ -1505,7 +2476,9 @@ export default function Configuracion() {
                       cambiar(
                         'whatsapp',
                         'numero',
-                        e.target.value
+                        soloDigitos(
+                          e.target.value
+                        )
                       )
                     }
                     placeholder="10 dígitos"
@@ -1513,20 +2486,25 @@ export default function Configuracion() {
 
                   {errores.numero ? (
                     <p className="cf-error">
+
                       <AlertCircle
                         size={13}
                         aria-hidden="true"
                       />
+
                       {errores.numero}
+
                     </p>
                   ) : (
                     <p className="cf-ayuda">
                       Normalmente el del dueño
                     </p>
                   )}
+
                 </div>
 
                 <div className="cf-campo">
+
                   <label
                     className="cf-etiqueta"
                     htmlFor="cf-hora"
@@ -1552,6 +2530,7 @@ export default function Configuracion() {
                       )
                     }
                   >
+
                     {HORAS.map((h) => (
                       <option
                         key={h.valor}
@@ -1560,15 +2539,19 @@ export default function Configuracion() {
                         {h.texto}
                       </option>
                     ))}
+
                   </select>
 
                   <p className="cf-ayuda">
-                    Recomendado: al cerrar, para planear el
-                    surtido del día siguiente
+                    Recomendado: al cerrar,
+                    para planear el surtido del
+                    día siguiente
                   </p>
+
                 </div>
 
                 <div className="cf-campo">
+
                   <label
                     className="cf-etiqueta"
                     htmlFor="cf-dias"
@@ -1591,10 +2574,13 @@ export default function Configuracion() {
                       cambiar(
                         'whatsapp',
                         'diasCaducidad',
-                        Number(e.target.value)
+                        Number(
+                          e.target.value
+                        )
                       )
                     }
                   >
+
                     {[15, 30, 45, 60].map(
                       (d) => (
                         <option
@@ -1605,18 +2591,21 @@ export default function Configuracion() {
                         </option>
                       )
                     )}
+
                   </select>
 
                   {!ajustes.preferencias
                     .maneja_caducidad && (
                     <p className="cf-ayuda">
-                      Activa "Fecha de caducidad" en
-                      Preferencias para usarlo
+                      Activa "Fecha de caducidad"
+                      en Preferencias para usarlo
                     </p>
                   )}
+
                 </div>
 
                 <div className="cf-campo">
+
                   <span className="cf-etiqueta">
                     Probar
                   </span>
@@ -1636,11 +2625,14 @@ export default function Configuracion() {
                       })
                     }
                   >
+
                     <Send
                       size={14}
                       aria-hidden="true"
                     />
+
                     Enviar mensaje de prueba
+
                   </button>
 
                   <p className="cf-ayuda">
@@ -1648,50 +2640,75 @@ export default function Configuracion() {
                       ? 'Revisa que te llegue al WhatsApp'
                       : 'Necesitas internet para enviarlo'}
                   </p>
+
                 </div>
+
               </div>
+
             </section>
           )}
 
-          {/* ============ BARRA DE GUARDAR ============ */}
+          {/* ====================================================
+              BARRA DE GUARDAR
+              ==================================================== */}
 
           {seccion !== 'usuarios' && (
             <footer className="cf-barra">
+
               {hayCambios ? (
+
                 <span className="cf-barra__estado is-pendiente">
+
                   <AlertCircle
                     size={15}
                     aria-hidden="true"
                   />
+
                   Tienes cambios sin guardar
+
                 </span>
+
               ) : ultimoGuardado ? (
+
                 <span className="cf-barra__estado">
+
                   <Clock
                     size={15}
                     aria-hidden="true"
                   />
-                  Último cambio guardado: hoy a las{' '}
+
+                  Último cambio guardado:
+                  hoy a las{' '}
+
                   <strong>
                     {ultimoGuardado.hora}
                   </strong>{' '}
+
                   por{' '}
+
                   <strong>
                     {ultimoGuardado.nombre}
                   </strong>
+
                 </span>
+
               ) : (
+
                 <span className="cf-barra__estado">
+
                   <Info
                     size={15}
                     aria-hidden="true"
                   />
-                  Ajusta lo que necesites y guarda los
-                  cambios
+
+                  Ajusta lo que necesites y
+                  guarda los cambios
+
                 </span>
               )}
 
               <div className="cf-barra__botones">
+
                 <button
                   type="button"
                   className="cf-boton"
@@ -1700,35 +2717,324 @@ export default function Configuracion() {
                     restablecerCambios
                   }
                 >
+
                   <RotateCcw
                     size={15}
                     aria-hidden="true"
                   />
+
                   Restablecer
+
                 </button>
 
                 <button
                   type="button"
                   className="cf-boton cf-boton--primario"
                   disabled={
-                    !hayCambios || hayErrores
+                    !hayCambios ||
+                    hayErrores
                   }
                   onClick={guardar}
                 >
+
                   <Save
                     size={15}
                     aria-hidden="true"
                   />
+
                   Guardar cambios
+
                 </button>
+
               </div>
             </footer>
           )}
+
         </div>
       </div>
 
+      {/* ========================================================
+          MODAL EDITAR USUARIO
+          ======================================================== */}
+
+      {editar && (
+        <div
+          className="cf-modal-overlay"
+          onMouseDown={(e) => {
+            if (
+              e.target ===
+              e.currentTarget
+            ) {
+              setEditar(null)
+              setIntentoEditar(false)
+            }
+          }}
+        >
+
+          <div
+            className="cf-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-editar-usuario"
+          >
+
+            <div className="cf-modal__cabecera">
+
+              <div>
+
+                <h2
+                  id="titulo-editar-usuario"
+                  className="cf-seccion__titulo"
+                >
+                  Editar usuario
+                </h2>
+
+                <p className="cf-seccion__sub">
+                  Corrige los datos del encargado.
+                </p>
+
+              </div>
+
+              <button
+                type="button"
+                className="cf-boton"
+                onClick={() => {
+                  setEditar(null)
+                  setIntentoEditar(false)
+                }}
+                aria-label="Cerrar"
+              >
+                <X size={16} />
+              </button>
+
+            </div>
+
+            <div className="cf-campos">
+
+              {/* NOMBRE */}
+
+              <div className="cf-campo">
+
+                <label
+                  className="cf-etiqueta"
+                  htmlFor="editar-nombre"
+                >
+                  Nombre completo{' '}
+                  <span className="cf-requerido">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  id="editar-nombre"
+                  className={
+                    'cf-input' +
+                    (intentoEditar &&
+                    erroresEditar.nombre
+                      ? ' is-error'
+                      : '')
+                  }
+                  value={editar.nombre}
+                  onChange={(e) =>
+                    setEditar({
+                      ...editar,
+                      nombre:
+                        e.target.value,
+                    })
+                  }
+                />
+
+                {intentoEditar &&
+                  erroresEditar.nombre && (
+                    <p className="cf-error">
+
+                      <AlertCircle
+                        size={13}
+                        aria-hidden="true"
+                      />
+
+                      {erroresEditar.nombre}
+
+                    </p>
+                  )}
+
+              </div>
+
+              {/* CORREO */}
+
+              <div className="cf-campo">
+
+                <label
+                  className="cf-etiqueta"
+                  htmlFor="editar-correo"
+                >
+                  Correo{' '}
+                  <span className="cf-requerido">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  id="editar-correo"
+                  type="email"
+                  className={
+                    'cf-input' +
+                    (intentoEditar &&
+                    erroresEditar.correo
+                      ? ' is-error'
+                      : '')
+                  }
+                  value={editar.correo}
+                  onChange={(e) =>
+                    setEditar({
+                      ...editar,
+                      correo:
+                        e.target.value,
+                    })
+                  }
+                />
+
+                {intentoEditar &&
+                  erroresEditar.correo && (
+                    <p className="cf-error">
+
+                      <AlertCircle
+                        size={13}
+                        aria-hidden="true"
+                      />
+
+                      {erroresEditar.correo}
+
+                    </p>
+                  )}
+
+              </div>
+
+              {/* WHATSAPP */}
+
+              <div className="cf-campo">
+
+                <label
+                  className="cf-etiqueta"
+                  htmlFor="editar-whatsapp"
+                >
+                  Número de WhatsApp{' '}
+                  <span className="cf-requerido">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  id="editar-whatsapp"
+                  inputMode="numeric"
+                  maxLength={10}
+                  className={
+                    'cf-input' +
+                    (intentoEditar &&
+                    erroresEditar.telefono_whatsapp
+                      ? ' is-error'
+                      : '')
+                  }
+                  value={
+                    editar.telefono_whatsapp
+                  }
+                  onChange={(e) =>
+                    setEditar({
+                      ...editar,
+                      telefono_whatsapp:
+                        soloDigitos(
+                          e.target.value
+                        ),
+                    })
+                  }
+                  placeholder="Ej. 5512345678"
+                />
+
+                {intentoEditar &&
+                erroresEditar.telefono_whatsapp ? (
+                  <p className="cf-error">
+
+                    <AlertCircle
+                      size={13}
+                      aria-hidden="true"
+                    />
+
+                    {
+                      erroresEditar.telefono_whatsapp
+                    }
+
+                  </p>
+                ) : (
+                  <p className="cf-ayuda">
+                    Debe tener exactamente 10 dígitos
+                  </p>
+                )}
+
+              </div>
+
+              {/* ROL */}
+
+              <div className="cf-campo">
+
+                <label className="cf-etiqueta">
+                  Rol
+                </label>
+
+                <input
+                  className="cf-input"
+                  value="Encargado"
+                  disabled
+                  readOnly
+                />
+
+                <p className="cf-ayuda">
+                  El rol no se puede modificar.
+                </p>
+
+              </div>
+
+            </div>
+
+            <div className="cf-nuevo__botones">
+
+              <button
+                type="button"
+                className="cf-boton"
+                onClick={() => {
+                  setEditar(null)
+                  setIntentoEditar(false)
+                }}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="cf-boton cf-boton--primario"
+                onClick={guardarEdicion}
+              >
+                <Save
+                  size={15}
+                  aria-hidden="true"
+                />
+
+                Guardar cambios
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          CONFIRMAR RESTABLECER
+          ======================================================== */}
+
       <ConfirmDialog
-        open={restablecer !== null}
+        open={
+          restablecer !== null
+        }
         title="¿Restablecer la contraseña?"
         message={
           restablecer
@@ -1745,6 +3051,53 @@ export default function Configuracion() {
           setRestablecer(null)
         }
       />
+
+      {/* ========================================================
+          CONFIRMAR BAJA
+          ======================================================== */}
+
+      <ConfirmDialog
+        open={
+          confirmarBaja !== null
+        }
+        title="¿Dar de baja al usuario?"
+        message={
+          confirmarBaja
+            ? `${confirmarBaja.nombre} ya no podrá iniciar sesión en INVENTIA. Sus registros anteriores se conservarán.`
+            : ''
+        }
+        confirmText="Sí, dar de baja"
+        cancelText="Cancelar"
+        tone="danger"
+        onConfirm={ejecutarBaja}
+        onCancel={() =>
+          setConfirmarBaja(null)
+        }
+      />
+
+      {/* ========================================================
+          CONFIRMAR ELIMINACIÓN
+          ======================================================== */}
+
+      <ConfirmDialog
+        open={
+          confirmarEliminar !== null
+        }
+        title="¿Eliminar definitivamente?"
+        message={
+          confirmarEliminar
+            ? `Se eliminará definitivamente a ${confirmarEliminar.nombre}. Esta acción no se puede deshacer.`
+            : ''
+        }
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+        tone="danger"
+        onConfirm={ejecutarEliminar}
+        onCancel={() =>
+          setConfirmarEliminar(null)
+        }
+      />
+
     </div>
   )
 }
