@@ -11,6 +11,8 @@ from .views import (
     actualizar_mi_perfil_view,
     cambiar_mi_contrasena_view,
     crear_primer_propietario_view,
+    editar_usuario_view,
+eliminar_usuario_view,
 )
 
 
@@ -22,6 +24,17 @@ urlpatterns = [
     # Administración de usuarios - propietario
     path('registrar/', registrar_usuario_view, name='registrar_usuario'),
     path('lista/', listar_usuarios_view, name='listar_usuarios'),
+    path(
+    '<int:usuario_id>/',
+    editar_usuario_view,
+    name='editar_usuario'
+),
+
+path(
+    '<int:usuario_id>/eliminar/',
+    eliminar_usuario_view,
+    name='eliminar_usuario'
+),
     path(
         '<int:usuario_id>/estado/',
         cambiar_estado_usuario_view,

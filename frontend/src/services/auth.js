@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000/api';
@@ -42,10 +41,13 @@ export async function getUsuarioActual() {
     return response.data;
 }
 
-export async function listarUsuarios() {
+export async function listarUsuarios(incluirInactivos = false) {
     const response = await axios.get(
         API_URL + '/usuarios/lista/',
         {
+            params: {
+                incluir_inactivos: incluirInactivos
+            },
             withCredentials: true
         }
     );
@@ -65,12 +67,35 @@ export async function registrarUsuario(datos) {
     return response.data;
 }
 
+export async function editarUsuario(usuarioId, datos) {
+    const response = await axios.patch(
+        API_URL + '/usuarios/' + usuarioId + '/',
+        datos,
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
 export async function cambiarEstadoUsuario(usuarioId, activo) {
     const response = await axios.patch(
         API_URL + '/usuarios/' + usuarioId + '/estado/',
         {
             activo: activo
         },
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+export async function eliminarUsuario(usuarioId) {
+    const response = await axios.delete(
+        API_URL + '/usuarios/' + usuarioId + '/eliminar/',
         {
             withCredentials: true
         }

@@ -52,7 +52,37 @@ class UsuarioRegistroSerializer(serializers.ModelSerializer):
         usuario.save()
 
         return usuario
+class UsuarioEditarSerializer(serializers.ModelSerializer):
+    """
+    Permite al propietario editar los datos de un encargado.
 
+    El rol, contraseña y estado no se pueden modificar
+    desde este serializer.
+    """
+
+    class Meta:
+        model = Usuario
+        fields = [
+            'nombre_completo',
+            'correo',
+            'telefono_whatsapp'
+        ]
+
+    def validate_correo(self, value):
+        usuario_actual = self.instance
+
+        existe = Usuario.objects.filter(
+            correo=value
+        ).exclude(
+            id=usuario_actual.id
+        ).exists()
+
+        if existe:
+            raise serializers.ValidationError(
+                'Ese correo ya está registrado por otro usuario.'
+            )
+
+        return value
 class UsuarioActualizarPerfilSerializer(serializers.ModelSerializer):
     """
     Permite al usuario modificar únicamente sus propios datos personales.
