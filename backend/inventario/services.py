@@ -1,51 +1,47 @@
 from django.db import transaction
-from rest_framework.exceptions import ValidationError
+from .models import Producto, Movimiento
 
-from .models import Producto, Alerta
-
-
-@transaction.atomic
-def registrar_movimiento(serializer):
-    datos = serializer.validated_data
-    tipo = datos["tipo"]
-    cantidad = datos["cantidad"]
-
-    # Traemos el producto "bloqueado" para que nadie lo modifique al mismo tiempo
-    producto = Producto.objects.select_for_update().get(pk=datos["producto"].pk)
-
-    if cantidad <= 0:
-        raise ValidationError({"cantidad": "La cantidad debe ser mayor a 0."})
-
-    stock_anterior = producto.cantidad
-
-    if tipo == "ENTRADA":
-        producto.cantidad += cantidad
-    elif tipo == "SALIDA":
-        if cantidad > producto.cantidad:
-            raise ValidationError({
-                "cantidad": f"No hay suficiente stock. Disponible: {producto.cantidad}."
-            })
-        producto.cantidad -= cantidad
-    else:
-        raise ValidationError({"tipo": "Tipo de movimiento no válido."})
-
-    producto.save(update_fields=["cantidad"])
-    movimiento = serializer.save()
-
-    # Alerta solo cuando el producto CRUZA el stock mínimo hacia abajo
-    estaba_bien = stock_anterior > producto.stock_minimo
-    ahora_esta_bajo = producto.cantidad <= producto.stock_minimo
-
-    if estaba_bien and ahora_esta_bajo:
-        Alerta.objects.create(
+def registrar_movimiento(producto_id, tipo, cantidad, observaciones=None):
+    """
+    Registra un movimiento de inventario (Entrada, Salida, Merma, Corrección)
+    dentro de una transacción atómica, validando que no quede stock negativo
+    y guardando el stock resultante.
+    """
+    with transaction.atomic():
+        # Bloqueamos el producto para evitar conflictos concurrentes
+        producto = Producto.objects.select_for_update().get(id=producto_id)
+        
+        stock_actual = producto.cantidad
+        tipo_upper = tipo.upper()
+        
+        # Calcular el nuevo stock según el tipo de movimiento
+        if tipo_upper == 'ENTRADA':
+            nuevo_stock = stock_actual + cantidad
+        elif tipo_upper == 'SALIDA':
+            nuevo_stock = stock_actual - cantidad
+        elif tipo_upper == 'MERMA':
+            nuevo_stock = stock_actual - cantidad
+        elif tipo_upper == 'CORRECCION':
+            # En corrección de inventario, la cantidad representa el nuevo stock físico directo
+            nuevo_stock = cantidad
+        else:
+            raise ValueError(f"Tipo de movimiento '{tipo}' no válido.")
+            
+        # Regla de oro: El stock nunca puede ser negativo
+        if nuevo_stock < 0:
+            raise ValueError("Operación rechazada: El stock resultante no puede ser negativo.")
+            
+        # Actualizamos el stock del producto
+        producto.cantidad = nuevo_stock
+        producto.save()
+        
+        # Creamos el registro en el historial de movimientos
+        movimiento = Movimiento.objects.create(
             producto=producto,
-            mensaje=(
-                f"Stock bajo: {producto.nombre} ({producto.codigo}) "
-                f"tiene {producto.cantidad} piezas. Mínimo: {producto.stock_minimo}."
-            ),
-            enviada_whatsapp=False,
+            tipo=tipo_upper,
+            cantidad=cantidad,
+            stock_resultante=nuevo_stock,
+            observaciones=observaciones
         )
-        # Aquí después Héctor conecta Twilio para mandar el WhatsApp
-        # y marcar enviada_whatsapp=True cuando sí se envíe.
-
-    return movimiento
+        
+        return movimiento

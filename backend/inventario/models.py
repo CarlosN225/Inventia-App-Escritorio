@@ -20,19 +20,24 @@ class Producto(models.Model):
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
 
+    """aqui actualice los 4 movimientos que vamos a tener"""
+
 class Movimiento(models.Model):
     TIPO_CHOICES = [
         ('ENTRADA', 'Entrada'),
         ('SALIDA', 'Salida'),
+        ('MERMA', 'Merma'),
+        ('CORRECCION', 'Corrección'),
     ]
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
     cantidad = models.IntegerField()
+    stock_resultante = models.IntegerField(default=0) # NUEVO: Guarda el stock después del movimiento
     fecha = models.DateTimeField(auto_now_add=True)
     observaciones = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.tipo} - {self.producto.nombre} ({self.cantidad})"
+        return f"{self.tipo} - {self.producto.nombre} (Cant: {self.cantidad} | Res: {self.stock_resultante})"
 
 class Alerta(models.Model):
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
