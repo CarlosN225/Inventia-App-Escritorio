@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 
 import { PRODUCTOS, CATEGORIAS, DETALLES } from '../data/productos'
+import { getUsuarioActual } from '../services/auth'
 import '../styles/producto-form.css'
 
 // TODO: traer estos interruptores de la Configuración del negocio
@@ -200,9 +201,20 @@ export default function ProductoForm() {
   const [errorImagen, setErrorImagen] = useState('')
   const [errores, setErrores] = useState({})
   const [guardado, setGuardado] = useState(false)
-    const [incluirImagen, setIncluirImagen] = useState(false)
+  const [incluirImagen, setIncluirImagen] = useState(false)
+
+  const [usuarioActual, setUsuarioActual] = useState(null)
+  const [cargandoUsuario, setCargandoUsuario] = useState(true)
 
   const inputImagenRef = useRef(null)
+
+  // Usuario que tiene la sesión abierta (para saber si es propietario)
+  useEffect(() => {
+    getUsuarioActual()
+      .then(setUsuarioActual)
+      .catch(() => setUsuarioActual(null))
+      .finally(() => setCargandoUsuario(false))
+  }, [])
 
   // Libera la memoria de la imagen anterior cuando se cambia o se quita
   useEffect(() => {
@@ -252,7 +264,7 @@ export default function ProductoForm() {
     procesarArchivo(event.dataTransfer.files?.[0])
   }
 
-    // "Sí": abre el explorador de archivos de una vez
+  // "Sí": abre el explorador de archivos de una vez
   function elegirConImagen() {
     setIncluirImagen(true)
     inputImagenRef.current?.click()
@@ -264,6 +276,7 @@ export default function ProductoForm() {
     setImagen(null)
     setErrorImagen('')
   }
+
   /* ---------- Promociones ---------- */
 
   function abrirNuevaPromo() {
@@ -367,6 +380,25 @@ export default function ProductoForm() {
   const gananciaMes = utilidad !== null ? vendidasMes * utilidad : null
   const hayErrores = Object.keys(errores).length > 0
 
+  /* ---------- Solo el propietario puede entrar ---------- */
+
+  if (cargandoUsuario) return null
+
+  if (usuarioActual?.rol !== 'propietario') {
+    return (
+      <div className="pf">
+        <div className="pf-panel pf-no-encontrado">
+          <h1 className="pf-titulo">Solo el propietario puede dar de alta o editar productos</h1>
+          <p>Si necesitas agregar o cambiar un producto, pídeselo al dueño.</p>
+          <button type="button" className="pf-boton pf-boton--secundario" onClick={() => navigate('/catalogo')}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            Volver al catálogo
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   /* ---------- Producto que no existe ---------- */
 
   if (!esNuevo && !producto) {
@@ -432,7 +464,7 @@ export default function ProductoForm() {
           {/* Información básica */}
           <Seccion icono={Package} titulo="Información básica" completa>
             <div className="pf-info">
-                      <div className="pf-imagen-bloque">
+              <div className="pf-imagen-bloque">
                 <span className="pf-imagen-pregunta">¿Incluir imagen?</span>
 
                 <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Incluir imagen">
@@ -507,7 +539,6 @@ export default function ProductoForm() {
                   </p>
                 )}
               </div>
-        
 
               <div className="pf-info__campos">
                 <Campo
@@ -707,8 +738,8 @@ export default function ProductoForm() {
                 etiqueta="¿Cuántas trae cada empaque del proveedor?"
                 htmlFor="pf-empaque"
                 error={errores.piezasEmpaque}
-              >                
-              <div className={'pf-grupo' + (errores.piezasEmpaque ? ' is-error' : '')}>
+              >
+                <div className={'pf-grupo' + (errores.piezasEmpaque ? ' is-error' : '')}>
                   <input
                     id="pf-empaque"
                     type="number"

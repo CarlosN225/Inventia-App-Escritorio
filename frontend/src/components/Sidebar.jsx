@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ArrowLeftRight,
@@ -5,6 +6,7 @@ import {
   ShoppingCart, Truck, PackageMinus, ClipboardCheck, History,
 } from 'lucide-react'
 import logoInventia from '../assets/logo-inventia-sf.png'
+import { getUsuarioActual } from '../services/auth'
 
 /* ============================================================
    NAVEGACIÓN
@@ -13,17 +15,27 @@ import logoInventia from '../assets/logo-inventia-sf.png'
    esté listo. Por ahora recibe la prop `alertasPendientes`.
    ============================================================ */
 const links = [
-  { to: '/panel',                  label: 'Panel principal',         icon: LayoutDashboard },
-  { to: '/catalogo',               label: 'Catálogo',                icon: Package },
-  { to: '/registrar-venta',        label: 'Registrar venta',         icon: ShoppingCart },
-  { to: '/registrar-compra',       label: 'Registrar compra',        icon: Truck },
-  { to: '/registrar-merma',        label: 'Registrar merma',         icon: PackageMinus },
-  { to: '/correccion-inventario',  label: 'Corrección de inventario', icon: ClipboardCheck },
-  { to: '/movimientos',            label: 'Historial',               icon: History },
-  { to: '/alertas',                label: 'Alertas',                 icon: Bell, badgeKey: 'alertas' },
+  { to: '/panel',                  label: 'Panel principal',          icon: LayoutDashboard },
+  { to: '/catalogo',               label: 'Catálogo',                 icon: Package },
+  { to: '/registrar-venta',        label: 'Registrar venta',          icon: ShoppingCart },
+  { to: '/registrar-compra',       label: 'Registrar compra',         icon: Truck },
+  { to: '/registrar-merma',        label: 'Registrar merma',          icon: PackageMinus },
+  { to: '/correccion-inventario',  label: 'Corrección de inventario', icon: ClipboardCheck, soloPropietario: true },
+  { to: '/movimientos',            label: 'Historial',                icon: History },
+  { to: '/alertas',                label: 'Alertas',                  icon: Bell, badgeKey: 'alertas' },
 ]
 
 export default function Sidebar({ collapsed, onToggle, onClose, alertasPendientes = 0 }) {
+  const [rol, setRol] = useState(null)
+
+  useEffect(() => {
+    getUsuarioActual()
+      .then((u) => setRol(u.rol))
+      .catch(() => setRol(null))
+  }, [])
+
+  const visibles = links.filter((l) => !l.soloPropietario || rol === 'propietario')
+
   return (
     <aside className={'sidebar' + (collapsed ? ' is-collapsed' : '')}>
       <div className="sidebar__brand">
@@ -36,7 +48,7 @@ export default function Sidebar({ collapsed, onToggle, onClose, alertasPendiente
       </div>
 
       <nav className="sidebar__nav" aria-label="Navegación principal">
-        {links.map(({ to, label, icon: Icon, badgeKey }) => {
+        {visibles.map(({ to, label, icon: Icon, badgeKey }) => {
           const badge = badgeKey === 'alertas' ? alertasPendientes : 0
 
           return (

@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000/api';
@@ -7,19 +8,17 @@ export async function login(correo, contrasena, mantenerSesion = false) {
         API_URL + '/usuarios/login/',
         {
             correo: correo,
-            contrasena: contrasena, 
+            contrasena: contrasena,
             mantener_sesion: mantenerSesion
-
         },
         {
             withCredentials: true
         }
     );
 
-  
-
     return response.data;
 }
+
 export async function logout() {
     const response = await axios.post(
         API_URL + '/usuarios/logout/',
@@ -35,6 +34,55 @@ export async function logout() {
 export async function getUsuarioActual() {
     const response = await axios.get(
         API_URL + '/usuarios/me/',
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+export async function listarUsuarios() {
+    const response = await axios.get(
+        API_URL + '/usuarios/lista/',
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+export async function registrarUsuario(datos) {
+    const response = await axios.post(
+        API_URL + '/usuarios/registrar/',
+        datos,
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+export async function cambiarEstadoUsuario(usuarioId, activo) {
+    const response = await axios.patch(
+        API_URL + '/usuarios/' + usuarioId + '/estado/',
+        {
+            activo: activo
+        },
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+export async function restablecerContrasena(usuarioId) {
+    const response = await axios.post(
+        API_URL + '/usuarios/' + usuarioId + '/reset-password/',
+        {},
         {
             withCredentials: true
         }

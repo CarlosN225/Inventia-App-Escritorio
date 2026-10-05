@@ -29,4 +29,11 @@ backend/staticfiles/
 # Editor / Sistema
 .vscode/
 .DS_Store
-Thumbs.db
+Thumbs.dbdb.sqlite3
+pruebas_local.bat
+p.txt
+e.txt
+cookies*.txt
+encargado*.txt
+venv/
+venv313/
