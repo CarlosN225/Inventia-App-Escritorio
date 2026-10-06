@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Usuario(models.Model):
     ROL_PROPIETARIO = "propietario"
     ROL_ENCARGADO = "encargado"
@@ -23,6 +24,4 @@ class Usuario(models.Model):
         verbose_name_plural = "Usuarios"
 
     def __str__(self):
-        return self.nombre_completo
-
-
+        return f"{self.nombre_completo} ({self.rol})"

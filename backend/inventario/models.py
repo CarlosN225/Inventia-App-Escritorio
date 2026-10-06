@@ -313,7 +313,7 @@ class MovimientoInventario(models.Model):
         constraints = [
             models.CheckConstraint(condition=Q(stock_resultante__gte=0), name="movimiento_stock_no_negativo"),
             CheckConstraint(
-                check=(
+                condition=(
                     (~Q(tipo_movimiento="correccion") | Q(motivo__isnull=False))
                     & (~Q(tipo_movimiento="merma") | Q(motivo_merma__isnull=False))
                     & (~Q(motivo_merma="otro") | Q(motivo__isnull=False))

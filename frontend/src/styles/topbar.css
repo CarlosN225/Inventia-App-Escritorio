@@ -1,0 +1,340 @@
+/* ============================================================
+   TOPBAR — todo su estilo vive aquí
+   ============================================================ */
+
+.topbar {
+  /* Si tu menú lateral usa otro tono, cambia solo esta primera variable */
+  --tb-fondo-inicio: #eef8fc;
+  --tb-fondo-medio:  #f5faff;
+  --tb-fondo-fin:    #eef2fd;
+  --tb-borde:        #e6eaf0;
+  --tb-borde-2:      #eef1f5;
+  --tb-azul:         #1668e3;
+  --tb-marino:       #0b1220;
+  --tb-gris:         #64748b;
+  --tb-gris-2:       #94a3b8;
+  --tb-verde:        #047857;
+  --tb-rojo:         #dc2626;
+
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 68px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--tb-borde);
+  background: linear-gradient(90deg, var(--tb-fondo-inicio) 0%, var(--tb-fondo-fin) 60%);
+    color: var(--tb-marino);
+}
+
+/* ============ IZQUIERDA ============ */
+.topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Dulcería: Los Querubines */
+.topbar__negocio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar__negocio-icono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dbe7f7;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--tb-azul);
+  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.05);
+  flex-shrink: 0;
+}
+
+.topbar__negocio-texto {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__negocio-prefijo {
+  color: var(--tb-gris);
+  font-weight: 500;
+}
+
+.topbar__negocio-texto strong {
+  color: var(--tb-marino);
+  font-weight: 700;
+}
+
+.topbar__separador {
+  width: 1px;
+  height: 24px;
+  background: var(--tb-borde);
+  flex-shrink: 0;
+}
+
+/* Fecha completa */
+.topbar__fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.topbar__fecha svg { color: var(--tb-gris-2); }
+
+/* ============ DERECHA ============ */
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Indicador de internet */
+.topbar__conexion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+.topbar__conexion.is-en-linea {
+  background: #ecfdf3;
+  border-color: #b8e6d1;
+  color: var(--tb-verde);
+}
+
+.topbar__conexion.is-sin-conexion {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+/* Botón de sincronizar */
+.topbar__sync {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--tb-borde);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--tb-gris);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.topbar__sync:hover:not(:disabled) {
+  border-color: #c9d8ed;
+  color: var(--tb-azul);
+}
+
+.topbar__sync:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.topbar__sync.is-girando svg {
+  animation: topbar-girar 0.8s linear infinite;
+}
+
+@keyframes topbar-girar {
+  to { transform: rotate(360deg); }
+}
+
+/* ============ PERFIL (solo el monito) ============ */
+.topbar__user-wrap {
+  position: relative;
+}
+
+.topbar__perfil {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.topbar__perfil:hover,
+.topbar__perfil.is-open {
+  border-color: #c9d8ed;
+}
+
+.topbar__avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2aa9e0, #1668e3);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* ============ MENÚ DEL PERFIL ============ */
+.user-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: 270px;
+  padding: 6px;
+  border: 1px solid var(--tb-borde);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(11, 18, 32, 0.14);
+  animation: topbar-menu 0.15s ease-out;
+}
+
+@keyframes topbar-menu {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.user-menu__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+
+.topbar__user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar__user-name {
+  overflow: hidden;
+  color: var(--tb-marino);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__user-role {
+  overflow: hidden;
+  color: var(--tb-gris);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__rol {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 1px 7px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.topbar__rol.is-propietario {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #6d28d9;
+}
+
+.topbar__rol.is-encargado {
+  background: #e6f2fc;
+  border-color: #c9e4f8;
+  color: #0369a1;
+}
+
+.user-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--tb-borde-2);
+}
+
+.user-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tb-marino);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.user-menu__item svg { color: var(--tb-gris); }
+
+.user-menu__item:hover {
+  background: #f1f4f9;
+}
+
+.user-menu__item:hover svg { color: var(--tb-azul); }
+
+.user-menu__item--danger,
+.user-menu__item--danger svg {
+  color: var(--tb-rojo);
+}
+
+.user-menu__item--danger:hover {
+  background: #fdecec;
+}
+
+.user-menu__item--danger:hover svg { color: var(--tb-rojo); }
+
+/* ============ PANTALLAS MÁS ANGOSTAS ============ */
+@media (max-width: 1150px) {
+  .topbar__negocio-prefijo { display: none; }
+}
+
+@media (max-width: 1000px) {
+  .topbar__separador,
+  .topbar__fecha { display: none; }
+
+  /* El indicador de internet se queda solo con el icono */
+  .topbar__conexion {
+    gap: 0;
+    padding: 7px;
+    font-size: 0;
+  }
+
+  .topbar__conexion svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+ 

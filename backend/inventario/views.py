@@ -1,22 +1,31 @@
-"""Las vistas son los controladores que toman el serializers.py
+"""Las vistas son los controladores que toman el serializers.py y
 deciden qué hacer cuando el frontend pide o envía información."""
 
-from rest_framework import viewsets
-from .models import Categoria, Producto, Movimiento, Alerta
+from rest_framework import viewsets, mixins
+
+from .models import Categoria, Producto, MovimientoInventario, AlertaStock
 from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer, AlertaSerializer
+from .services import registrar_movimiento
+from usuarios.permissions import EsUsuarioAutenticado, EsPropietario
+
 
 class CategoriaViewSet(viewsets.ModelViewSet):
     queryset = Categoria.objects.all()
     serializer_class = CategoriaSerializer
 
+    def get_permissions(self):
+        # Consultar categorías: propietario y encargado
+        if self.action in ['list', 'retrieve']:
+            return [EsUsuarioAutenticado()]
+
+        # Crear, editar y eliminar categorías: solo propietario
+        return [EsPropietario()]
+
+
 class ProductoViewSet(viewsets.ModelViewSet):
     queryset = Producto.objects.all()
     serializer_class = ProductoSerializer
 
-<<<<<<< Updated upstream
-class MovimientoViewSet(viewsets.ModelViewSet):
-    queryset = Movimiento.objects.all()
-=======
     def get_permissions(self):
         # Consultar productos: propietario y encargado
         if self.action in ['list', 'retrieve']:
@@ -33,22 +42,17 @@ class MovimientoViewSet(mixins.CreateModelMixin,
     """Los movimientos se crean y consultan, pero no se editan ni se borran,
     para que el stock nunca quede descuadrado."""
 
-    queryset = Movimiento.objects.all().order_by("-fecha_movimiento")
->>>>>>> Stashed changes
+    queryset = MovimientoInventario.objects.all().order_by("-fecha_movimiento")
     serializer_class = MovimientoSerializer
+    permission_classes = [EsUsuarioAutenticado]
 
-class AlertaViewSet(viewsets.ModelViewSet):
-    queryset = Alerta.objects.all()
-    serializer_class = AlertaSerializer  
+    def perform_create(self, serializer):
+        registrar_movimiento(serializer)
 
 
-<<<<<<< Updated upstream
-    
-=======
 class AlertaViewSet(viewsets.ReadOnlyModelViewSet):
     """Las alertas las genera el sistema solo; aquí únicamente se consultan."""
 
-    queryset = Alerta.objects.all().order_by("-fecha_generacion")
+    queryset = AlertaStock.objects.all().order_by("-fecha_generacion")
     serializer_class = AlertaSerializer
     permission_classes = [EsUsuarioAutenticado]
->>>>>>> Stashed changes
