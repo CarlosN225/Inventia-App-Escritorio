@@ -17,21 +17,21 @@ import {
   X,
   History,
   EyeOff,
+  Eye,
   SearchX,
   PackageOpen,
+  Loader2,
+  WifiOff,
+  RotateCcw,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react'
 
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { getUsuarioActual } from '../services/auth'
+import { listarProductos, cambiarActivoProducto, mensajeDeError } from '../services/productos'
+import { textoUnidad } from '../utils/unidades'
 import '../styles/catalogo.css'
-
-/* ============================================================
-   ESTADO INICIAL — Todo vacío hasta conectar el backend
-   ------------------------------------------------------------
-   PRODUCTOS:  catálogo del negocio
-   CATEGORIAS: categorías disponibles (o se calculan de PRODUCTOS)
-   ============================================================ */
-const PRODUCTOS = []
-const CATEGORIAS = []
 
 const POR_PAGINA = 15
 const DIAS_AVISO_CADUCIDAD = 30
@@ -56,18 +56,35 @@ function porCaducar(p) {
   return p.diasCaducar !== null && p.diasCaducar <= DIAS_AVISO_CADUCIDAD
 }
 
+// null si no se puede calcular (por ejemplo, el encargado no recibe el costo)
 function margen(p) {
+  if (p.costo === null || !p.precio) return null
   return Math.round(((p.precio - p.costo) / p.precio) * 100)
+}
+
+// Números de página con puntos suspensivos: 1 … 4 5 6 … 20
+function paginasVisibles(total, actual) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+  const paginas = [1]
+  const desde = Math.max(2, actual - 1)
+  const hasta = Math.min(total - 1, actual + 1)
+
+  if (desde > 2) paginas.push('…')
+  for (let n = desde; n <= hasta; n++) paginas.push(n)
+  if (hasta < total - 1) paginas.push('…')
+
+  paginas.push(total)
+  return paginas
 }
 
 /* ============ Componentes auxiliares ============ */
 
 function PastillaStock({ producto }) {
   const estado = estadoStock(producto)
+  const unidad = textoUnidad(producto.unidad, producto.stock)
   const texto =
-    estado === 'agotado'
-      ? '0 · Agotado'
-      : `${producto.stock} pzas${estado === 'bajo' ? ' · Bajo' : ''}`
+    estado === 'agotado' ? '0 · Agotado' : `${producto.stock} ${unidad}${estado === 'bajo' ? ' · Bajo' : ''}`
 
   return (
     <span className={`cat-stock cat-stock--${estado}`}>
@@ -82,17 +99,40 @@ function Caducidad({ producto }) {
     return <span className="cat-sin-fecha">Sin fecha de caducidad registrada</span>
   }
 
-  if (porCaducar(producto)) {
-    const urgente = producto.diasCaducar <= 7
+  const dias = producto.diasCaducar
+
+  if (dias < 0) {
+    const pasaron = Math.abs(dias)
     return (
-      <span className={'cat-caduca' + (urgente ? ' is-urgente' : '')}>
+      <span className="cat-caduca is-urgente">
         <CalendarClock size={13} aria-hidden="true" />
-        Caduca en {producto.diasCaducar} días
+        Caducó hace {pasaron} {pasaron === 1 ? 'día' : 'días'}
+      </span>
+    )
+  }
+
+  if (dias <= DIAS_AVISO_CADUCIDAD) {
+    return (
+      <span className={'cat-caduca' + (dias <= 7 ? ' is-urgente' : '')}>
+        <CalendarClock size={13} aria-hidden="true" />
+        {dias === 0 ? 'Caduca hoy' : `Caduca en ${dias} ${dias === 1 ? 'día' : 'días'}`}
       </span>
     )
   }
 
   return <span>{producto.caducidad}</span>
+}
+
+function FotoProducto({ producto, grande = false }) {
+  return (
+    <span className={'cat-placeholder' + (grande ? ' cat-placeholder--grande' : '')} aria-hidden="true">
+      {producto.imagen ? (
+        <img src={producto.imagen} alt="" className="cat-foto" />
+      ) : (
+        <Candy size={grande ? 22 : 16} />
+      )}
+    </span>
+  )
 }
 
 /* ============ Componente principal ============ */
@@ -101,14 +141,11 @@ export default function Catalogo() {
   const navigate = useNavigate()
 
   const [usuarioActual, setUsuarioActual] = useState(null)
-
-  useEffect(() => {
-    getUsuarioActual()
-      .then(setUsuarioActual)
-      .catch(() => setUsuarioActual(null))
-  }, [])
-
-  const esPropietario = usuarioActual?.rol === 'propietario'
+  const [productos, setProductos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState(null)
+  const [aviso, setAviso] = useState(null) // { texto, tipo: 'ok' | 'error' }
+  const [aCambiar, setACambiar] = useState(null) // producto que se va a desactivar o reactivar
 
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState('Todas')
@@ -118,6 +155,32 @@ export default function Catalogo() {
   const [menuAbierto, setMenuAbierto] = useState(null)
 
   const menuRef = useRef(null)
+
+  const esPropietario = usuarioActual?.rol === 'propietario'
+
+  /* ============ Cargar del backend ============ */
+
+  async function cargarProductos() {
+    setCargando(true)
+    setError(null)
+
+    try {
+      setProductos(await listarProductos())
+    } catch (e) {
+      setError(mensajeDeError(e))
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    getUsuarioActual()
+      .then(setUsuarioActual)
+      .catch(() => setUsuarioActual(null))
+
+    cargarProductos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (menuAbierto === null) return
@@ -143,28 +206,39 @@ export default function Catalogo() {
 
   /* ============ Cómputos ============ */
 
+  const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
+  const desactivados = useMemo(() => productos.filter((p) => !p.activo), [productos])
+
   const resumen = useMemo(
     () => ({
-      total: PRODUCTOS.length,
-      bajo: PRODUCTOS.filter((p) => estadoStock(p) === 'bajo').length,
-      agotado: PRODUCTOS.filter((p) => estadoStock(p) === 'agotado').length,
-      caducar: PRODUCTOS.filter(porCaducar).length,
+      total: activos.length,
+      bajo: activos.filter((p) => estadoStock(p) === 'bajo').length,
+      agotado: activos.filter((p) => estadoStock(p) === 'agotado').length,
+      caducar: activos.filter(porCaducar).length,
     }),
-    []
+    [activos]
   )
+
+  // Categorías que tienen productos, en el orden fijo de la lista de 16
+  const categorias = useMemo(() => {
+    const porNombre = new Map()
+    activos.forEach((p) => porNombre.set(p.categoria, p.categoriaId))
+    return [...porNombre.entries()].sort((a, b) => a[1] - b[1]).map(([nombre]) => nombre)
+  }, [activos])
 
   const conteoCategorias = useMemo(() => {
     const conteo = {}
-    PRODUCTOS.forEach((p) => {
+    activos.forEach((p) => {
       conteo[p.categoria] = (conteo[p.categoria] || 0) + 1
     })
     return conteo
-  }, [])
+  }, [activos])
 
   const filtrados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
+    const base = estado === 'desactivados' ? desactivados : activos
 
-    return PRODUCTOS.filter((p) => {
+    return base.filter((p) => {
       if (texto && !normalizar(`${p.nombre} ${p.marca}`).includes(texto)) return false
       if (categoria !== 'Todas' && p.categoria !== categoria) return false
       if (estado === 'bajo' && estadoStock(p) !== 'bajo') return false
@@ -172,7 +246,7 @@ export default function Catalogo() {
       if (estado === 'caducar' && !porCaducar(p)) return false
       return true
     })
-  }, [busqueda, categoria, estado])
+  }, [activos, desactivados, busqueda, categoria, estado])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
@@ -180,8 +254,8 @@ export default function Catalogo() {
   const visibles = filtrados.slice(inicio, inicio + POR_PAGINA)
   const hayFiltros = busqueda !== '' || categoria !== 'Todas' || estado !== 'todos'
 
-  const sinProductos = PRODUCTOS.length === 0
-  const sinResultados = filtrados.length === 0 && !sinProductos
+  const sinProductos = !cargando && !error && productos.length === 0
+  const sinResultados = !cargando && !error && !sinProductos && filtrados.length === 0
 
   /* ============ Acciones ============ */
 
@@ -211,12 +285,49 @@ export default function Catalogo() {
     navigate(`/catalogo/${id}/editar`)
   }
 
+  function pedirCambioActivo(producto) {
+    setMenuAbierto(null)
+    setACambiar(producto)
+  }
+
+  async function confirmarCambioActivo() {
+    const producto = aCambiar
+    setACambiar(null)
+
+    try {
+      const actualizado = await cambiarActivoProducto(producto.id, !producto.activo)
+      setProductos((lista) => lista.map((p) => (p.id === actualizado.id ? actualizado : p)))
+      setAviso({
+        tipo: 'ok',
+        texto: actualizado.activo
+          ? `${actualizado.nombre} se reactivó y vuelve a aparecer en ventas.`
+          : `${actualizado.nombre} se desactivó. Su historial se conserva.`,
+      })
+    } catch (e) {
+      setAviso({ tipo: 'error', texto: mensajeDeError(e) })
+    }
+  }
+
   const chipsResumen = [
-    { id: 'todos',   icono: Package,       texto: `${resumen.total} productos`, clase: '' },
-    { id: 'bajo',    icono: AlertTriangle, texto: `${resumen.bajo} stock bajo`, clase: 'cat-resumen__chip--bajo' },
-    { id: 'agotado', icono: XCircle,       texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`, clase: 'cat-resumen__chip--agotado' },
+    { id: 'todos', icono: Package, texto: `${resumen.total} productos`, clase: '' },
+    { id: 'bajo', icono: AlertTriangle, texto: `${resumen.bajo} stock bajo`, clase: 'cat-resumen__chip--bajo' },
+    {
+      id: 'agotado',
+      icono: XCircle,
+      texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`,
+      clase: 'cat-resumen__chip--agotado',
+    },
     { id: 'caducar', icono: CalendarClock, texto: `${resumen.caducar} por caducar`, clase: 'cat-resumen__chip--caducar' },
   ]
+
+  if (esPropietario && desactivados.length > 0) {
+    chipsResumen.push({
+      id: 'desactivados',
+      icono: EyeOff,
+      texto: `${desactivados.length} desactivado${desactivados.length === 1 ? '' : 's'}`,
+      clase: 'cat-resumen__chip--desactivado',
+    })
+  }
 
   return (
     <div className="cat">
@@ -225,37 +336,51 @@ export default function Catalogo() {
         <div>
           <h1 className="cat-encabezado__titulo">Catálogo</h1>
           <p className="cat-encabezado__subtitulo">
-            {sinProductos
-              ? 'Aún no tienes productos registrados'
-              : `Todos los productos de tu negocio`}
+            {cargando
+              ? 'Cargando tus productos…'
+              : sinProductos
+                ? 'Aún no tienes productos registrados'
+                : 'Todos los productos de tu negocio'}
           </p>
 
-          <div className="cat-resumen">
-            {chipsResumen.map(({ id, icono: Icono, texto, clase }) => (
-              <button
-                key={id}
-                type="button"
-                className={`cat-resumen__chip ${clase}` + (estado === id ? ' is-activo' : '')}
-                onClick={() => cambiarEstado(id)}
-              >
-                <Icono size={14} aria-hidden="true" />
-                {texto}
-              </button>
-            ))}
-          </div>
+          {!cargando && !error && (
+            <div className="cat-resumen">
+              {chipsResumen.map(({ id, icono: Icono, texto, clase }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`cat-resumen__chip ${clase}` + (estado === id ? ' is-activo' : '')}
+                  onClick={() => cambiarEstado(id)}
+                >
+                  <Icono size={14} aria-hidden="true" />
+                  {texto}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {!sinProductos && esPropietario && (
-          <button
-            type="button"
-            className="cat-boton-primario"
-            onClick={() => navigate('/catalogo/nuevo')}
-          >
+        {!sinProductos && !cargando && !error && esPropietario && (
+          <button type="button" className="cat-boton-primario" onClick={() => navigate('/catalogo/nuevo')}>
             <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
             Nuevo producto
           </button>
         )}
       </header>
+
+      {aviso && (
+        <div className={'cat-aviso' + (aviso.tipo === 'error' ? ' is-error' : '')} role="status">
+          {aviso.tipo === 'error' ? (
+            <AlertCircle size={17} aria-hidden="true" />
+          ) : (
+            <CheckCircle2 size={17} aria-hidden="true" />
+          )}
+          <span>{aviso.texto}</span>
+          <button type="button" aria-label="Cerrar aviso" onClick={() => setAviso(null)}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* ============ FILTROS ============ */}
       <section className="cat-panel">
@@ -268,6 +393,7 @@ export default function Catalogo() {
               value={busqueda}
               onChange={(e) => cambiarBusqueda(e.target.value)}
               aria-label="Buscar producto"
+              disabled={cargando || !!error}
             />
             {busqueda && (
               <button
@@ -283,11 +409,12 @@ export default function Catalogo() {
 
           <label className="cat-estado">
             <span className="cat-estado__etiqueta">Estado</span>
-            <select value={estado} onChange={(e) => cambiarEstado(e.target.value)}>
+            <select value={estado} onChange={(e) => cambiarEstado(e.target.value)} disabled={cargando || !!error}>
               <option value="todos">Todos</option>
               <option value="bajo">Stock bajo</option>
               <option value="agotado">Agotados</option>
               <option value="caducar">Por caducar</option>
+              {esPropietario && <option value="desactivados">Desactivados</option>}
             </select>
           </label>
 
@@ -315,17 +442,17 @@ export default function Catalogo() {
           </div>
         </div>
 
-        {CATEGORIAS.length > 0 && (
+        {categorias.length > 0 && estado !== 'desactivados' && (
           <div className="cat-categorias">
             <button
               type="button"
               className={'cat-categoria' + (categoria === 'Todas' ? ' is-activa' : '')}
               onClick={() => cambiarCategoria('Todas')}
             >
-              Todas<span className="cat-categoria__conteo">({PRODUCTOS.length})</span>
+              Todas<span className="cat-categoria__conteo">({activos.length})</span>
             </button>
 
-            {CATEGORIAS.filter((c) => conteoCategorias[c]).map((c) => (
+            {categorias.map((c) => (
               <button
                 key={c}
                 type="button"
@@ -342,9 +469,29 @@ export default function Catalogo() {
 
       {/* ============ RESULTADOS ============ */}
       <section className="cat-panel cat-panel--tabla">
-
-        {/* --- Sin productos registrados --- */}
-        {sinProductos ? (
+        {cargando ? (
+          /* --- Cargando --- */
+          <div className="cat-vacio-estado">
+            <span className="cat-vacio-estado__icono" aria-hidden="true">
+              <Loader2 size={22} className="cat-girando" />
+            </span>
+            <p className="cat-vacio-estado__titulo">Cargando productos…</p>
+          </div>
+        ) : error ? (
+          /* --- No se pudo cargar --- */
+          <div className="cat-vacio-estado">
+            <span className="cat-vacio-estado__icono cat-vacio-estado__icono--error" aria-hidden="true">
+              <WifiOff size={22} />
+            </span>
+            <p className="cat-vacio-estado__titulo">No pudimos cargar tus productos</p>
+            <p className="cat-vacio-estado__texto">{error}</p>
+            <button type="button" className="cat-boton-secundario" onClick={cargarProductos}>
+              <RotateCcw size={14} aria-hidden="true" />
+              Reintentar
+            </button>
+          </div>
+        ) : sinProductos ? (
+          /* --- Sin productos registrados --- */
           <div className="cat-vacio-estado">
             <span className="cat-vacio-estado__icono" aria-hidden="true">
               <PackageOpen size={22} />
@@ -356,11 +503,7 @@ export default function Catalogo() {
                 : 'Pídele al propietario que agregue los productos del negocio.'}
             </p>
             {esPropietario && (
-              <button
-                type="button"
-                className="cat-boton-primario"
-                onClick={() => navigate('/catalogo/nuevo')}
-              >
+              <button type="button" className="cat-boton-primario" onClick={() => navigate('/catalogo/nuevo')}>
                 <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
                 Nuevo producto
               </button>
@@ -403,16 +546,17 @@ export default function Catalogo() {
                 const abreArriba = visibles.length > 3 && indice >= visibles.length - 2
 
                 return (
-                  <tr key={p.id}>
+                  <tr key={p.id} className={p.activo ? '' : 'cat-fila-inactiva'}>
                     <td className="cat-col-num">{numero}</td>
                     <td className="cat-col-producto">
                       <div className="cat-producto">
-                        <span className="cat-placeholder" aria-hidden="true">
-                          <Candy size={16} />
-                        </span>
+                        <FotoProducto producto={p} />
                         <div>
-                          <p className="cat-producto__nombre">{p.nombre}</p>
-                          <p className="cat-producto__marca">{p.marca}</p>
+                          <p className="cat-producto__nombre">
+                            {p.nombre}
+                            {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
+                          </p>
+                          {p.marca && <p className="cat-producto__marca">{p.marca}</p>}
                         </div>
                       </div>
                     </td>
@@ -421,10 +565,14 @@ export default function Catalogo() {
                     </td>
                     <td className="is-der cat-precio">{moneda.format(p.precio)}</td>
                     {esPropietario && (
-                      <td className="is-der cat-costo">{moneda.format(p.costo)}</td>
+                      <td className="is-der cat-costo">
+                        {p.costo !== null ? moneda.format(p.costo) : <span className="cat-sin-dato">—</span>}
+                      </td>
                     )}
                     {esPropietario && (
-                      <td className={'is-der cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}%</td>
+                      <td className={'is-der cat-margen' + (m !== null && m < MARGEN_BAJO ? ' is-bajo' : '')}>
+                        {m !== null ? `${m}%` : <span className="cat-sin-dato">—</span>}
+                      </td>
                     )}
                     <td>
                       <PastillaStock producto={p} />
@@ -434,7 +582,7 @@ export default function Catalogo() {
                     </td>
                     <td className="is-der">
                       <div className="cat-acciones" ref={menuAbierto === p.id ? menuRef : null}>
-                        {esPropietario && (
+                        {esPropietario && p.activo && (
                           <button
                             type="button"
                             className="cat-icono-boton"
@@ -458,7 +606,7 @@ export default function Catalogo() {
 
                         {menuAbierto === p.id && (
                           <div className={'cat-menu' + (abreArriba ? ' cat-menu--arriba' : '')} role="menu">
-                            {esPropietario && (
+                            {esPropietario && p.activo && (
                               <button type="button" role="menuitem" onClick={() => irAEditar(p.id)}>
                                 <Pencil size={14} aria-hidden="true" />
                                 Editar producto
@@ -468,18 +616,23 @@ export default function Catalogo() {
                               <History size={14} aria-hidden="true" />
                               Ver movimientos
                             </button>
-                            {/* TODO: conectar con el backend (desactivar, no borrar) */}
-                            {esPropietario && (
-                              <button
-                                type="button"
-                                role="menuitem"
-                                className="is-peligro"
-                                onClick={() => setMenuAbierto(null)}
-                              >
-                                <EyeOff size={14} aria-hidden="true" />
-                                Desactivar
-                              </button>
-                            )}
+                            {esPropietario &&
+                              (p.activo ? (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="is-peligro"
+                                  onClick={() => pedirCambioActivo(p)}
+                                >
+                                  <EyeOff size={14} aria-hidden="true" />
+                                  Desactivar
+                                </button>
+                              ) : (
+                                <button type="button" role="menuitem" onClick={() => pedirCambioActivo(p)}>
+                                  <Eye size={14} aria-hidden="true" />
+                                  Reactivar
+                                </button>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -496,22 +649,18 @@ export default function Catalogo() {
               const m = margen(p)
 
               return (
-                <article className="cat-tarjeta" key={p.id}>
+                <article className={'cat-tarjeta' + (p.activo ? '' : ' cat-tarjeta--inactiva')} key={p.id}>
                   <div className="cat-tarjeta__arriba">
-                    <span className="cat-placeholder cat-placeholder--grande" aria-hidden="true">
-                      <Candy size={22} />
-                    </span>
+                    <FotoProducto producto={p} grande />
                     <span className="cat-tarjeta__numero">No. {inicio + indice + 1}</span>
                   </div>
 
                   <p className="cat-tarjeta__nombre">{p.nombre}</p>
-                  <p className="cat-tarjeta__marca">
-                    {p.marca} · {p.categoria}
-                  </p>
+                  <p className="cat-tarjeta__marca">{p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}</p>
 
                   <div className="cat-tarjeta__precio">
                     <span className="cat-precio">{moneda.format(p.precio)}</span>
-                    {esPropietario && (
+                    {esPropietario && m !== null && (
                       <span className={'cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}% margen</span>
                     )}
                   </div>
@@ -521,12 +670,18 @@ export default function Catalogo() {
                     {porCaducar(p) && <Caducidad producto={p} />}
                   </div>
 
-                  {esPropietario && (
-                    <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
-                      <Pencil size={14} aria-hidden="true" />
-                      Editar
-                    </button>
-                  )}
+                  {esPropietario &&
+                    (p.activo ? (
+                      <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
+                        <Pencil size={14} aria-hidden="true" />
+                        Editar
+                      </button>
+                    ) : (
+                      <button type="button" className="cat-boton-secundario" onClick={() => pedirCambioActivo(p)}>
+                        <Eye size={14} aria-hidden="true" />
+                        Reactivar
+                      </button>
+                    ))}
                 </article>
               )
             })}
@@ -534,47 +689,71 @@ export default function Catalogo() {
         )}
 
         {/* ============ PAGINACIÓN ============ */}
-        {!sinProductos && !sinResultados && (
+        {!cargando && !error && !sinProductos && !sinResultados && (
           <footer className="cat-paginacion">
             <span>
-              Mostrando <strong>{inicio + 1}–{Math.min(inicio + POR_PAGINA, filtrados.length)}</strong> de{' '}
-              <strong>{filtrados.length}</strong> productos
+              Mostrando{' '}
+              <strong>
+                {inicio + 1}–{Math.min(inicio + POR_PAGINA, filtrados.length)}
+              </strong>{' '}
+              de <strong>{filtrados.length}</strong> productos
             </span>
 
-            <div className="cat-paginacion__botones">
-              <button
-                type="button"
-                disabled={paginaActual === 1}
-                onClick={() => setPagina(paginaActual - 1)}
-              >
-                <ChevronLeft size={15} aria-hidden="true" />
-                Anterior
-              </button>
-
-              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={'cat-pagina' + (n === paginaActual ? ' is-activa' : '')}
-                  onClick={() => setPagina(n)}
-                  aria-current={n === paginaActual ? 'page' : undefined}
-                >
-                  {n}
+            {totalPaginas > 1 && (
+              <div className="cat-paginacion__botones">
+                <button type="button" disabled={paginaActual === 1} onClick={() => setPagina(paginaActual - 1)}>
+                  <ChevronLeft size={15} aria-hidden="true" />
+                  Anterior
                 </button>
-              ))}
 
-              <button
-                type="button"
-                disabled={paginaActual === totalPaginas}
-                onClick={() => setPagina(paginaActual + 1)}
-              >
-                Siguiente
-                <ChevronRight size={15} aria-hidden="true" />
-              </button>
-            </div>
+                {paginasVisibles(totalPaginas, paginaActual).map((n, i) =>
+                  n === '…' ? (
+                    <span key={`puntos-${i}`} className="cat-paginacion__puntos">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      type="button"
+                      className={'cat-pagina' + (n === paginaActual ? ' is-activa' : '')}
+                      onClick={() => setPagina(n)}
+                      aria-current={n === paginaActual ? 'page' : undefined}
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+
+                <button
+                  type="button"
+                  disabled={paginaActual === totalPaginas}
+                  onClick={() => setPagina(paginaActual + 1)}
+                >
+                  Siguiente
+                  <ChevronRight size={15} aria-hidden="true" />
+                </button>
+              </div>
+            )}
           </footer>
         )}
       </section>
+
+      <ConfirmDialog
+        open={aCambiar !== null}
+        title={aCambiar?.activo ? '¿Desactivar el producto?' : '¿Reactivar el producto?'}
+        message={
+          aCambiar
+            ? aCambiar.activo
+              ? `${aCambiar.nombre} ya no aparecerá en ventas ni en el catálogo. Su historial se conserva y lo puedes reactivar cuando quieras.`
+              : `${aCambiar.nombre} vuelve a aparecer en el catálogo y en ventas.`
+            : ''
+        }
+        confirmText={aCambiar?.activo ? 'Sí, desactivar' : 'Sí, reactivar'}
+        cancelText="Cancelar"
+        tone={aCambiar?.activo ? 'danger' : 'default'}
+        onConfirm={confirmarCambioActivo}
+        onCancel={() => setACambiar(null)}
+      />
     </div>
   )
 }
