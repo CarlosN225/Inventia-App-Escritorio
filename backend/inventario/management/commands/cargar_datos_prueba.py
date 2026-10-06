@@ -192,9 +192,24 @@ class Command(BaseCommand):
         creados = 0
 
         for i, (nombre, cat_idx, unidad, precio, mayoreo, cant_min, empaque, usa_cad) in enumerate(PRODUCTOS, start=1):
-            fecha_cad = hoy + timedelta(days=random.randint(30, 400)) if usa_cad else None
+            # Para la demo: cada 9° producto con caducidad vence pronto (sale en "Por caducar")
+            if usa_cad and i % 9 == 0:
+                fecha_cad = hoy + timedelta(days=random.randint(3, 25))
+            elif usa_cad:
+                fecha_cad = hoy + timedelta(days=random.randint(45, 400))
+            else:
+                fecha_cad = None
+
             stock_minimo = random.choice([5, 8, 10, 12, 15])
             stock_maximo = stock_minimo * random.choice([6, 8, 10])
+
+            # Para la demo: algunos agotados y algunos en stock bajo, siempre los mismos
+            if i % 17 == 0:
+                stock_actual = 0
+            elif i % 6 == 0:
+                stock_actual = random.randint(1, stock_minimo - 1)
+            else:
+                stock_actual = random.randint(stock_minimo, stock_maximo)
 
             producto, creado = Producto.objects.get_or_create(
                 nombre=nombre,
@@ -204,20 +219,21 @@ class Command(BaseCommand):
                     "unidad_medida": unidad,
                     "precio_venta": precio,
                     "ultimo_costo": round(precio * random.choice([0.62, 0.66, 0.70]), 2),
-                    "tipo_empaque": "caja" if empaque else None,
                     "precio_mayoreo": mayoreo,
                     "cantidad_minima_mayoreo": cant_min,
                     "piezas_por_empaque": empaque,
+                    "tipo_empaque": "caja" if empaque else None,
                     "fecha_caducidad": fecha_cad,
-                    "stock_actual": random.randint(max(0, stock_minimo - 4), stock_maximo),
+                    "stock_actual": stock_actual,
                     "stock_minimo": stock_minimo,
                     "stock_maximo": stock_maximo,
                     "activo": True,
                 },
             )
 
-            if creado:
-                # Movimiento de entrada inicial, para que el historial no arranque vacío
+            # Movimiento de entrada inicial, para que el historial no arranque vacío
+            # (los agotados no llevan movimiento, porque no se puede registrar una entrada de 0)
+            if creado and producto.stock_actual > 0:
                 MovimientoInventario.objects.create(
                     producto=producto,
                     usuario=usuario,
@@ -226,6 +242,8 @@ class Command(BaseCommand):
                     stock_resultante=producto.stock_actual,
                     motivo='Datos iniciales de prueba',
                 )
+
+            if creado:
                 creados += 1
 
         self.stdout.write(self.style.SUCCESS(
