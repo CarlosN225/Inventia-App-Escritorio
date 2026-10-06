@@ -1,44 +1,369 @@
-"""Este código le dirá a la base de datos (SQLite) qué información necesitas 
-guardar sobre las categorías y los productos:"""""
+import uuid
 
 from django.db import models
+from usuarios.models import Usuario
+from django.db.models import CheckConstraint, Q
 
-class Categoria(models.Model):
-    nombre = models.CharField(max_length=100)
-    descripcion = models.TextField(blank=True, null=True)
+
+def generar_uuid_local():
+    return str(uuid.uuid4())
+
+
+class Negocio(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_negocio")
+    nombre = models.CharField(max_length=150)
+    propietario = models.CharField(max_length=120)
+    direccion = models.CharField(max_length=200)
+    telefono = models.CharField(max_length=20, null=True, blank=True)
+    usuario_admin = models.ForeignKey(
+        Usuario,
+        db_column="id_usuario_admin",
+        on_delete=models.PROTECT,
+        related_name="negocios_administrados",
+    )
+
+    class Meta:
+        db_table = "Negocio"
+        verbose_name = "Negocio"
+        verbose_name_plural = "Negocios"
 
     def __str__(self):
         return self.nombre
 
+
+class Configuracion(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_configuracion")
+    negocio = models.OneToOneField(
+        Negocio,
+        db_column="id_negocio",
+        on_delete=models.CASCADE,
+        related_name="configuracion",
+    )
+    maneja_caducidad = models.BooleanField(default=False)
+    maneja_promociones = models.BooleanField(default=False)
+    usa_codigo_barras = models.BooleanField(default=False)
+    alertas_activas = models.BooleanField(default=True)
+    vende_mayoreo = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "Configuracion"
+        verbose_name = "Configuracion"
+        verbose_name_plural = "Configuraciones"
+
+    def __str__(self):
+        return f"Configuracion de {self.negocio.nombre}"
+
+
+class Categoria(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_categoria")
+    nombre = models.CharField(max_length=80)
+    descripcion = models.CharField(max_length=200, null=True, blank=True)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "Categoria"
+        verbose_name = "Categoria"
+        verbose_name_plural = "Categorias"
+
+    def __str__(self):
+        return self.nombre
+
+
 class Producto(models.Model):
-    codigo = models.CharField(max_length=50, unique=True)
-    nombre = models.CharField(max_length=200)
-    categoria = models.ForeignKey(Categoria, on_delete=models.SET_NULL, null=True)
-    cantidad = models.IntegerField(default=0)
-    stock_minimo = models.IntegerField(default=5)
-
-    def __str__(self):
-        return f"{self.codigo} - {self.nombre}"
-
-class Movimiento(models.Model):
-    TIPO_CHOICES = [
-        ('ENTRADA', 'Entrada'),
-        ('SALIDA', 'Salida'),
+    UNIDAD_PIEZA = "pieza"
+    UNIDAD_BOLSA = "bolsa"
+    UNIDAD_CAJA = "caja"
+    UNIDAD_PAQUETE = "paquete"
+    UNIDAD_CHOICES = [
+        (UNIDAD_PIEZA, "Pieza"),
+        (UNIDAD_BOLSA, "Bolsa"),
+        (UNIDAD_CAJA, "Caja"),
+        (UNIDAD_PAQUETE, "Paquete"),
+        ("gramo", "Gramo"),
+        ("litro", "Litro"),
     ]
-    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
+
+    id = models.AutoField(primary_key=True, db_column="id_producto")
+    codigo_barras = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    nombre = models.CharField(max_length=120)
+    descripcion = models.CharField(max_length=200, null=True, blank=True)
+    categoria = models.ForeignKey(
+        Categoria,
+        db_column="id_categoria",
+        on_delete=models.PROTECT,
+        related_name="productos",
+    )
+    unidad_medida = models.CharField(max_length=20, choices=UNIDAD_CHOICES, default="pieza")
+    precio_venta = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_mayoreo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cantidad_minima_mayoreo = models.IntegerField(null=True, blank=True)
+    piezas_por_empaque = models.IntegerField(null=True, blank=True)
+    fecha_caducidad = models.DateField(null=True, blank=True)
+    imagen = models.ImageField(upload_to="productos/", null=True, blank=True)
+    marca = models.CharField(max_length=80, blank=True, default="")
+    stock_actual = models.IntegerField(default=0)
+    stock_minimo = models.IntegerField()
+    stock_maximo = models.IntegerField(null=True, blank=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "Producto"
+        verbose_name = "Producto"
+        verbose_name_plural = "Productos"
+        constraints = [models.CheckConstraint(condition=Q(stock_actual__gte=0), name="producto_stock_no_negativo")]
+
+    def __str__(self):
+        return self.nombre
+
+
+class Promocion(models.Model):
+    TIPO_PORCENTAJE = "descuento_porcentaje"
+    TIPO_MONTO = "descuento_monto"
+    TIPO_CHOICES = [
+        (TIPO_PORCENTAJE, "Descuento por porcentaje"),
+        (TIPO_MONTO, "Descuento por monto"),
+    ]
+
+    id = models.AutoField(primary_key=True, db_column="id_promocion")
+    producto = models.ForeignKey(
+        Producto,
+        db_column="id_producto",
+        on_delete=models.PROTECT,
+        related_name="promociones",
+    )
+    tipo_promocion = models.CharField(max_length=30, choices=TIPO_CHOICES)
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "Promocion"
+        verbose_name = "Promocion"
+        verbose_name_plural = "Promociones"
+
+    def __str__(self):
+        return f"{self.producto.nombre} - {self.get_tipo_promocion_display()}"
+
+
+class Venta(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_venta")
+    fecha_venta = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(
+        Usuario,
+        db_column="id_usuario",
+        on_delete=models.PROTECT,
+        related_name="ventas",
+    )
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "Venta"
+        verbose_name = "Venta"
+        verbose_name_plural = "Ventas"
+
+    def __str__(self):
+        return f"Venta #{self.pk}"
+
+
+class DetalleVenta(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_detalle_venta")
+    venta = models.ForeignKey(
+        Venta,
+        db_column="id_venta",
+        on_delete=models.CASCADE,
+        related_name="detalles",
+    )
+    producto = models.ForeignKey(
+        Producto,
+        db_column="id_producto",
+        on_delete=models.PROTECT,
+        related_name="detalles_venta",
+    )
     cantidad = models.IntegerField()
-    fecha = models.DateTimeField(auto_now_add=True)
-    observaciones = models.TextField(blank=True, null=True)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "DetalleVenta"
+        verbose_name = "Detalle de venta"
+        verbose_name_plural = "Detalles de venta"
 
     def __str__(self):
-        return f"{self.tipo} - {self.producto.nombre} ({self.cantidad})"
+        return f"Detalle {self.pk} (Venta {self.venta_id})"
 
-class Alerta(models.Model):
-    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
-    mensaje = models.CharField(max_length=255)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    enviada_whatsapp = models.BooleanField(default=False)
+
+class Compra(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_compra")
+    proveedor = models.CharField(max_length=120)
+    fecha_compra = models.DateTimeField()
+    nota = models.CharField(max_length=200, blank=True, default="")
+    usuario = models.ForeignKey(
+        Usuario,
+        db_column="id_usuario",
+        on_delete=models.PROTECT,
+        related_name="compras",
+    )
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "Compra"
+        verbose_name = "Compra"
+        verbose_name_plural = "Compras"
 
     def __str__(self):
-        return f"Alerta: {self.producto.nombre} - Enviada: {self.enviada_whatsapp}"
+        return f"Compra #{self.pk} - {self.proveedor}"
+
+
+class DetalleCompra(models.Model):
+    id = models.AutoField(primary_key=True, db_column="id_detalle_compra")
+    compra = models.ForeignKey(
+        Compra,
+        db_column="id_compra",
+        on_delete=models.CASCADE,
+        related_name="detalles",
+    )
+    producto = models.ForeignKey(
+        Producto,
+        db_column="id_producto",
+        on_delete=models.PROTECT,
+        related_name="detalles_compra",
+    )
+    cantidad = models.IntegerField()
+    costo_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha_caducidad = models.DateField(null=True, blank=True)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "DetalleCompra"
+        verbose_name = "Detalle de compra"
+        verbose_name_plural = "Detalles de compra"
+
+    def __str__(self):
+        return f"Detalle {self.pk} (Compra {self.compra_id})"
+
+
+class MovimientoInventario(models.Model):
+    TIPO_ENTRADA = "entrada"
+    TIPO_SALIDA = "salida"
+    TIPO_MERMA = "merma"
+    TIPO_CORRECCION = "correccion"
+    TIPO_CHOICES = [
+        (TIPO_ENTRADA, "Entrada"),
+        (TIPO_SALIDA, "Salida"),
+        (TIPO_MERMA, "Merma"),
+        (TIPO_CORRECCION, "Correccion"),
+    ]
+
+    MOTIVO_MERMA_CADUCADO = "caducado"
+    MOTIVO_MERMA_DANADO = "danado"
+    MOTIVO_MERMA_CONSUMO_PROPIO = "consumo_propio"
+    MOTIVO_MERMA_DEVOLUCION_PROVEEDOR = "devolucion_proveedor"
+    MOTIVO_MERMA_OTRO = "otro"
+    MOTIVO_MERMA_CHOICES = [
+        (MOTIVO_MERMA_CADUCADO, "Caducado"),
+        (MOTIVO_MERMA_DANADO, "Danado"),
+        (MOTIVO_MERMA_CONSUMO_PROPIO, "Consumo propio"),
+        (MOTIVO_MERMA_DEVOLUCION_PROVEEDOR, "Devolucion a proveedor"),
+        (MOTIVO_MERMA_OTRO, "Otro"),
+    ]
+
+    id = models.AutoField(primary_key=True, db_column="id_movimiento")
+    producto = models.ForeignKey(
+        Producto,
+        db_column="id_producto",
+        on_delete=models.PROTECT,
+        related_name="movimientos",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        db_column="id_usuario",
+        on_delete=models.PROTECT,
+        related_name="movimientos",
+    )
+    venta = models.ForeignKey(
+        Venta,
+        db_column="id_venta",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="movimientos",
+    )
+    compra = models.ForeignKey(
+        Compra,
+        db_column="id_compra",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="movimientos",
+    )
+    tipo_movimiento = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    motivo_merma = models.CharField(
+        max_length=30, choices=MOTIVO_MERMA_CHOICES, null=True, blank=True
+    )
+    motivo = models.CharField(max_length=200, null=True, blank=True)
+    cantidad = models.IntegerField()
+    stock_resultante = models.IntegerField(default=0)
+    fecha_movimiento = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "MovimientoInventario"
+        verbose_name = "Movimiento de inventario"
+        verbose_name_plural = "Movimientos de inventario"
+        constraints = [
+            models.CheckConstraint(condition=Q(stock_resultante__gte=0), name="movimiento_stock_no_negativo"),
+            CheckConstraint(
+                check=(
+                    (~Q(tipo_movimiento="correccion") | Q(motivo__isnull=False))
+                    & (~Q(tipo_movimiento="merma") | Q(motivo_merma__isnull=False))
+                    & (~Q(motivo_merma="otro") | Q(motivo__isnull=False))
+                ),
+                name="chk_movimiento_motivo",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tipo_movimiento} - {self.producto.nombre} ({self.cantidad})"
+
+
+class AlertaStock(models.Model):
+    TIPO_STOCK_BAJO = "stock_bajo"
+    TIPO_CADUCIDAD = "caducidad"
+    TIPO_ALERTA_CHOICES = [
+        (TIPO_STOCK_BAJO, "Stock bajo"),
+        (TIPO_CADUCIDAD, "Caducidad"),
+    ]
+
+    id = models.AutoField(primary_key=True, db_column="id_alerta")
+    uuid_local = models.CharField(max_length=36, unique=True, default=generar_uuid_local)
+    producto = models.ForeignKey(
+        Producto,
+        db_column="id_producto",
+        on_delete=models.PROTECT,
+        related_name="alertas",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        db_column="id_usuario",
+        on_delete=models.PROTECT,
+        related_name="alertas",
+    )
+    tipo_alerta = models.CharField(max_length=20, choices=TIPO_ALERTA_CHOICES, default="stock_bajo")
+    nivel_stock = models.IntegerField(default=0)
+    fecha_generacion = models.DateTimeField(auto_now_add=True)
+    enviada = models.BooleanField(default=False)
+    fecha_envio = models.DateTimeField(null=True, blank=True)
+    mensaje = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "AlertaStock"
+        verbose_name = "Alerta de stock"
+        verbose_name_plural = "Alertas de stock"
+
+    def __str__(self):
+        return f"Alerta {self.tipo_alerta} - {self.producto.nombre}"
+
+# Compatibilidad con imports del proyecto original. Son aliases de la misma clase;
+# no crean otros modelos ni otras tablas.
+Movimiento = MovimientoInventario
+Alerta = AlertaStock
