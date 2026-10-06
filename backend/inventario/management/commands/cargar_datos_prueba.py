@@ -203,6 +203,8 @@ class Command(BaseCommand):
                     "codigo_barras": f"750{1000000 + i:07d}",
                     "unidad_medida": unidad,
                     "precio_venta": precio,
+                    "ultimo_costo": round(precio * random.choice([0.62, 0.66, 0.70]), 2),
+                    "tipo_empaque": "caja" if empaque else None,
                     "precio_mayoreo": mayoreo,
                     "cantidad_minima_mayoreo": cant_min,
                     "piezas_por_empaque": empaque,

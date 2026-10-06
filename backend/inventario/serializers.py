@@ -2,7 +2,7 @@
 No incorpora endpoints del catálogo ampliado ni operaciones nuevas.
 """
 from rest_framework import serializers
-from .models import Categoria, Producto, Movimiento, Alerta
+from .models import Categoria, Producto, Movimiento
 
 class CategoriaSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,9 +34,3 @@ class MovimientoSerializer(serializers.ModelSerializer):
         data['tipo'] = data['tipo'].upper()
         return data
 
-class AlertaSerializer(serializers.ModelSerializer):
-    fecha_creacion = serializers.DateTimeField(source='fecha_generacion', read_only=True)
-    enviada_whatsapp = serializers.BooleanField(source='enviada', read_only=True)
-    class Meta:
-        model = Alerta
-        fields = ['id', 'producto', 'mensaje', 'fecha_creacion', 'enviada_whatsapp']

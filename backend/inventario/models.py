@@ -1,5 +1,5 @@
 import uuid
-
+from datetime import time
 from django.db import models
 from usuarios.models import Usuario
 from django.db.models import CheckConstraint, Q
@@ -44,7 +44,10 @@ class Configuracion(models.Model):
     usa_codigo_barras = models.BooleanField(default=False)
     alertas_activas = models.BooleanField(default=True)
     vende_mayoreo = models.BooleanField(default=False)
-
+    telefono_alertas = models.CharField(max_length=20, blank=True, default="")
+    hora_resumen = models.TimeField(default=time(20, 0))
+    dias_aviso_caducidad = models.PositiveIntegerField(default=30)
+    
     class Meta:
         db_table = "Configuracion"
         verbose_name = "Configuracion"
@@ -79,8 +82,11 @@ class Producto(models.Model):
         (UNIDAD_BOLSA, "Bolsa"),
         (UNIDAD_CAJA, "Caja"),
         (UNIDAD_PAQUETE, "Paquete"),
-        ("gramo", "Gramo"),
-        ("litro", "Litro"),
+    ]
+    TIPO_EMPAQUE_CHOICES = [
+        ("caja", "Caja"),
+        ("bolsa", "Bolsa"),
+        ("paquete", "Paquete"),
     ]
 
     id = models.AutoField(primary_key=True, db_column="id_producto")
@@ -95,9 +101,11 @@ class Producto(models.Model):
     )
     unidad_medida = models.CharField(max_length=20, choices=UNIDAD_CHOICES, default="pieza")
     precio_venta = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    ultimo_costo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     precio_mayoreo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     cantidad_minima_mayoreo = models.IntegerField(null=True, blank=True)
     piezas_por_empaque = models.IntegerField(null=True, blank=True)
+    tipo_empaque = models.CharField(max_length=10, choices=TIPO_EMPAQUE_CHOICES, null=True, blank=True)
     fecha_caducidad = models.DateField(null=True, blank=True)
     imagen = models.ImageField(upload_to="productos/", null=True, blank=True)
     marca = models.CharField(max_length=80, blank=True, default="")
@@ -184,10 +192,17 @@ class DetalleVenta(models.Model):
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
+    TIPO_PRECIO_CHOICES = [
+        ("normal", "Normal"),
+        ("mayoreo", "Mayoreo"),
+        ("promocion", "Promoción"),
+        ("editado", "Editado"),
+    ]
+    tipo_precio = models.CharField(max_length=10, choices=TIPO_PRECIO_CHOICES, default="normal")
+
     class Meta:
         db_table = "DetalleVenta"
-        verbose_name = "Detalle de venta"
-        verbose_name_plural = "Detalles de venta"
+   
 
     def __str__(self):
         return f"Detalle {self.pk} (Venta {self.venta_id})"
@@ -326,44 +341,6 @@ class MovimientoInventario(models.Model):
         return f"{self.tipo_movimiento} - {self.producto.nombre} ({self.cantidad})"
 
 
-class AlertaStock(models.Model):
-    TIPO_STOCK_BAJO = "stock_bajo"
-    TIPO_CADUCIDAD = "caducidad"
-    TIPO_ALERTA_CHOICES = [
-        (TIPO_STOCK_BAJO, "Stock bajo"),
-        (TIPO_CADUCIDAD, "Caducidad"),
-    ]
-
-    id = models.AutoField(primary_key=True, db_column="id_alerta")
-    uuid_local = models.CharField(max_length=36, unique=True, default=generar_uuid_local)
-    producto = models.ForeignKey(
-        Producto,
-        db_column="id_producto",
-        on_delete=models.PROTECT,
-        related_name="alertas",
-    )
-    usuario = models.ForeignKey(
-        Usuario,
-        db_column="id_usuario",
-        on_delete=models.PROTECT,
-        related_name="alertas",
-    )
-    tipo_alerta = models.CharField(max_length=20, choices=TIPO_ALERTA_CHOICES, default="stock_bajo")
-    nivel_stock = models.IntegerField(default=0)
-    fecha_generacion = models.DateTimeField(auto_now_add=True)
-    enviada = models.BooleanField(default=False)
-    fecha_envio = models.DateTimeField(null=True, blank=True)
-    mensaje = models.TextField(null=True, blank=True)
-
-    class Meta:
-        db_table = "AlertaStock"
-        verbose_name = "Alerta de stock"
-        verbose_name_plural = "Alertas de stock"
-
-    def __str__(self):
-        return f"Alerta {self.tipo_alerta} - {self.producto.nombre}"
-
 # Compatibilidad con imports del proyecto original. Son aliases de la misma clase;
 # no crean otros modelos ni otras tablas.
 Movimiento = MovimientoInventario
-Alerta = AlertaStock

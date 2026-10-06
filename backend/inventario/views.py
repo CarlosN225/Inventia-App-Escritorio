@@ -3,8 +3,8 @@ deciden qué hacer cuando el frontend pide o envía información."""
 
 from rest_framework import viewsets, mixins
 
-from .models import Categoria, Producto, MovimientoInventario, AlertaStock
-from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer, AlertaSerializer
+from .models import Categoria, Producto, MovimientoInventario
+from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer
 from .services import registrar_movimiento
 from usuarios.permissions import EsUsuarioAutenticado, EsPropietario
 
@@ -48,11 +48,3 @@ class MovimientoViewSet(mixins.CreateModelMixin,
 
     def perform_create(self, serializer):
         registrar_movimiento(serializer)
-
-
-class AlertaViewSet(viewsets.ReadOnlyModelViewSet):
-    """Las alertas las genera el sistema solo; aquí únicamente se consultan."""
-
-    queryset = AlertaStock.objects.all().order_by("-fecha_generacion")
-    serializer_class = AlertaSerializer
-    permission_classes = [EsUsuarioAutenticado]
