@@ -209,7 +209,7 @@ class Command(BaseCommand):
                     "cantidad_minima_mayoreo": cant_min,
                     "piezas_por_empaque": empaque,
                     "fecha_caducidad": fecha_cad,
-                    "stock_actual": random.randint(5, 120),
+                    "stock_actual": random.randint(max(0, stock_minimo - 4), stock_maximo),
                     "stock_minimo": stock_minimo,
                     "stock_maximo": stock_maximo,
                     "activo": True,
