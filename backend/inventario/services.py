@@ -1,13 +1,17 @@
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
-from .models import Producto, Alerta
+from .models import Producto
+from usuarios.models import Usuario
 
 
 @transaction.atomic
 def registrar_movimiento(serializer):
+    """Registra un movimiento y actualiza el stock del producto en una sola transacción.
+    Las alertas ya no se guardan aquí: el resumen diario las calcula en vivo (app alertas).
+    TODO (Santi): agregar los tipos merma y corrección."""
     datos = serializer.validated_data
-    tipo = datos["tipo"]
+    tipo = datos["tipo_movimiento"]
     cantidad = datos["cantidad"]
 
     # Traemos el producto "bloqueado" para que nadie lo modifique al mismo tiempo
@@ -16,36 +20,19 @@ def registrar_movimiento(serializer):
     if cantidad <= 0:
         raise ValidationError({"cantidad": "La cantidad debe ser mayor a 0."})
 
-    stock_anterior = producto.cantidad
-
-    if tipo == "ENTRADA":
-        producto.cantidad += cantidad
-    elif tipo == "SALIDA":
-        if cantidad > producto.cantidad:
+    if tipo == "entrada":
+        producto.stock_actual += cantidad
+    elif tipo == "salida":
+        if cantidad > producto.stock_actual:
             raise ValidationError({
-                "cantidad": f"No hay suficiente stock. Disponible: {producto.cantidad}."
+                "cantidad": f"No hay suficiente stock. Disponible: {producto.stock_actual}."
             })
-        producto.cantidad -= cantidad
+        producto.stock_actual -= cantidad
     else:
-        raise ValidationError({"tipo": "Tipo de movimiento no válido."})
+        raise ValidationError({"tipo_movimiento": "Tipo de movimiento no válido."})
 
-    producto.save(update_fields=["cantidad"])
-    movimiento = serializer.save()
+    producto.save(update_fields=["stock_actual"])
 
-    # Alerta solo cuando el producto CRUZA el stock mínimo hacia abajo
-    estaba_bien = stock_anterior > producto.stock_minimo
-    ahora_esta_bajo = producto.cantidad <= producto.stock_minimo
-
-    if estaba_bien and ahora_esta_bajo:
-        Alerta.objects.create(
-            producto=producto,
-            mensaje=(
-                f"Stock bajo: {producto.nombre} ({producto.codigo}) "
-                f"tiene {producto.cantidad} piezas. Mínimo: {producto.stock_minimo}."
-            ),
-            enviada_whatsapp=False,
-        )
-        # Aquí después Héctor conecta Twilio para mandar el WhatsApp
-        # y marcar enviada_whatsapp=True cuando sí se envíe.
-
-    return movimiento
+    # El DER requiere autor y saldo: se toman de la sesión y del stock calculado
+    usuario = Usuario.objects.get(pk=serializer.context["request"].session["id_usuario"])
+    return serializer.save(usuario=usuario, stock_resultante=producto.stock_actual)

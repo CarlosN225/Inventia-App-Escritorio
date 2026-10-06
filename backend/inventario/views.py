@@ -1,9 +1,10 @@
-"""Las vistas son los controladores que toman el serializers.py
+"""Las vistas son los controladores que toman el serializers.py y
 deciden qué hacer cuando el frontend pide o envía información."""
 
 from rest_framework import viewsets, mixins
-from .models import Categoria, Producto, Movimiento, Alerta
-from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer, AlertaSerializer
+
+from .models import Categoria, Producto, MovimientoInventario
+from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer
 from .services import registrar_movimiento
 from usuarios.permissions import EsUsuarioAutenticado, EsPropietario
 
@@ -41,17 +42,9 @@ class MovimientoViewSet(mixins.CreateModelMixin,
     """Los movimientos se crean y consultan, pero no se editan ni se borran,
     para que el stock nunca quede descuadrado."""
 
-    queryset = Movimiento.objects.all().order_by("-fecha")
+    queryset = MovimientoInventario.objects.all().order_by("-fecha_movimiento")
     serializer_class = MovimientoSerializer
     permission_classes = [EsUsuarioAutenticado]
 
     def perform_create(self, serializer):
         registrar_movimiento(serializer)
-
-
-class AlertaViewSet(viewsets.ReadOnlyModelViewSet):
-    """Las alertas las genera el sistema solo; aquí únicamente se consultan."""
-
-    queryset = Alerta.objects.all().order_by("-fecha_creacion")
-    serializer_class = AlertaSerializer
-    permission_classes = [EsUsuarioAutenticado]
