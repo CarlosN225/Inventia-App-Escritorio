@@ -772,34 +772,138 @@
 */
 
 .cf-menu-acciones-usuario__dropdown {
-
   position: absolute;
-
   top: 50%;
-  left: calc(100% + 8px);
-
-  right: auto;
-
-  transform: translateY(-50%);
-
+  right: calc(100% + 8px);
+  left: auto;
   z-index: 9999;
-
-  min-width: 220px;
-  padding: 6px;
-
-  background: #ffffff;
-
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-
-  box-shadow:
-    0 10px 25px rgba(0, 0, 0, 0.12),
-    0 4px 8px rgba(0, 0, 0, 0.06);
-
   display: flex;
   flex-direction: column;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--d-borde);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow:
+    0 12px 28px rgba(11, 18, 32, 0.14),
+    0 4px 8px rgba(11, 18, 32, 0.06);
+  transform: translateY(-50%);
+  animation: cf-menu-aparecer 0.12s ease-out;
 }
 
+@keyframes cf-menu-aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+/* ============================================================
+   MODAL EDITAR USUARIO — pulido
+   ============================================================ */
+
+/* Fondo de atrás difuminado */
+.cf-modal-overlay {
+  background: rgba(11, 18, 32, 0.4);
+  backdrop-filter: blur(3px);
+  animation: cf-fondo-aparecer 0.15s ease-out;
+}
+
+@keyframes cf-fondo-aparecer {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* La ventana */
+.cf-modal {
+  padding: 24px 26px;
+  border: 1px solid var(--d-borde);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(11, 18, 32, 0.25);
+  animation: cf-modal-entrar 0.18s ease-out;
+}
+
+@keyframes cf-modal-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Encabezado con el degradado del topbar y línea divisoria */
+.cf-modal__cabecera {
+  align-items: center;
+  margin: -24px -26px 22px;
+  padding: 20px 26px 18px;
+  border-bottom: 1px solid var(--d-borde-2);
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, #eef8fc 0%, #f5faff 50%, #eef2fd 100%);
+}
+
+.cf-modal__cabecera h2,
+.cf-modal__cabecera h3 {
+  margin: 0;
+  color: var(--d-marino);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cf-modal__cabecera p {
+  margin: 3px 0 0;
+  color: var(--d-gris);
+  font-size: 13px;
+}
+
+/* Botón de cerrar (X) */
+.cf-modal__cabecera button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--d-borde);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--d-gris);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.cf-modal__cabecera button:hover {
+  border-color: #f3b4b4;
+  color: var(--d-rojo);
+}
+
+/* Más aire entre los campos */
+.cf-modal .cf-campos {
+  row-gap: 18px;
+}
+
+/* Campos bloqueados (Rol): que se note que no se editan */
+.cf-modal .cf-input:disabled,
+.cf-modal .cf-input[readonly] {
+  border-style: dashed;
+  background: #f1f4f9;
+  color: var(--d-gris);
+  cursor: not-allowed;
+}
+
+/* Botones en su propia franja gris, abajo */
+.cf-modal .cf-nuevo__botones {
+  margin: 24px -26px -24px;
+  padding: 14px 26px;
+  border-top: 1px solid var(--d-borde-2);
+  border-radius: 0 0 16px 16px;
+  background: #f8fafc;
+}
 
 /* Opciones del menú */
 
