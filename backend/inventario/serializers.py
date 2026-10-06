@@ -10,16 +10,45 @@ class CategoriaSerializer(serializers.ModelSerializer):
         fields = ['id', 'nombre', 'descripcion']
 
 class ProductoSerializer(serializers.ModelSerializer):
-    codigo = serializers.CharField(source='codigo_barras', max_length=50)
-    cantidad = serializers.IntegerField(source='stock_actual', min_value=0, required=False)
+    """Producto con todos los campos del DER, con los nombres reales del modelo.
+    Al encargado no se le manda el costo (solo el propietario ve costos y ganancias)."""
+
+    categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
+
     class Meta:
         model = Producto
-        fields = ['id', 'codigo', 'nombre', 'categoria', 'cantidad', 'stock_minimo']
-    def validate_codigo(self, value):
-        qs = Producto.objects.filter(codigo_barras=value)
-        if self.instance: qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists(): raise serializers.ValidationError('Ese código ya existe.')
-        return value
+        fields = [
+            "id",
+            "codigo_barras",
+            "nombre",
+            "descripcion",
+            "marca",
+            "categoria",
+            "categoria_nombre",
+            "unidad_medida",
+            "precio_venta",
+            "ultimo_costo",
+            "precio_mayoreo",
+            "cantidad_minima_mayoreo",
+            "piezas_por_empaque",
+            "tipo_empaque",
+            "fecha_caducidad",
+            "imagen",
+            "stock_actual",
+            "stock_minimo",
+            "stock_maximo",
+            "activo",
+        ]
+
+    def to_representation(self, instance):
+        datos = super().to_representation(instance)
+        request = self.context.get("request")
+        rol = request.session.get("rol") if request else None
+
+        if rol != "propietario":
+            datos.pop("ultimo_costo", None)
+
+        return datos
 
 class MovimientoSerializer(serializers.ModelSerializer):
     tipo = serializers.ChoiceField(source='tipo_movimiento', choices=['ENTRADA','SALIDA'])
