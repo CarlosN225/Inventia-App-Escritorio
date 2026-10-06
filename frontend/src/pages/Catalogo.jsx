@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   Plus,
@@ -139,6 +139,7 @@ function FotoProducto({ producto, grande = false }) {
 
 export default function Catalogo() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [usuarioActual, setUsuarioActual] = useState(null)
   const [productos, setProductos] = useState([])
@@ -146,6 +147,7 @@ export default function Catalogo() {
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null) // { texto, tipo: 'ok' | 'error' }
   const [aCambiar, setACambiar] = useState(null) // producto que se va a desactivar o reactivar
+  const [resaltado, setResaltado] = useState(null) // id del producto recién guardado
 
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState('Todas')
@@ -172,6 +174,26 @@ export default function Catalogo() {
       setCargando(false)
     }
   }
+  // Aviso que manda el formulario al guardar (ej. "Chocolate Carlos V se actualizó.")
+  useEffect(() => {
+    const { aviso: avisoRecibido, resaltar } = location.state ?? {}
+    if (!avisoRecibido) return
+
+    setAviso(avisoRecibido)
+    setResaltado(resaltar ?? null)
+
+    // Lo borra para que no vuelva a salir si recargas la página
+    navigate(location.pathname, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // La notificación se va sola a los 4 segundos
+  useEffect(() => {
+    if (!aviso) return
+    const temporizador = setTimeout(() => setAviso(null), 4000)
+    return () => clearTimeout(temporizador)
+  }, [aviso])
+
 
   useEffect(() => {
     getUsuarioActual()
@@ -208,6 +230,17 @@ export default function Catalogo() {
 
   const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
   const desactivados = useMemo(() => productos.filter((p) => !p.activo), [productos])
+  // Lleva a la página del producto recién guardado y le quita el resaltado a los 3 segundos
+  useEffect(() => {
+    if (resaltado === null || cargando) return
+
+    const indice = activos.findIndex((p) => p.id === resaltado)
+    if (indice >= 0) setPagina(Math.floor(indice / POR_PAGINA) + 1)
+
+    const temporizador = setTimeout(() => setResaltado(null), 3000)
+    return () => clearTimeout(temporizador)
+  }, [resaltado, cargando, activos])
+
 
   const resumen = useMemo(
     () => ({
@@ -369,8 +402,8 @@ export default function Catalogo() {
       </header>
 
       {aviso && (
-        <div className={'cat-aviso' + (aviso.tipo === 'error' ? ' is-error' : '')} role="status">
-          {aviso.tipo === 'error' ? (
+        <div className={'cat-toast' + (aviso.tipo === 'error' ? ' is-error' : '')} role="status">          
+        {aviso.tipo === 'error' ? (
             <AlertCircle size={17} aria-hidden="true" />
           ) : (
             <CheckCircle2 size={17} aria-hidden="true" />
@@ -546,7 +579,10 @@ export default function Catalogo() {
                 const abreArriba = visibles.length > 3 && indice >= visibles.length - 2
 
                 return (
-                  <tr key={p.id} className={p.activo ? '' : 'cat-fila-inactiva'}>
+                 <tr
+                    key={p.id}
+                    className={(p.activo ? '' : 'cat-fila-inactiva') + (p.id === resaltado ? ' cat-fila-resaltada' : '')}
+                  >
                     <td className="cat-col-num">{numero}</td>
                     <td className="cat-col-producto">
                       <div className="cat-producto">
@@ -649,7 +685,14 @@ export default function Catalogo() {
               const m = margen(p)
 
               return (
-                <article className={'cat-tarjeta' + (p.activo ? '' : ' cat-tarjeta--inactiva')} key={p.id}>
+                <article
+                  className={
+                    'cat-tarjeta' +
+                    (p.activo ? '' : ' cat-tarjeta--inactiva') +
+                    (p.id === resaltado ? ' cat-tarjeta--resaltada' : '')
+                  }
+                  key={p.id}
+                >
                   <div className="cat-tarjeta__arriba">
                     <FotoProducto producto={p} grande />
                     <span className="cat-tarjeta__numero">No. {inicio + indice + 1}</span>

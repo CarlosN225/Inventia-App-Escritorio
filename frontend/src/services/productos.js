@@ -71,3 +71,98 @@ export function mensajeDeError(error) {
   }
   return 'Ocurrió un error inesperado. Intenta de nuevo.'
 }
+
+/* ============ Formulario de producto ============ */
+
+export async function obtenerProducto(id) {
+  const response = await axios.get(`${API_URL}/productos/${id}/`, CON_SESION)
+  return adaptarProducto(response.data)
+}
+
+export async function listarCategorias() {
+  const response = await axios.get(`${API_URL}/categorias/`, CON_SESION)
+  return response.data
+    .filter((c) => c.activa !== false)
+    .sort((a, b) => a.id - b.id)
+    .map((c) => ({ id: c.id, nombre: c.nombre }))
+}
+
+function aNumeroONulo(texto) {
+  return texto === '' || texto === null || texto === undefined ? null : Number(texto)
+}
+
+/* Traduce el formulario a los nombres del DER que espera el backend */
+export function aDatosBackend(form, esNuevo) {
+  const piezas = aNumeroONulo(form.piezasEmpaque)
+
+  const datos = {
+    nombre: form.nombre.trim(),
+    marca: form.marca.trim(),
+    descripcion: form.descripcion.trim() || null,
+    categoria: Number(form.categoria),
+    unidad_medida: form.unidad,
+    precio_venta: Number(form.precio),
+    precio_mayoreo: aNumeroONulo(form.precioMayoreo),
+    cantidad_minima_mayoreo: aNumeroONulo(form.minimoMayoreo),
+    piezas_por_empaque: piezas,
+    tipo_empaque: piezas ? form.tipoEmpaque : null,
+    stock_minimo: Number(form.minimo),
+    stock_maximo: aNumeroONulo(form.maximo),
+    fecha_caducidad: form.fechaCaducidad || null,
+    codigo_barras: form.codigoBarras.trim() || null,
+  }
+
+  // El stock solo se captura al crear; después cambia con ventas, compras, mermas o correcciones
+  if (esNuevo) datos.stock_actual = Number(form.stock)
+
+  return datos
+}
+
+export async function crearProducto(datos) {
+  const response = await axios.post(`${API_URL}/productos/`, datos, CON_SESION)
+  return adaptarProducto(response.data)
+}
+
+export async function actualizarProducto(id, datos) {
+  const response = await axios.patch(`${API_URL}/productos/${id}/`, datos, CON_SESION)
+  return adaptarProducto(response.data)
+}
+
+// Nombre del campo en el backend -> nombre del campo en el formulario
+const CAMPOS_FORMULARIO = {
+  nombre: 'nombre',
+  marca: 'marca',
+  descripcion: 'descripcion',
+  categoria: 'categoria',
+  precio_venta: 'precio',
+  precio_mayoreo: 'precioMayoreo',
+  cantidad_minima_mayoreo: 'minimoMayoreo',
+  unidad_medida: 'unidad',
+  piezas_por_empaque: 'piezasEmpaque',
+  stock_actual: 'stock',
+  stock_minimo: 'minimo',
+  stock_maximo: 'maximo',
+  fecha_caducidad: 'fechaCaducidad',
+  codigo_barras: 'codigoBarras',
+}
+
+/* Si el backend rechazó campos (error 400), los regresa listos para pintarlos en rojo */
+export function erroresDeCampos(error) {
+  if (error.response?.status !== 400 || typeof error.response.data !== 'object') return null
+
+  const errores = {}
+
+  Object.entries(error.response.data).forEach(([campo, mensajes]) => {
+    const destino = CAMPOS_FORMULARIO[campo]
+    if (!destino) return
+
+    const texto = Array.isArray(mensajes) ? String(mensajes[0]) : String(mensajes)
+    errores[destino] = /already exists|ya existe/i.test(texto)
+      ? campo === 'codigo_barras'
+        ? 'Ya hay otro producto con este código'
+        : 'Ya existe un producto con este dato'
+      : texto
+  })
+
+  return Object.keys(errores).length > 0 ? errores : null
+}
