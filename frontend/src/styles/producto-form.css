@@ -832,3 +832,38 @@ textarea.pf-input {
   color: var(--d-azul);
   cursor: default;
 }
+
+/* ============ CONECTADO AL BACKEND ============ */
+
+.pf-girando {
+  animation: pf-girar 0.9s linear infinite;
+}
+
+@keyframes pf-girar {
+  to { transform: rotate(360deg); }
+}
+
+/* Aviso de "todavía no se guarda" */
+.pf-pendiente {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px dashed #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.pf-pendiente svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pf-imagen-bloque .pf-pendiente,
+.pf-lateral .pf-pendiente {
+  margin: 8px 0 0;
+}

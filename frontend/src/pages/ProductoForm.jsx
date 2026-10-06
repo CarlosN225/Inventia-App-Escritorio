@@ -13,23 +13,31 @@ import {
   Eye,
   BarChart3,
   ImagePlus,
-  X,
   Save,
   Plus,
   Trash2,
   Candy,
-  Clock,
   AlertCircle,
   TrendingUp,
   CheckCircle2,
   ArrowLeft,
+  Loader2,
+  Info,
 } from 'lucide-react'
 
-import { PRODUCTOS, CATEGORIAS, DETALLES } from '../data/productos'
 import { getUsuarioActual } from '../services/auth'
+import {
+  obtenerProducto,
+  listarCategorias,
+  aDatosBackend,
+  crearProducto,
+  actualizarProducto,
+  erroresDeCampos,
+  mensajeDeError,
+} from '../services/productos'
 import '../styles/producto-form.css'
 
-// TODO: traer estos interruptores de la Configuración del negocio
+// TODO: traer estos interruptores de la Configuración del negocio (endpoint de Héctor)
 const CONFIG = {
   maneja_caducidad: true,
   vende_mayoreo: true,
@@ -42,6 +50,12 @@ const UNIDADES = [
   { id: 'bolsa', label: 'Bolsa', plural: 'bolsas' },
   { id: 'caja', label: 'Caja', plural: 'cajas' },
   { id: 'paquete', label: 'Paquete', plural: 'paquetes' },
+]
+
+const EMPAQUES = [
+  { id: 'caja', label: 'Caja' },
+  { id: 'bolsa', label: 'Bolsa' },
+  { id: 'paquete', label: 'Paquete' },
 ]
 
 const MAX_NOMBRE = 80
@@ -67,22 +81,24 @@ function aTexto(valor) {
   return valor === null || valor === undefined ? '' : String(valor)
 }
 
-function crearFormulario(producto, detalles) {
+// Arma el formulario a partir de un producto del backend (ya traducido)
+function crearFormulario(producto) {
   return {
     nombre: producto?.nombre ?? '',
     marca: producto?.marca ?? '',
-    categoria: producto?.categoria ?? '',
-    descripcion: detalles?.descripcion ?? '',
+    categoria: producto ? String(producto.categoriaId) : '',
+    descripcion: producto?.descripcion ?? '',
     precio: aTexto(producto?.precio),
-    precioMayoreo: aTexto(detalles?.precioMayoreo),
-    minimoMayoreo: aTexto(detalles?.minimoMayoreo),
-    unidad: detalles?.unidad ?? 'pieza',
-    piezasEmpaque: aTexto(detalles?.piezasEmpaque),
+    precioMayoreo: aTexto(producto?.precioMayoreo),
+    minimoMayoreo: aTexto(producto?.minimoMayoreo),
+    unidad: producto?.unidad ?? 'pieza',
+    piezasEmpaque: aTexto(producto?.piezasEmpaque),
+    tipoEmpaque: producto?.empaque ?? 'caja',
     stock: producto ? String(producto.stock) : '0',
     minimo: aTexto(producto?.minimo),
-    maximo: aTexto(detalles?.maximo),
-    fechaCaducidad: detalles?.fechaCaducidad ?? '',
-    codigoBarras: detalles?.codigoBarras ?? '',
+    maximo: aTexto(producto?.maximo),
+    fechaCaducidad: producto?.fechaCaducidad ?? '',
+    codigoBarras: producto?.codigoBarras ?? '',
   }
 }
 
@@ -183,38 +199,88 @@ function Campo({ etiqueta, htmlFor, requerido, ayuda, error, contador, children 
   )
 }
 
+function Pendiente({ texto }) {
+  return (
+    <p className="pf-pendiente">
+      <Info size={14} aria-hidden="true" />
+      {texto}
+    </p>
+  )
+}
+
 /* ---------- Pantalla ---------- */
 
 export default function ProductoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
-
   const esNuevo = !id
-  const producto = esNuevo ? null : PRODUCTOS.find((p) => p.id === Number(id)) ?? null
-  const detalles = producto ? DETALLES[producto.id] ?? null : null
 
-  const [form, setForm] = useState(() => crearFormulario(producto, detalles))
-  const [promociones, setPromociones] = useState(() => detalles?.promociones ?? [])
-  const [nuevaPromo, setNuevaPromo] = useState(null)
-  const [errorPromo, setErrorPromo] = useState('')
-  const [imagen, setImagen] = useState(null)
-  const [errorImagen, setErrorImagen] = useState('')
-  const [errores, setErrores] = useState({})
-  const [guardado, setGuardado] = useState(false)
-  const [incluirImagen, setIncluirImagen] = useState(false)
+  // Datos del backend
+  const [producto, setProducto] = useState(null)
+  const [categorias, setCategorias] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null) // null | 'no-encontrado' | mensaje
 
   const [usuarioActual, setUsuarioActual] = useState(null)
   const [cargandoUsuario, setCargandoUsuario] = useState(true)
 
+  // Formulario
+  const [form, setForm] = useState(() => crearFormulario(null))
+  const [errores, setErrores] = useState({})
+  const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState(null)
+
+  // Imagen y promociones (todavía no se guardan en el backend)
+  const [promociones, setPromociones] = useState([])
+  const [nuevaPromo, setNuevaPromo] = useState(null)
+  const [errorPromo, setErrorPromo] = useState('')
+  const [imagen, setImagen] = useState(null)
+  const [errorImagen, setErrorImagen] = useState('')
+  const [incluirImagen, setIncluirImagen] = useState(false)
+
   const inputImagenRef = useRef(null)
 
-  // Usuario que tiene la sesión abierta (para saber si es propietario)
+  // Usuario con la sesión abierta (para saber si es propietario)
   useEffect(() => {
     getUsuarioActual()
       .then(setUsuarioActual)
       .catch(() => setUsuarioActual(null))
       .finally(() => setCargandoUsuario(false))
   }, [])
+
+  // Categorías y, si es edición, el producto
+  useEffect(() => {
+    let sigueMontado = true
+
+    async function cargar() {
+      setCargando(true)
+      setErrorCarga(null)
+
+      try {
+        const [listaCategorias, productoBackend] = await Promise.all([
+          listarCategorias(),
+          esNuevo ? Promise.resolve(null) : obtenerProducto(id),
+        ])
+
+        if (!sigueMontado) return
+
+        setCategorias(listaCategorias)
+        setProducto(productoBackend)
+        setForm(crearFormulario(productoBackend))
+      } catch (e) {
+        if (!sigueMontado) return
+        setErrorCarga(e.response?.status === 404 ? 'no-encontrado' : mensajeDeError(e))
+      } finally {
+        if (sigueMontado) setCargando(false)
+      }
+    }
+
+    cargar()
+
+    return () => {
+      sigueMontado = false
+    }
+  }, [id, esNuevo])
 
   // Libera la memoria de la imagen anterior cuando se cambia o se quita
   useEffect(() => {
@@ -264,20 +330,18 @@ export default function ProductoForm() {
     procesarArchivo(event.dataTransfer.files?.[0])
   }
 
-  // "Sí": abre el explorador de archivos de una vez
   function elegirConImagen() {
     setIncluirImagen(true)
     inputImagenRef.current?.click()
   }
 
-  // "No": quita la imagen y se queda el icono del dulce
   function elegirSinImagen() {
     setIncluirImagen(false)
     setImagen(null)
     setErrorImagen('')
   }
 
-  /* ---------- Promociones ---------- */
+  /* ---------- Promociones (vista previa, aún no se guardan) ---------- */
 
   function abrirNuevaPromo() {
     setNuevaPromo({ tipo: 'porcentaje', valor: '', inicio: '', fin: '' })
@@ -307,7 +371,6 @@ export default function ProductoForm() {
     setNuevaPromo(null)
   }
 
-  // Enter dentro del formulario de promoción agrega la promoción, no guarda el producto
   function enterEnPromo(event) {
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -325,8 +388,9 @@ export default function ProductoForm() {
 
   /* ---------- Guardar ---------- */
 
-  function guardar(event) {
+  async function guardar(event) {
     event.preventDefault()
+    setErrorGuardar(null)
 
     const nuevosErrores = validar(form)
     setErrores(nuevosErrores)
@@ -336,9 +400,42 @@ export default function ProductoForm() {
       return
     }
 
-    // TODO: mandar form, promociones e imagen al backend
-    setGuardado(true)
-    setTimeout(() => navigate('/catalogo'), 1200)
+    setGuardando(true)
+
+    try {
+      const datos = aDatosBackend(form, esNuevo)
+
+             const resultado = esNuevo
+        ? await crearProducto(datos)
+        : await actualizarProducto(producto.id, datos)
+
+      // TODO: guardar imagen y promociones cuando existan sus endpoints
+
+      // Regresa al catálogo con la notificación y el producto resaltado
+      navigate('/catalogo', {
+        state: {
+          aviso: {
+            tipo: 'ok',
+            texto: esNuevo
+              ? `${resultado.nombre} se agregó al catálogo.`
+              : `${resultado.nombre} se actualizó.`,
+          },
+          resaltar: resultado.id,
+        },
+      })
+    } catch (e) {
+      const deCampos = erroresDeCampos(e)
+
+      if (deCampos) {
+        setErrores(deCampos)
+      } else {
+        setErrorGuardar(mensajeDeError(e))
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setGuardando(false)
+    }
   }
 
   /* ---------- Cálculos en vivo ---------- */
@@ -350,6 +447,7 @@ export default function ProductoForm() {
   const margenInfo = nivelMargen(margenPct)
 
   const unidad = UNIDADES.find((u) => u.id === form.unidad) ?? UNIDADES[0]
+  const empaque = EMPAQUES.find((e) => e.id === form.tipoEmpaque) ?? EMPAQUES[0]
   const piezasEmpaque = Number(form.piezasEmpaque) || 0
   const minimoMayoreo = Number(form.minimoMayoreo) || 0
   const empaquesMayoreo =
@@ -376,8 +474,6 @@ export default function ProductoForm() {
           ? { clase: 'aviso', texto: `Caduca en ${diasCaducidad} días` }
           : { clase: 'ok', texto: 'Vigente' }
 
-  const vendidasMes = detalles?.vendidasMes ?? 0
-  const gananciaMes = utilidad !== null ? vendidasMes * utilidad : null
   const hayErrores = Object.keys(errores).length > 0
 
   /* ---------- Solo el propietario puede entrar ---------- */
@@ -399,14 +495,31 @@ export default function ProductoForm() {
     )
   }
 
-  /* ---------- Producto que no existe ---------- */
+  /* ---------- Cargando o con error ---------- */
 
-  if (!esNuevo && !producto) {
+  if (cargando) {
     return (
       <div className="pf">
         <div className="pf-panel pf-no-encontrado">
-          <h1 className="pf-titulo">Producto no encontrado</h1>
-          <p>Puede que se haya desactivado o que la dirección esté mal escrita.</p>
+          <Loader2 size={24} className="pf-girando" aria-hidden="true" />
+          <p>{esNuevo ? 'Preparando el formulario…' : 'Cargando producto…'}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (errorCarga) {
+    return (
+      <div className="pf">
+        <div className="pf-panel pf-no-encontrado">
+          <h1 className="pf-titulo">
+            {errorCarga === 'no-encontrado' ? 'Producto no encontrado' : 'No pudimos cargar el producto'}
+          </h1>
+          <p>
+            {errorCarga === 'no-encontrado'
+              ? 'Puede que la dirección esté mal escrita.'
+              : errorCarga}
+          </p>
           <button type="button" className="pf-boton pf-boton--secundario" onClick={() => navigate('/catalogo')}>
             <ArrowLeft size={15} aria-hidden="true" />
             Volver al catálogo
@@ -431,27 +544,26 @@ export default function ProductoForm() {
 
           <div className="pf-titulo-fila">
             <h1 className="pf-titulo">{esNuevo ? 'Nuevo producto' : 'Editar producto'}</h1>
-            {!esNuevo && <span className="pf-pastilla pf-pastilla--ok">Activo</span>}
+            {!esNuevo &&
+              (producto.activo ? (
+                <span className="pf-pastilla pf-pastilla--ok">Activo</span>
+              ) : (
+                <span className="pf-pastilla pf-pastilla--gris">Desactivado</span>
+              ))}
           </div>
         </div>
-
-        {/* TODO: fecha real desde el backend */}
-        {!esNuevo && (
-          <p className="pf-modificado">
-            <Clock size={14} aria-hidden="true" />
-            Última modificación: hoy a las 10:42
-          </p>
-        )}
       </header>
 
-      {guardado && (
-        <div className="pf-aviso pf-aviso--ok" role="status">
-          <CheckCircle2 size={18} aria-hidden="true" />
-          {esNuevo ? 'Producto creado.' : 'Cambios guardados.'} Regresando al catálogo…
+     
+
+      {errorGuardar && (
+        <div className="pf-aviso pf-aviso--error" role="alert">
+          <AlertCircle size={18} aria-hidden="true" />
+          {errorGuardar}
         </div>
       )}
 
-      {hayErrores && (
+      {hayErrores && !errorGuardar && (
         <div className="pf-aviso pf-aviso--error" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
           Revisa los campos marcados en rojo.
@@ -525,18 +637,8 @@ export default function ProductoForm() {
                   </p>
                 ) : !incluirImagen ? (
                   <p className="pf-ayuda">Se mostrará este icono</p>
-                ) : imagen ? (
-                  <button
-                    type="button"
-                    className="pf-enlace"
-                    onClick={() => inputImagenRef.current?.click()}
-                  >
-                    Cambiar imagen
-                  </button>
                 ) : (
-                  <p className="pf-ayuda">
-                    Del celular o descargada de internet · JPG, PNG o WebP · máx. {MAX_IMAGEN_MB} MB
-                  </p>
+                  <Pendiente texto="La foto todavía no se guarda; se conecta muy pronto." />
                 )}
               </div>
 
@@ -563,7 +665,7 @@ export default function ProductoForm() {
                 </Campo>
 
                 <div className="pf-fila pf-fila--2">
-                  <Campo etiqueta="Marca" htmlFor="pf-marca">
+                  <Campo etiqueta="Marca" htmlFor="pf-marca" error={errores.marca}>
                     <input
                       id="pf-marca"
                       className="pf-input"
@@ -581,16 +683,16 @@ export default function ProductoForm() {
                       onChange={(e) => cambiar('categoria', e.target.value)}
                     >
                       <option value="">Elige una categoría</option>
-                      {CATEGORIAS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
+                      {categorias.map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.nombre}
                         </option>
                       ))}
                     </select>
                   </Campo>
                 </div>
 
-                <Campo etiqueta="Descripción (opcional)" htmlFor="pf-descripcion">
+                <Campo etiqueta="Descripción (opcional)" htmlFor="pf-descripcion" error={errores.descripcion}>
                   <textarea
                     id="pf-descripcion"
                     className="pf-input"
@@ -627,18 +729,18 @@ export default function ProductoForm() {
               <Campo
                 etiqueta="Último costo"
                 htmlFor="pf-costo"
-                ayuda={costo !== null ? 'Se actualiza con cada compra' : 'Se llenará con la primera compra'}
+                ayuda={costo !== null && costo > 0 ? 'Se actualiza con cada compra' : 'Se llenará con la primera compra'}
               >
                 <div className="pf-grupo is-lectura">
                   <span className="pf-grupo__extra">$</span>
-                  <input id="pf-costo" readOnly value={costo !== null ? costo.toFixed(2) : '—'} />
+                  <input id="pf-costo" readOnly value={costo !== null && costo > 0 ? costo.toFixed(2) : '—'} />
                   <span className="pf-grupo__extra">MXN</span>
                 </div>
               </Campo>
 
               <div className="pf-campo">
                 <span className="pf-etiqueta">Margen calculado</span>
-                {margenInfo ? (
+                {margenInfo && costo > 0 ? (
                   <div className={`pf-margen pf-margen--${margenInfo.clase}`}>
                     <p className="pf-margen__valor">
                       <TrendingUp size={15} aria-hidden="true" />
@@ -706,7 +808,7 @@ export default function ProductoForm() {
                 <p className="pf-ayuda">
                   Se aplica solo al registrar la venta, cuando se llega a la cantidad mínima.
                   {empaquesMayoreo !== null &&
-                    ` ${minimoMayoreo} ${unidad.plural} = ${empaquesMayoreo} empaque${empaquesMayoreo === 1 ? '' : 's'}.`}
+                    ` ${minimoMayoreo} ${unidad.plural} = ${empaquesMayoreo} ${empaque.label.toLowerCase()}${empaquesMayoreo === 1 ? '' : 's'}.`}
                 </p>
               </div>
             </Seccion>
@@ -755,9 +857,28 @@ export default function ProductoForm() {
               </Campo>
 
               {piezasEmpaque > 0 ? (
-                <span className="pf-conversion">
-                  1 empaque del proveedor = {piezasEmpaque} {unidad.plural}
-                </span>
+                <>
+                  <div className="pf-campo">
+                    <span className="pf-etiqueta">El proveedor lo manda en</span>
+                    <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Tipo de empaque">
+                      {EMPAQUES.map((e) => (
+                        <button
+                          key={e.id}
+                          type="button"
+                          aria-pressed={form.tipoEmpaque === e.id}
+                          className={'pf-segmentado__opcion' + (form.tipoEmpaque === e.id ? ' is-activo' : '')}
+                          onClick={() => cambiar('tipoEmpaque', e.id)}
+                        >
+                          {e.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <span className="pf-conversion">
+                    1 {empaque.label.toLowerCase()} = {piezasEmpaque} {unidad.plural}
+                  </span>
+                </>
               ) : (
                 <p className="pf-ayuda">Ayuda a registrar compras por caja sin hacer cuentas.</p>
               )}
@@ -797,11 +918,7 @@ export default function ProductoForm() {
                 ) : esNuevo ? (
                   <p className="pf-ayuda">Lo que tienes hoy en el anaquel</p>
                 ) : (
-                  <button
-                    type="button"
-                    className="pf-enlace"
-                    onClick={() => navigate('/correccion-inventario')}
-                  >
+                  <button type="button" className="pf-enlace" onClick={() => navigate('/correccion-inventario')}>
                     ¿No cuadra? Corregir inventario
                   </button>
                 )}
@@ -864,10 +981,9 @@ export default function ProductoForm() {
               <Campo
                 etiqueta="Próxima fecha de caducidad"
                 htmlFor="pf-caducidad"
+                error={errores.fechaCaducidad}
                 ayuda={
-                  form.fechaCaducidad
-                    ? 'Se actualiza sola al registrar compras'
-                    : 'Déjalo vacío si el producto no caduca'
+                  form.fechaCaducidad ? 'Se actualiza sola al registrar compras' : 'Déjalo vacío si el producto no caduca'
                 }
               >
                 <input
@@ -891,9 +1007,10 @@ export default function ProductoForm() {
               <Campo
                 etiqueta="Código EAN / UPC"
                 htmlFor="pf-codigo"
+                error={errores.codigoBarras}
                 ayuda="Con lector USB: deja el cursor aquí y escanea"
               >
-                <div className="pf-grupo">
+                <div className={'pf-grupo' + (errores.codigoBarras ? ' is-error' : '')}>
                   <span className="pf-grupo__extra">
                     <Barcode size={16} aria-hidden="true" />
                   </span>
@@ -916,14 +1033,10 @@ export default function ProductoForm() {
               icono={Percent}
               titulo="Promociones"
               completa
-              extra={
-                promociones.length > 0 && (
-                  <span className="pf-pastilla pf-pastilla--gris">
-                    {promociones.length} {promociones.length === 1 ? 'promoción' : 'promociones'}
-                  </span>
-                )
-              }
+              extra={<span className="pf-pastilla pf-pastilla--gris">Próximamente</span>}
             >
+              <Pendiente texto="Puedes probar cómo se verán, pero todavía no se guardan: falta conectarlas con el sistema." />
+
               {promociones.length > 0 ? (
                 <ul className="pf-promos">
                   {promociones.map((p) => {
@@ -1101,22 +1214,26 @@ export default function ProductoForm() {
             {esNuevo ? (
               <p className="pf-ayuda">El resumen aparece cuando el producto tenga ventas.</p>
             ) : (
-              <dl className="pf-resumen">
-                <div>
-                  <dt>Stock disponible</dt>
-                  <dd>
-                    {stockActual} {unidad.plural}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Vendidas este mes</dt>
-                  <dd>{vendidasMes}</dd>
-                </div>
-                <div>
-                  <dt>Ganancia estimada del mes</dt>
-                  <dd className="is-verde">{gananciaMes !== null ? moneda.format(gananciaMes) : '—'}</dd>
-                </div>
-              </dl>
+              <>
+                <dl className="pf-resumen">
+                  <div>
+                    <dt>Stock disponible</dt>
+                    <dd>
+                      {stockActual} {unidad.plural}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Vendidas este mes</dt>
+                    <dd>—</dd>
+                  </div>
+                  <div>
+                    <dt>Ganancia estimada del mes</dt>
+                    <dd>—</dd>
+                  </div>
+                </dl>
+                {/* TODO: llenar con las ventas reales cuando se conecte Registrar venta */}
+                <Pendiente texto="Las ventas del mes aparecerán cuando se conecte Registrar venta." />
+              </>
             )}
           </section>
         </aside>
@@ -1132,9 +1249,13 @@ export default function ProductoForm() {
           <button type="button" className="pf-boton pf-boton--secundario" onClick={() => navigate('/catalogo')}>
             Cancelar
           </button>
-          <button type="submit" className="pf-boton pf-boton--primario" disabled={guardado}>
-            <Save size={16} aria-hidden="true" />
-            {esNuevo ? 'Crear producto' : 'Guardar cambios'}
+          <button type="submit" className="pf-boton pf-boton--primario" disabled={guardando}>
+            {guardando ? (
+              <Loader2 size={16} className="pf-girando" aria-hidden="true" />
+            ) : (
+              <Save size={16} aria-hidden="true" />
+            )}
+            {guardando ? 'Guardando…' : esNuevo ? 'Crear producto' : 'Guardar cambios'}
           </button>
         </div>
       </footer>
