@@ -8,6 +8,8 @@ import './styles/base.css'
 import './styles/layout.css'
 import './styles/components.css'
 // CAMBIO 1: estilos del tema oscuro y función que arranca el tema
+import './styles/tema-oscuro-pantallas.css'
+import './styles/tema-oscuro.css'
 import './styles/tema-oscuro.css'
 import { iniciarTema } from './services/tema'
 

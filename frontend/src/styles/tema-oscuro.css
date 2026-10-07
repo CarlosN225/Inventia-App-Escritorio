@@ -84,3 +84,116 @@
 }
 :root[data-theme='dark'] .user-menu__item:hover { background: var(--color-surface-2); }
 :root[data-theme='dark'] .user-menu__item--danger:hover { background: var(--color-danger-soft); }
+
+
+/* ============================================================
+   FASE 2 · CATÁLOGO (tema oscuro)
+   ============================================================ */
+
+/* Paleta local del Catálogo */
+:root[data-theme='dark'] .cat {
+  --d-azul:    #3b82f6;
+  --d-marino:  #e8edf6;
+  --d-gris:    #9aa8bf;
+  --d-gris-2:  #6f7f98;
+  --d-gris-3:  #41547a;
+  --d-borde:   #243148;
+  --d-borde-2: #1c2840;
+  --d-verde:   #34d399;
+  --d-ambar:   #fbbf24;
+  --d-rojo:    #f87171;
+}
+
+/* Paneles, tarjetas y menús (antes #ffffff) */
+:root[data-theme='dark'] .cat-panel,
+:root[data-theme='dark'] .cat-tarjeta,
+:root[data-theme='dark'] .cat-menu,
+:root[data-theme='dark'] .cat-resumen__chip {
+  background: var(--color-surface);
+}
+
+/* Chips de resumen (50 productos, stock bajo, agotados, por caducar) */
+:root[data-theme='dark'] .cat-resumen__chip:hover { border-color: var(--color-border-2); }
+:root[data-theme='dark'] .cat-resumen__chip--bajo    { background: #33250e; border-color: #5b3f12; color: #fbbf24; }
+:root[data-theme='dark'] .cat-resumen__chip--agotado { background: #3a1618; border-color: #5c2326; color: #f87171; }
+:root[data-theme='dark'] .cat-resumen__chip--caducar { background: #3a1620; border-color: #5c2333; color: #fb7185; }
+
+/* Buscador y filtro de estado */
+:root[data-theme='dark'] .cat-buscador input,
+:root[data-theme='dark'] .cat-estado select {
+  background: var(--color-surface-2);
+  color: var(--d-marino);
+}
+:root[data-theme='dark'] .cat-estado select option {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+:root[data-theme='dark'] .cat-buscador input:focus { box-shadow: 0 0 0 3px rgba(90, 160, 255, 0.22); }
+:root[data-theme='dark'] .cat-buscador__limpiar:hover { background: var(--color-surface-2); }
+
+/* Selector Tabla / Tarjetas */
+:root[data-theme='dark'] .cat-segmentado { background: var(--color-bg); }
+:root[data-theme='dark'] .cat-segmentado__opcion.is-activo {
+  background: var(--color-surface-2);
+  box-shadow: none;
+}
+
+/* Botones de categoría */
+:root[data-theme='dark'] .cat-categoria { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-categoria.is-activa {
+  background: var(--color-brand-soft);
+  border-color: #2a4a85;
+}
+
+/* Tabla */
+:root[data-theme='dark'] .cat .cat-tabla th { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat .cat-tabla tbody tr,
+:root[data-theme='dark'] .cat .cat-tabla tbody tr:nth-child(odd),
+:root[data-theme='dark'] .cat .cat-tabla tbody tr:nth-child(even) {
+  background: var(--color-surface);
+}
+:root[data-theme='dark'] .cat .cat-tabla tbody tr:hover { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-placeholder { background: var(--color-brand-soft); }
+:root[data-theme='dark'] .cat-chip {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+/* Etiquetas de stock y caducidad */
+:root[data-theme='dark'] .cat-stock--ok      { background: #0f2d25; border-color: #14532d; color: #34d399; }
+:root[data-theme='dark'] .cat-stock--bajo    { background: #33250e; border-color: #5b3f12; color: #fbbf24; }
+:root[data-theme='dark'] .cat-stock--agotado { background: #3a1618; border-color: #5c2326; color: #f87171; }
+:root[data-theme='dark'] .cat-caduca { background: #33250e; color: #fbbf24; }
+:root[data-theme='dark'] .cat-caduca.is-urgente { background: #3a1618; color: #f87171; }
+
+/* Acciones por fila y menú de tres puntos */
+:root[data-theme='dark'] .cat-icono-boton:hover { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-menu { box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5); }
+:root[data-theme='dark'] .cat-menu button:hover { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-menu button.is-peligro:hover { background: var(--color-danger-soft); }
+
+/* Vista de tarjetas */
+:root[data-theme='dark'] .cat-tarjeta:hover {
+  border-color: var(--color-border-2);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Botones, estado vacío y paginación */
+:root[data-theme='dark'] .cat-boton-primario:hover { background: #2563eb; }
+:root[data-theme='dark'] .cat-boton-secundario { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-boton-secundario:hover { border-color: var(--color-border-2); }
+:root[data-theme='dark'] .cat-vacio-estado__icono { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-paginacion__botones button { background: var(--color-surface-2); }
+:root[data-theme='dark'] .cat-paginacion__botones button:hover:not(:disabled) { border-color: var(--color-border-2); }
+
+/* ============================================================
+   MENÚ LATERAL · botón "Contraer" (se veía claro)
+   ============================================================ */
+:root[data-theme='dark'] .sidebar__toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-border);
+}
+:root[data-theme='dark'] .sidebar__toggle:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-border-2);
+}
