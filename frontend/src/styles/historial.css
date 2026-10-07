@@ -680,3 +680,54 @@
   color: var(--d-gris);
   font-size: 12.5px;
 }
+
+/* ============ VENTAS Y COMPRAS AGRUPADAS ============ */
+
+.hi-grupo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hi-grupo__sub {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--d-gris);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hi-cantidad--neutra {
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.hi-total {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ EXPANDIR / CONTRAER TODO ============ */
+.hi-expandir {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--d-azul);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hi-expandir:hover { background: #eef3fb; }
+
+.hi-expandir svg { transition: transform 150ms ease; }
+.hi-expandir svg.is-girado { transform: rotate(180deg); }
