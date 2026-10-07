@@ -16,49 +16,36 @@ import {
   History,
   ArrowUpRight,
   Lock,
+  Loader2,
 } from 'lucide-react'
 
-import { getUsuarioActual } from '../services/auth'
+import { getUsuarioActual, actualizarMiPerfil, cambiarMiContrasena } from '../services/auth'
+import { listarProductos, mensajeDeError } from '../services/productos'
+import { listarMovimientos } from '../services/movimientos'
+import { textoUnidad } from '../utils/unidades'
 import '../styles/mi-perfil.css'
-
-/* ============================================================
-   ESTADO INICIAL — Todo vacío hasta conectar el backend
-   ------------------------------------------------------------
-   PRODUCTOS:   catálogo del negocio
-   MOVIMIENTOS: historial de movimientos del negocio
-   ============================================================ */
-const PRODUCTOS = []
-const MOVIMIENTOS = []
-
-// TODO: cuando el backend esté listo, estas funciones vienen del backend
-function unidadDe() { return 'pza' }
-function textoUnidad(unidad, cantidad) {
-  return cantidad === 1 ? unidad : `${unidad}s`
-}
 
 // TODO: compartir con Configuración (es la misma tabla de permisos)
 const PERMISOS = [
-  { funcion: 'Registrar ventas',                        propietario: true, encargado: true },
-  { funcion: 'Registrar compras',                       propietario: true, encargado: true },
-  { funcion: 'Registrar mermas',                        propietario: true, encargado: true },
-  { funcion: 'Consultar catálogo e historial',          propietario: true, encargado: true },
+  { funcion: 'Registrar ventas', propietario: true, encargado: true },
+  { funcion: 'Registrar compras', propietario: true, encargado: true },
+  { funcion: 'Registrar mermas', propietario: true, encargado: true },
+  { funcion: 'Consultar catálogo e historial', propietario: true, encargado: true },
   { funcion: 'Dar de alta productos y cambiar precios', propietario: true, encargado: false },
-  { funcion: 'Corregir inventario',                     propietario: true, encargado: false },
-  { funcion: 'Ver ganancias',                           propietario: true, encargado: false },
-  { funcion: 'Configuración y usuarios',                propietario: true, encargado: false },
+  { funcion: 'Corregir inventario', propietario: true, encargado: false },
+  { funcion: 'Ver ganancias', propietario: true, encargado: false },
+  { funcion: 'Configuración y usuarios', propietario: true, encargado: false },
 ]
 
-const TIPOS = { venta: 'Venta', compra: 'Compra', merma: 'Merma', correccion: 'Corrección' }
+const TIPOS = { entrada: 'Entrada', salida: 'Venta', merma: 'Merma', correccion: 'Corrección' }
+const CLASES_TIPO = { entrada: 'compra', salida: 'venta', merma: 'merma', correccion: 'correccion' }
 const NIVELES = ['', 'Débil', 'Regular', 'Buena', 'Segura']
 
-const productosPorId = Object.fromEntries(PRODUCTOS.map((p) => [p.id, p]))
 const formatoFecha = new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short' })
 const formatoHora = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
 
-/* ============ Utilidades ============ */
-
 function iniciales(nombre) {
-  const partes = (nombre ?? '').trim().split(/\s+/)
+  const partes = nombre.trim().split(/\s+/)
   if (!partes[0]) return '?'
   const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ''
   return (partes[0][0] + ultima).toUpperCase()
@@ -66,6 +53,20 @@ function iniciales(nombre) {
 
 function soloDigitos(texto) {
   return texto.replace(/\D/g, '')
+}
+
+// Cuánto cambió el stock con el movimiento (con signo)
+function cambioDeStock(m) {
+  if (m.tipo === 'entrada' || m.tipo === 'correccion') return m.cantidad
+  return -m.cantidad
+}
+
+// El primer mensaje que mandó el backend al rechazar algo
+function primerMensaje(datos) {
+  if (!datos || typeof datos !== 'object') return null
+  if (datos.error) return String(datos.error)
+  const primero = Object.values(datos)[0]
+  return Array.isArray(primero) ? String(primero[0]) : String(primero)
 }
 
 function CampoContrasena({ id, etiqueta, valor, onCambiar, visible, onAlternar, error, autoComplete }) {
@@ -102,21 +103,26 @@ function CampoContrasena({ id, etiqueta, valor, onCambiar, visible, onAlternar, 
   )
 }
 
-/* ============ Pantalla ============ */
-
 export default function MiPerfil() {
   const navigate = useNavigate()
 
   const [usuario, setUsuario] = useState(null)
   const [cargando, setCargando] = useState(true)
-  const [aviso, setAviso] = useState(null)
+  const [aviso, setAviso] = useState(null) // { tipo: 'ok' | 'error', texto }
 
   const [datos, setDatos] = useState({ nombre: '', telefono: '' })
   const [datosGuardados, setDatosGuardados] = useState({ nombre: '', telefono: '' })
+  const [guardandoDatos, setGuardandoDatos] = useState(false)
+  const [erroresServidorDatos, setErroresServidorDatos] = useState({})
 
   const [pass, setPass] = useState({ actual: '', nueva: '', confirmar: '' })
   const [ver, setVer] = useState({ actual: false, nueva: false, confirmar: false })
   const [intentoPass, setIntentoPass] = useState(false)
+  const [guardandoPass, setGuardandoPass] = useState(false)
+  const [erroresServidorPass, setErroresServidorPass] = useState({})
+
+  const [actividad, setActividad] = useState([]) // mis movimientos
+  const [unidades, setUnidades] = useState(new Map()) // idProducto -> unidad
 
   useEffect(() => {
     getUsuarioActual()
@@ -125,6 +131,20 @@ export default function MiPerfil() {
         const iniciales = { nombre: u.nombre_completo ?? '', telefono: u.telefono_whatsapp ?? '' }
         setDatos(iniciales)
         setDatosGuardados(iniciales)
+
+        // Mis movimientos reales (y las unidades de los productos para mostrarlos bien)
+        Promise.allSettled([listarMovimientos(), listarProductos()]).then(([movs, prods]) => {
+          if (prods.status === 'fulfilled') {
+            setUnidades(new Map(prods.value.map((p) => [p.id, p.unidad])))
+          }
+          if (movs.status === 'fulfilled') {
+            setActividad(
+              movs.value
+                .filter((m) => m.usuarioId === u.id)
+                .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+            )
+          }
+        })
       })
       .catch(() => setUsuario(null))
       .finally(() => setCargando(false))
@@ -136,17 +156,59 @@ export default function MiPerfil() {
 
   /* ---------- Tus datos ---------- */
 
-  const erroresDatos = {}
+  const erroresDatos = { ...erroresServidorDatos }
   if (!datos.nombre.trim()) erroresDatos.nombre = 'Escribe tu nombre'
   if (datos.telefono && soloDigitos(datos.telefono).length !== 10) erroresDatos.telefono = 'Deben ser 10 dígitos'
 
   const hayCambiosDatos = JSON.stringify(datos) !== JSON.stringify(datosGuardados)
 
-  function guardarDatos() {
+  function cambiarDato(campo, valor) {
+    setDatos((d) => ({ ...d, [campo]: valor }))
+    setErroresServidorDatos((e) => {
+      const copia = { ...e }
+      delete copia[campo]
+      return copia
+    })
+  }
+
+  async function guardarDatos() {
     if (Object.keys(erroresDatos).length > 0) return
-    // TODO: mandar al backend
-    setDatosGuardados(datos)
-    setAviso('Tus datos se guardaron')
+
+    setGuardandoDatos(true)
+
+    try {
+      const respuesta = await actualizarMiPerfil({
+        nombre_completo: datos.nombre.trim(),
+        telefono_whatsapp: soloDigitos(datos.telefono),
+      })
+
+      const actualizado = respuesta.usuario ?? {}
+      const nuevos = {
+        nombre: actualizado.nombre_completo ?? datos.nombre.trim(),
+        telefono: actualizado.telefono_whatsapp ?? soloDigitos(datos.telefono),
+      }
+
+      setDatos(nuevos)
+      setDatosGuardados(nuevos)
+      setUsuario((u) => ({ ...u, nombre_completo: nuevos.nombre, telefono_whatsapp: nuevos.telefono }))
+      setAviso({ tipo: 'ok', texto: 'Tus datos se guardaron' })
+
+      // Avisa a la barra de arriba para que muestre el nombre nuevo
+      window.dispatchEvent(new Event('inventia:usuario-actualizado'))
+    } catch (e) {
+      const errores = e.response?.status === 400 ? e.response.data : null
+
+      if (errores?.nombre_completo || errores?.telefono_whatsapp) {
+        setErroresServidorDatos({
+          ...(errores.nombre_completo && { nombre: String([].concat(errores.nombre_completo)[0]) }),
+          ...(errores.telefono_whatsapp && { telefono: String([].concat(errores.telefono_whatsapp)[0]) }),
+        })
+      } else {
+        setAviso({ tipo: 'error', texto: primerMensaje(e.response?.data) ?? mensajeDeError(e) })
+      }
+    } finally {
+      setGuardandoDatos(false)
+    }
   }
 
   /* ---------- Contraseña ---------- */
@@ -164,31 +226,53 @@ export default function MiPerfil() {
   if (reglas.some((r) => !r.ok)) erroresPass.nueva = 'Cumple todas las reglas de abajo'
   if (pass.confirmar !== pass.nueva || !pass.confirmar) erroresPass.confirmar = 'Las contraseñas no coinciden'
 
+  // Los del servidor se muestran siempre; los locales, al intentar guardar
+  const errorVisible = (campo) => erroresServidorPass[campo] ?? (intentoPass ? erroresPass[campo] : null)
+
   function cambiarPass(campo, valor) {
     setPass((p) => ({ ...p, [campo]: valor }))
+    setErroresServidorPass((e) => {
+      const copia = { ...e }
+      delete copia[campo]
+      return copia
+    })
   }
 
   function alternarVer(campo) {
     setVer((v) => ({ ...v, [campo]: !v[campo] }))
   }
 
-  function cambiarContrasena() {
+  async function cambiarContrasena() {
     setIntentoPass(true)
+    setErroresServidorPass({})
     if (Object.keys(erroresPass).length > 0) return
 
-    // TODO: el backend revisa que la actual sea correcta antes de cambiarla
-    setPass({ actual: '', nueva: '', confirmar: '' })
-    setVer({ actual: false, nueva: false, confirmar: false })
-    setIntentoPass(false)
-    setAviso('Tu contraseña se cambió. Úsala la próxima vez que entres.')
+    setGuardandoPass(true)
+
+    try {
+      await cambiarMiContrasena(pass.actual, pass.nueva)
+
+      setPass({ actual: '', nueva: '', confirmar: '' })
+      setVer({ actual: false, nueva: false, confirmar: false })
+      setIntentoPass(false)
+      setAviso({ tipo: 'ok', texto: 'Tu contraseña se cambió. Úsala la próxima vez que entres.' })
+    } catch (e) {
+      const errores = e.response?.status === 400 ? e.response.data : null
+
+      if (errores?.error && /actual/i.test(errores.error)) {
+        setErroresServidorPass({ actual: errores.error })
+      } else if (errores?.contrasena_actual || errores?.nueva_contrasena) {
+        setErroresServidorPass({
+          ...(errores.contrasena_actual && { actual: String([].concat(errores.contrasena_actual)[0]) }),
+          ...(errores.nueva_contrasena && { nueva: String([].concat(errores.nueva_contrasena)[0]) }),
+        })
+      } else {
+        setAviso({ tipo: 'error', texto: primerMensaje(e.response?.data) ?? mensajeDeError(e) })
+      }
+    } finally {
+      setGuardandoPass(false)
+    }
   }
-
-  /* ---------- Actividad ---------- */
-
-  const misMovimientos = MOVIMIENTOS.filter((m) =>
-    usuario.nombre_completo?.startsWith(m.usuario ?? '')
-  )
-  const nombreEnHistorial = misMovimientos[0]?.usuario
 
   return (
     <div className="mp">
@@ -213,9 +297,13 @@ export default function MiPerfil() {
       </section>
 
       {aviso && (
-        <div className="mp-aviso" role="status">
-          <CheckCircle2 size={18} aria-hidden="true" />
-          <span>{aviso}</span>
+        <div className={'mp-aviso' + (aviso.tipo === 'error' ? ' is-error' : '')} role="status">
+          {aviso.tipo === 'error' ? (
+            <AlertCircle size={18} aria-hidden="true" />
+          ) : (
+            <CheckCircle2 size={18} aria-hidden="true" />
+          )}
+          <span>{aviso.texto}</span>
           <button type="button" aria-label="Cerrar aviso" onClick={() => setAviso(null)}>
             <X size={15} />
           </button>
@@ -243,8 +331,9 @@ export default function MiPerfil() {
                   <User size={16} aria-hidden="true" />
                   <input
                     id="mp-nombre"
+                    maxLength={120}
                     value={datos.nombre}
-                    onChange={(e) => setDatos({ ...datos, nombre: e.target.value })}
+                    onChange={(e) => cambiarDato('nombre', e.target.value)}
                   />
                 </div>
                 {erroresDatos.nombre && (
@@ -266,7 +355,7 @@ export default function MiPerfil() {
                     inputMode="tel"
                     placeholder="55 1234 5678"
                     value={datos.telefono}
-                    onChange={(e) => setDatos({ ...datos, telefono: e.target.value })}
+                    onChange={(e) => cambiarDato('telefono', e.target.value)}
                   />
                 </div>
                 {erroresDatos.telefono ? (
@@ -275,7 +364,7 @@ export default function MiPerfil() {
                     {erroresDatos.telefono}
                   </p>
                 ) : (
-                  <p className="mp-ayuda">Opcional</p>
+                  <p className="mp-ayuda">10 dígitos, sin lada internacional</p>
                 )}
               </div>
 
@@ -310,19 +399,26 @@ export default function MiPerfil() {
               <button
                 type="button"
                 className="mp-boton"
-                disabled={!hayCambiosDatos}
-                onClick={() => setDatos(datosGuardados)}
+                disabled={!hayCambiosDatos || guardandoDatos}
+                onClick={() => {
+                  setDatos(datosGuardados)
+                  setErroresServidorDatos({})
+                }}
               >
                 Descartar
               </button>
               <button
                 type="button"
                 className="mp-boton mp-boton--primario"
-                disabled={!hayCambiosDatos || Object.keys(erroresDatos).length > 0}
+                disabled={!hayCambiosDatos || Object.keys(erroresDatos).length > 0 || guardandoDatos}
                 onClick={guardarDatos}
               >
-                <Save size={15} aria-hidden="true" />
-                Guardar datos
+                {guardandoDatos ? (
+                  <Loader2 size={15} className="mp-girando" aria-hidden="true" />
+                ) : (
+                  <Save size={15} aria-hidden="true" />
+                )}
+                {guardandoDatos ? 'Guardando…' : 'Guardar datos'}
               </button>
             </div>
           </section>
@@ -347,7 +443,7 @@ export default function MiPerfil() {
                   onCambiar={(v) => cambiarPass('actual', v)}
                   visible={ver.actual}
                   onAlternar={() => alternarVer('actual')}
-                  error={intentoPass && erroresPass.actual}
+                  error={errorVisible('actual')}
                 />
               </div>
 
@@ -359,7 +455,7 @@ export default function MiPerfil() {
                 onCambiar={(v) => cambiarPass('nueva', v)}
                 visible={ver.nueva}
                 onAlternar={() => alternarVer('nueva')}
-                error={intentoPass && erroresPass.nueva}
+                error={errorVisible('nueva')}
               />
 
               <CampoContrasena
@@ -370,7 +466,7 @@ export default function MiPerfil() {
                 onCambiar={(v) => cambiarPass('confirmar', v)}
                 visible={ver.confirmar}
                 onAlternar={() => alternarVer('confirmar')}
-                error={intentoPass && erroresPass.confirmar}
+                error={errorVisible('confirmar')}
               />
 
               <div className="mp-campo mp-campo--ancho">
@@ -398,9 +494,18 @@ export default function MiPerfil() {
             </div>
 
             <div className="mp-acciones">
-              <button type="button" className="mp-boton mp-boton--primario" onClick={cambiarContrasena}>
-                <KeyRound size={15} aria-hidden="true" />
-                Cambiar contraseña
+              <button
+                type="button"
+                className="mp-boton mp-boton--primario"
+                onClick={cambiarContrasena}
+                disabled={guardandoPass}
+              >
+                {guardandoPass ? (
+                  <Loader2 size={15} className="mp-girando" aria-hidden="true" />
+                ) : (
+                  <KeyRound size={15} aria-hidden="true" />
+                )}
+                {guardandoPass ? 'Cambiando…' : 'Cambiar contraseña'}
               </button>
             </div>
           </section>
@@ -446,44 +551,33 @@ export default function MiPerfil() {
                 <History size={16} />
               </span>
               <h2 className="mp-cabecera__titulo">Tu actividad reciente</h2>
-              {misMovimientos.length > 0 && (
-                <span className="mp-cabecera__extra">{misMovimientos.length} movimientos</span>
-              )}
+              <span className="mp-cabecera__extra">{actividad.length} movimientos</span>
             </header>
 
-            {misMovimientos.length === 0 ? (
-              <div className="mp-actividad-vacio-estado">
-                <span className="mp-actividad-vacio-estado__icono" aria-hidden="true">
-                  <History size={20} />
-                </span>
-                <p className="mp-actividad-vacio-estado__titulo">Sin actividad todavía</p>
-                <p className="mp-actividad-vacio-estado__texto">
-                  Cuando registres ventas, compras o mermas, aparecerán aquí.
-                </p>
-              </div>
+            {actividad.length === 0 ? (
+              <p className="mp-actividad-vacio">Todavía no has registrado movimientos.</p>
             ) : (
               <ul className="mp-actividad">
-                {misMovimientos.slice(0, 5).map((m) => {
+                {actividad.slice(0, 5).map((m) => {
                   const fecha = new Date(m.fecha)
-                  const unidad = unidadDe(m.productoId)
+                  const unidad = unidades.get(m.productoId) ?? 'pieza'
+                  const cambio = cambioDeStock(m)
 
                   return (
                     <li key={m.id}>
                       <div className="mp-actividad__info">
-                        <span className="mp-actividad__producto">{productosPorId[m.productoId]?.nombre}</span>
+                        <span className="mp-actividad__producto">{m.productoNombre ?? `Producto #${m.productoId}`}</span>
                         <span className="mp-actividad__fecha">
                           {formatoFecha.format(fecha)} · {formatoHora.format(fecha)}
                         </span>
                       </div>
                       <div className="mp-actividad__lado">
-                        <span className={`mp-tipo mp-tipo--${m.tipo}`}>{TIPOS[m.tipo]}</span>
-                        <span
-                          className={
-                            'mp-cantidad ' + (m.cantidad > 0 ? 'mp-cantidad--entra' : 'mp-cantidad--sale')
-                          }
-                        >
-                          {m.cantidad > 0 ? '+' : ''}
-                          {m.cantidad} {textoUnidad(unidad, m.cantidad)}
+                        <span className={`mp-tipo mp-tipo--${CLASES_TIPO[m.tipo] ?? 'correccion'}`}>
+                          {TIPOS[m.tipo] ?? m.tipo}
+                        </span>
+                        <span className={'mp-cantidad ' + (cambio > 0 ? 'mp-cantidad--entra' : 'mp-cantidad--sale')}>
+                          {cambio > 0 ? '+' : ''}
+                          {cambio} {textoUnidad(unidad, cambio)}
                         </span>
                       </div>
                     </li>
@@ -492,18 +586,16 @@ export default function MiPerfil() {
               </ul>
             )}
 
-            {misMovimientos.length > 0 && (
-              <div className="mp-ver-todo">
-                <button
-                  type="button"
-                  className="mp-enlace"
-                  onClick={() => navigate('/movimientos', { state: { usuario: nombreEnHistorial } })}
-                >
-                  Ver todo en Historial
-                  <ArrowUpRight size={14} aria-hidden="true" />
-                </button>
-              </div>
-            )}
+            <div className="mp-ver-todo">
+              <button
+                type="button"
+                className="mp-enlace"
+                onClick={() => navigate('/movimientos', { state: { usuario: usuario.nombre_completo } })}
+              >
+                Ver todo en Historial
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </button>
+            </div>
           </section>
         </aside>
       </div>

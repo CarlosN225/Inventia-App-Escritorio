@@ -59,11 +59,18 @@ export default function Topbar({ onOpenSidebar }) {
 
   const ref = useRef(null)
 
-  // Usuario real desde el backend
+   // Usuario real desde el backend (y otra vez si se edita en Mi perfil)
   useEffect(() => {
-    getUsuarioActual()
-      .then(setUsuario)
-      .catch(() => setUsuario(null))
+    function cargarUsuario() {
+      getUsuarioActual()
+        .then(setUsuario)
+        .catch(() => setUsuario(null))
+    }
+
+    cargarUsuario()
+    window.addEventListener('inventia:usuario-actualizado', cargarUsuario)
+
+    return () => window.removeEventListener('inventia:usuario-actualizado', cargarUsuario)
   }, [])
 
   // Detecta si hay o no internet
