@@ -1,22 +1,34 @@
 """
-Carga datos de prueba para Inventia: propietaria (Ana Luisa), negocio,
-configuración, las 16 categorías fijas y 50 productos de dulcería.
+Carga datos de prueba para Inventia: propietaria (Ana Luisa), un encargado,
+negocio, configuración, las 16 categorías fijas y 50 productos de dulcería.
 
 Uso:
     python manage.py cargar_datos_prueba
+    python manage.py cargar_datos_prueba --con-ventas          (30 días de ventas, para la demo)
+    python manage.py cargar_datos_prueba --con-ventas --dias 45
     python manage.py cargar_datos_prueba --contrasena "OtraClave"
 
-Idempotente: si se corre dos veces no duplica nada; conserva productos,
-contraseñas y existencias ya registrados.
+Idempotente: si se corre dos veces no duplica nada. Las ventas de ejemplo solo
+se generan cuando los productos se acaban de crear (base limpia).
 """
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 from django.contrib.auth.hashers import make_password
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
-from inventario.models import Categoria, Configuracion, MovimientoInventario, Negocio, Producto
+from inventario.models import (
+    Categoria,
+    Configuracion,
+    DetalleVenta,
+    MovimientoInventario,
+    Negocio,
+    Producto,
+    Venta,
+)
 from usuarios.models import Usuario
 
 # Las 16 categorías fijas que se acordaron (sin texto libre; "Otros" como respaldo)
@@ -38,6 +50,9 @@ CATEGORIAS = [
     ("Juguetes", "Juguetes pequeños"),                                         # 14
     ("Otros", "Lo que no entra en ninguna otra categoría"),                    # 15
 ]
+
+# Qué tanto se vende cada categoría (para que el Top tenga sentido)
+POPULARIDAD = {0: 3, 1: 4, 2: 4, 3: 2, 4: 3, 5: 2, 6: 4, 7: 2, 8: 4, 9: 1, 10: 0.3, 11: 1, 12: 1, 13: 1, 14: 0.8, 15: 0.5}
 
 # (nombre, categoría (índice), unidad_medida, precio_venta, precio_mayoreo,
 #  cantidad_minima_mayoreo, piezas_por_empaque, maneja_caducidad)
@@ -126,8 +141,12 @@ PRODUCTOS = [
 ]
 
 
+def momento(dia, hora, minuto):
+    return timezone.make_aware(datetime.combine(dia, time(hora, minuto)))
+
+
 class Command(BaseCommand):
-    help = "Carga datos de prueba de Inventia (propietaria, negocio, 16 categorías y 50 productos)"
+    help = "Carga datos de prueba de Inventia (propietaria, encargado, negocio, 16 categorías y 50 productos)"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -135,13 +154,24 @@ class Command(BaseCommand):
             default='Char123',
             help='Contraseña de la propietaria de prueba (solo se usa al crearla).',
         )
+        parser.add_argument(
+            '--con-ventas',
+            action='store_true',
+            help='Genera un historial de ventas realista (para la demo).',
+        )
+        parser.add_argument(
+            '--dias',
+            type=int,
+            default=30,
+            help='Cuántos días de ventas generar con --con-ventas (por defecto 30).',
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
         random.seed(42)
 
-        # Propietaria de prueba (solo puede haber un propietario)
-        usuario, creado = Usuario.objects.get_or_create(
+        # ---------- Usuarios ----------
+        propietaria, creado = Usuario.objects.get_or_create(
             correo="ana@querubines.com",
             defaults={
                 "nombre_completo": "Ana Luisa Reyes Martínez",
@@ -152,23 +182,38 @@ class Command(BaseCommand):
             },
         )
         self.stdout.write(self.style.SUCCESS(
-            f"Propietaria: {usuario.nombre_completo} ({'creada' if creado else 'ya existía'})"
+            f"Propietaria: {propietaria.nombre_completo} ({'creada' if creado else 'ya existía'})"
         ))
 
+        encargado, creado = Usuario.objects.get_or_create(
+            correo="luis@querubines.com",
+            defaults={
+                "nombre_completo": "Luis Hernández Pérez",
+                "contrasena_hash": make_password("Luis2026"),
+                "telefono_whatsapp": "5511111111",
+                "rol": Usuario.ROL_ENCARGADO,
+                "activo": True,
+            },
+        )
+        self.stdout.write(self.style.SUCCESS(
+            f"Encargado: {encargado.nombre_completo} ({'creado' if creado else 'ya existía'})"
+        ))
+
+        # ---------- Negocio y preferencias ----------
         negocio, creado = Negocio.objects.get_or_create(
             nombre="Dulcería Los Querubines",
             defaults={
-                "propietario": usuario.nombre_completo,
+                "propietario": propietaria.nombre_completo,
                 "direccion": "Calle Morelos 12, Col. Centro",
                 "telefono": "5512345678",
-                "usuario_admin": usuario,
+                "usuario_admin": propietaria,
             },
         )
         self.stdout.write(self.style.SUCCESS(
             f"Negocio: {negocio.nombre} ({'creado' if creado else 'ya existía'})"
         ))
 
-        # Preferencias: código de barras apagado (la mayoría de las dulcerías no lo usa)
+        # Código de barras apagado (la mayoría de las dulcerías no lo usa)
         Configuracion.objects.get_or_create(
             negocio=negocio,
             defaults={
@@ -177,6 +222,7 @@ class Command(BaseCommand):
                 "usa_codigo_barras": False,
                 "alertas_activas": True,
                 "vende_mayoreo": True,
+                "telefono_alertas": propietaria.telefono_whatsapp,
             },
         )
 
@@ -188,11 +234,12 @@ class Command(BaseCommand):
             categorias_obj.append(categoria)
         self.stdout.write(self.style.SUCCESS(f"Categorías listas: {len(categorias_obj)}"))
 
+        # ---------- Planear cada producto (stock final de la demo) ----------
         hoy = date.today()
-        creados = 0
+        planes = []
 
         for i, (nombre, cat_idx, unidad, precio, mayoreo, cant_min, empaque, usa_cad) in enumerate(PRODUCTOS, start=1):
-            # Para la demo: cada 9° producto con caducidad vence pronto (sale en "Por caducar")
+            # Cada 9° producto con caducidad vence pronto (sale en "Por caducar")
             if usa_cad and i % 9 == 0:
                 fecha_cad = hoy + timedelta(days=random.randint(3, 25))
             elif usa_cad:
@@ -203,45 +250,116 @@ class Command(BaseCommand):
             stock_minimo = random.choice([5, 8, 10, 12, 15])
             stock_maximo = stock_minimo * random.choice([6, 8, 10])
 
-            # Para la demo: algunos agotados y algunos en stock bajo, siempre los mismos
+            # Algunos agotados y algunos en stock bajo, siempre los mismos
             if i % 17 == 0:
-                stock_actual = 0
+                stock_final = 0
             elif i % 6 == 0:
-                stock_actual = random.randint(1, stock_minimo - 1)
+                stock_final = random.randint(1, stock_minimo - 1)
             else:
-                stock_actual = random.randint(stock_minimo, stock_maximo)
+                stock_final = random.randint(stock_minimo, stock_maximo)
+
+            planes.append({
+                "i": i,
+                "nombre": nombre,
+                "categoria": categorias_obj[cat_idx],
+                "cat_idx": cat_idx,
+                "unidad": unidad,
+                "precio": precio,
+                "mayoreo": mayoreo,
+                "cant_min": cant_min,
+                "empaque": empaque,
+                "fecha_cad": fecha_cad,
+                "stock_minimo": stock_minimo,
+                "stock_maximo": stock_maximo,
+                "stock_final": stock_final,
+                "costo": round(precio * random.choice([0.62, 0.66, 0.70]), 2),
+                "vendidos": 0,
+            })
+
+        # ---------- Planear las ventas (si se pidieron) ----------
+        ventas_planeadas = []
+
+        if options["con_ventas"]:
+            pesos = [POPULARIDAD[p["cat_idx"]] for p in planes]
+            ahora = timezone.localtime()
+
+            for atras in range(options["dias"] - 1, -1, -1):
+                dia = hoy - timedelta(days=atras)
+                fin_de_semana = dia.weekday() >= 5
+                cuantas = random.randint(8, 12) if fin_de_semana else random.randint(4, 7)
+
+                for _ in range(cuantas):
+                    hora = random.randint(9, 20)
+                    minuto = random.randint(0, 59)
+
+                    # Las de hoy, solo hasta la hora actual
+                    if atras == 0 and (hora, minuto) >= (ahora.hour, ahora.minute):
+                        continue
+
+                    renglones = []
+                    elegidos = set()
+
+                    for _ in range(random.choice([1, 1, 2, 2, 3, 4])):
+                        plan = random.choices(planes, weights=pesos, k=1)[0]
+                        if plan["i"] in elegidos:
+                            continue
+                        elegidos.add(plan["i"])
+
+                        # De vez en cuando, una venta a mayoreo
+                        if plan["mayoreo"] and plan["cant_min"] and random.random() < 0.06:
+                            cantidad, tipo = plan["cant_min"], "mayoreo"
+                        else:
+                            cantidad, tipo = random.choice([1, 1, 1, 2, 2, 3]), "normal"
+
+                        plan["vendidos"] += cantidad
+                        renglones.append((plan, cantidad, tipo))
+
+                    if renglones:
+                        vendedor = encargado if random.random() < 0.4 else propietaria
+                        ventas_planeadas.append((momento(dia, hora, minuto), vendedor, renglones))
+
+            ventas_planeadas.sort(key=lambda v: v[0])
+
+        # ---------- Crear los productos ----------
+        inicio_historial = momento(hoy - timedelta(days=options["dias"]), 8, 0)
+        creados = 0
+
+        for plan in planes:
+            # Arranca con su stock final + lo que se va a vender, para que al final cuadre
+            stock_inicial = plan["stock_final"] + plan["vendidos"]
 
             producto, creado = Producto.objects.get_or_create(
-                nombre=nombre,
-                categoria=categorias_obj[cat_idx],
+                nombre=plan["nombre"],
+                categoria=plan["categoria"],
                 defaults={
-                    "codigo_barras": f"750{1000000 + i:07d}",
-                    "unidad_medida": unidad,
-                    "precio_venta": precio,
-                    "ultimo_costo": round(precio * random.choice([0.62, 0.66, 0.70]), 2),
-                    "precio_mayoreo": mayoreo,
-                    "cantidad_minima_mayoreo": cant_min,
-                    "piezas_por_empaque": empaque,
-                    "tipo_empaque": "caja" if empaque else None,
-                    "fecha_caducidad": fecha_cad,
-                    "stock_actual": stock_actual,
-                    "stock_minimo": stock_minimo,
-                    "stock_maximo": stock_maximo,
+                    "codigo_barras": f"750{1000000 + plan['i']:07d}",
+                    "unidad_medida": plan["unidad"],
+                    "precio_venta": plan["precio"],
+                    "ultimo_costo": plan["costo"],
+                    "precio_mayoreo": plan["mayoreo"],
+                    "cantidad_minima_mayoreo": plan["cant_min"],
+                    "piezas_por_empaque": plan["empaque"],
+                    "tipo_empaque": "caja" if plan["empaque"] else None,
+                    "fecha_caducidad": plan["fecha_cad"],
+                    "stock_actual": stock_inicial,
+                    "stock_minimo": plan["stock_minimo"],
+                    "stock_maximo": plan["stock_maximo"],
                     "activo": True,
                 },
             )
+            plan["producto"] = producto
 
-            # Movimiento de entrada inicial, para que el historial no arranque vacío
-            # (los agotados no llevan movimiento, porque no se puede registrar una entrada de 0)
-            if creado and producto.stock_actual > 0:
-                MovimientoInventario.objects.create(
+            # Entrada inicial (los que arrancan en 0 no llevan, porque sería una entrada de 0)
+            if creado and stock_inicial > 0:
+                mov = MovimientoInventario.objects.create(
                     producto=producto,
-                    usuario=usuario,
+                    usuario=propietaria,
                     tipo_movimiento='entrada',
-                    cantidad=producto.stock_actual,
-                    stock_resultante=producto.stock_actual,
-                    motivo='Datos iniciales de prueba',
+                    cantidad=stock_inicial,
+                    stock_resultante=stock_inicial,
+                    motivo='Inventario inicial',
                 )
+                MovimientoInventario.objects.filter(pk=mov.pk).update(fecha_movimiento=inicio_historial)
 
             if creado:
                 creados += 1
@@ -249,4 +367,54 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Productos nuevos creados: {creados} (total en el catálogo de prueba: {len(PRODUCTOS)})"
         ))
+
+        # ---------- Aplicar las ventas, día por día ----------
+        if ventas_planeadas and creados < len(PRODUCTOS):
+            self.stdout.write(self.style.WARNING(
+                "No se generaron ventas: ya había productos. Usa --con-ventas sobre una base limpia."
+            ))
+        elif ventas_planeadas:
+            for cuando, vendedor, renglones in ventas_planeadas:
+                venta = Venta.objects.create(usuario=vendedor, total=Decimal("0"), fecha_venta=cuando)
+                total = Decimal("0")
+
+                for plan, cantidad, tipo in renglones:
+                    producto = plan["producto"]
+                    precio = Decimal(str(plan["mayoreo"] if tipo == "mayoreo" else plan["precio"]))
+                    subtotal = precio * cantidad
+
+                    DetalleVenta.objects.create(
+                        venta=venta,
+                        producto=producto,
+                        cantidad=cantidad,
+                        precio_unitario=precio,
+                        subtotal=subtotal,
+                        tipo_precio=tipo,
+                    )
+
+                    producto.stock_actual -= cantidad
+                    producto.save(update_fields=["stock_actual"])
+
+                    mov = MovimientoInventario.objects.create(
+                        producto=producto,
+                        usuario=vendedor,
+                        venta=venta,
+                        tipo_movimiento='salida',
+                        cantidad=cantidad,
+                        stock_resultante=producto.stock_actual,
+                        motivo=f"Venta #{venta.pk}",
+                    )
+                    # La fecha real de la venta (el modelo pone "ahora" al crear)
+                    MovimientoInventario.objects.filter(pk=mov.pk).update(fecha_movimiento=cuando)
+
+                    total += subtotal
+
+                venta.total = total
+                venta.save(update_fields=["total"])
+                Venta.objects.filter(pk=venta.pk).update(fecha_venta=cuando)
+
+            self.stdout.write(self.style.SUCCESS(
+                f"Ventas de ejemplo: {len(ventas_planeadas)} en los últimos {options['dias']} días"
+            ))
+
         self.stdout.write(self.style.SUCCESS("Datos de prueba cargados correctamente."))

@@ -592,9 +592,12 @@ def eliminar_usuario_view(request, usuario_id):
     )
 
 
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def estado_inicial_view(request):
     """¿La app ya tiene dueño? Se consulta antes del login, sin sesión."""
-    return Response({'necesita_configuracion': not Usuario.objects.exists()})
+    negocio = Negocio.objects.first()
+    return Response({
+        'necesita_configuracion': not Usuario.objects.exists(),
+        'nombre_negocio': negocio.nombre if negocio else None,
+    })
