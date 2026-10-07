@@ -48,3 +48,49 @@ class MovimientoViewSet(mixins.CreateModelMixin,
 
     def perform_create(self, serializer):
         registrar_movimiento(serializer)
+
+
+
+# ============================================================
+#  VENTAS Y COMPRAS
+#  Se crean y se consultan; no se editan ni se borran.
+# ============================================================
+from rest_framework import status
+from rest_framework.response import Response
+
+from .models import Venta, Compra
+from .serializers import RegistrarVentaSerializer, VentaSerializer, RegistrarCompraSerializer, CompraSerializer
+from .services import registrar_venta, registrar_compra
+
+
+class VentaViewSet(mixins.CreateModelMixin,
+                   mixins.ListModelMixin,
+                   mixins.RetrieveModelMixin,
+                   viewsets.GenericViewSet):
+    queryset = Venta.objects.all().order_by("-fecha_venta")
+    serializer_class = VentaSerializer
+    permission_classes = [EsUsuarioAutenticado]
+
+    def create(self, request, *args, **kwargs):
+        entrada = RegistrarVentaSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        venta = registrar_venta(request, entrada.validated_data["renglones"])
+        return Response(VentaSerializer(venta).data, status=status.HTTP_201_CREATED)
+
+
+class CompraViewSet(mixins.CreateModelMixin,
+                    mixins.ListModelMixin,
+                    mixins.RetrieveModelMixin,
+                    viewsets.GenericViewSet):
+    queryset = Compra.objects.all().order_by("-fecha_compra")
+    serializer_class = CompraSerializer
+    permission_classes = [EsUsuarioAutenticado]
+
+    def create(self, request, *args, **kwargs):
+        entrada = RegistrarCompraSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        datos = entrada.validated_data
+        compra = registrar_compra(
+            request, datos["proveedor"], datos.get("nota", ""), datos["renglones"], datos.get("fecha")
+        )
+        return Response(CompraSerializer(compra).data, status=status.HTTP_201_CREATED)

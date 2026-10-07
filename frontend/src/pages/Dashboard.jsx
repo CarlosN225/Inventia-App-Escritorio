@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Info,
   ArrowUp,
+  ArrowDown,
   ArrowUpRight,
   Receipt,
   AlertTriangle,
@@ -19,6 +20,7 @@ import {
 import { getUsuarioActual } from '../services/auth'
 import { listarProductos } from '../services/productos'
 import { listarMovimientos } from '../services/movimientos'
+import { listarVentas } from '../services/ventas'
 import { textoUnidad } from '../utils/unidades'
 
 import '../styles/dashboard.css'
@@ -30,12 +32,7 @@ const NOMBRE_NEGOCIO = 'Los Querubines'
 const DIAS_AVISO_CADUCIDAD = 30
 const MAX_AVISOS = 5
 const MAX_MOVIMIENTOS = 6
-
-// TODO: llenar con el endpoint de ventas (Bryan)
-const RESULTADOS = null
-const GANANCIA_DIARIA = []
-const MAS_VENDIDOS = []
-const MENOS_VENDIDOS = []
+const MAX_TOP = 5
 
 const PERIODOS = [
   { id: 'hoy', label: 'Hoy' },
@@ -61,9 +58,49 @@ const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MX
 const monedaCorta = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
 const numero = new Intl.NumberFormat('es-MX')
 const formatoDiaMes = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
+const formatoDiaSemana = new Intl.DateTimeFormat('es-MX', { weekday: 'short' })
 
 function primerNombre(nombreCompleto) {
   return nombreCompleto?.trim().split(/\s+/)[0] ?? ''
+}
+
+function capitalizar(texto) {
+  return texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : ''
+}
+
+function redondear(n) {
+  return Math.round(n * 100) / 100
+}
+
+function inicioDelDia(fecha) {
+  const d = new Date(fecha)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+// Desde cuándo cuenta cada periodo, y contra qué se compara
+function rangoPeriodo(periodo) {
+  const hoy = inicioDelDia(new Date())
+
+  if (periodo === 'hoy') {
+    const ayer = new Date(hoy)
+    ayer.setDate(ayer.getDate() - 1)
+    return { desde: hoy, antDesde: ayer, antHasta: hoy, comparado: 'vs ayer', texto: 'de hoy' }
+  }
+
+  if (periodo === 'semana') {
+    const desde = new Date(hoy)
+    desde.setDate(desde.getDate() - 6)
+    const antDesde = new Date(desde)
+    antDesde.setDate(antDesde.getDate() - 7)
+    return { desde, antDesde, antHasta: desde, comparado: 'vs 7 días anteriores', texto: 'de los últimos 7 días' }
+  }
+
+  // Mes: del día 1 a hoy, contra lo que llevaba el mes pasado a esta fecha
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+  const antDesde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)
+  const antHasta = new Date(hoy.getFullYear(), hoy.getMonth() - 1, hoy.getDate() + 1)
+  return { desde, antDesde, antHasta, comparado: 'vs mes anterior', texto: 'del mes' }
 }
 
 // "hace 5 min", "hace 2 h", "ayer", "3 oct"
@@ -96,6 +133,7 @@ export default function Dashboard() {
 
   const [productos, setProductos] = useState([])
   const [movimientos, setMovimientos] = useState([])
+  const [ventas, setVentas] = useState([])
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
@@ -104,10 +142,11 @@ export default function Dashboard() {
       .catch(() => setUsuarioActual(null))
       .finally(() => setCargandoUsuario(false))
 
-    // Si una de las dos falla, la otra se muestra igual
-    Promise.allSettled([listarProductos(), listarMovimientos()]).then(([prods, movs]) => {
+    // Si una falla, las demás se muestran igual
+    Promise.allSettled([listarProductos(), listarMovimientos(), listarVentas()]).then(([prods, movs, vtas]) => {
       if (prods.status === 'fulfilled') setProductos(prods.value)
       if (movs.status === 'fulfilled') setMovimientos(movs.value)
+      if (vtas.status === 'fulfilled') setVentas(vtas.value)
       setCargando(false)
     })
   }, [])
@@ -191,6 +230,99 @@ export default function Dashboard() {
     return lista.sort((a, b) => a.orden - b.orden)
   }, [activos, stockBajo, porCaducar])
 
+  /* ---------- Ventas (de las ventas reales) ---------- */
+
+  // Cada venta con su ganancia: (precio de venta - costo actual) × cantidad
+  // TODO: usar el costo del día de la venta cuando DetalleVenta lo guarde
+  const ventasConDatos = useMemo(
+    () =>
+      ventas.map((v) => {
+        const detalles = v.detalles ?? []
+        const ganancia = detalles.reduce((suma, d) => {
+          const costo = productosPorId.get(d.producto)?.costo ?? 0
+          return suma + (Number(d.precio_unitario) - costo) * d.cantidad
+        }, 0)
+
+        return { fecha: new Date(v.fecha_venta), total: Number(v.total), ganancia, detalles }
+      }),
+    [ventas, productosPorId]
+  )
+
+  const rango = rangoPeriodo(periodo)
+
+  const resumen = useMemo(() => {
+    if (ventasConDatos.length === 0) return null
+
+    const { desde, antDesde, antHasta, comparado } = rangoPeriodo(periodo)
+    const actuales = ventasConDatos.filter((v) => v.fecha >= desde)
+    const anteriores = ventasConDatos.filter((v) => v.fecha >= antDesde && v.fecha < antHasta)
+    const sumar = (lista, campo) => lista.reduce((suma, v) => suma + v[campo], 0)
+
+    const ganancia = sumar(actuales, 'ganancia')
+    const gananciaAnterior = sumar(anteriores, 'ganancia')
+
+    return {
+      ventas: redondear(sumar(actuales, 'total')),
+      numVentas: actuales.length,
+      ganancia: redondear(ganancia),
+      cambio: gananciaAnterior > 0 ? Math.round(((ganancia - gananciaAnterior) / gananciaAnterior) * 100) : 0,
+      comparado,
+    }
+  }, [ventasConDatos, periodo])
+
+  // Ganancia de cada uno de los últimos 7 días (vacío si no hubo ventas)
+  const gananciaDiaria = useMemo(() => {
+    const hoy = inicioDelDia(new Date())
+
+    const dias = Array.from({ length: 7 }, (_, i) => {
+      const dia = new Date(hoy)
+      dia.setDate(dia.getDate() - (6 - i))
+      const fin = new Date(dia)
+      fin.setDate(fin.getDate() + 1)
+
+      const valor = ventasConDatos
+        .filter((v) => v.fecha >= dia && v.fecha < fin)
+        .reduce((suma, v) => suma + v.ganancia, 0)
+
+      return {
+        dia: capitalizar(formatoDiaSemana.format(dia).replace('.', '')),
+        valor: Math.max(0, redondear(valor)),
+        hoy: i === 6,
+      }
+    })
+
+    return dias.some((d) => d.valor > 0) ? dias : []
+  }, [ventasConDatos])
+
+  // Más y menos vendidos del periodo
+  const top = useMemo(() => {
+    const { desde } = rangoPeriodo(periodo)
+    const piezas = new Map()
+
+    ventasConDatos
+      .filter((v) => v.fecha >= desde)
+      .forEach((v) => v.detalles.forEach((d) => piezas.set(d.producto, (piezas.get(d.producto) || 0) + d.cantidad)))
+
+    const lista = activos.map((p) => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, piezas: piezas.get(p.id) || 0 }))
+    const vendidos = lista.filter((p) => p.piezas > 0).sort((a, b) => b.piezas - a.piezas)
+
+    return {
+      mas: vendidos.slice(0, MAX_TOP),
+      // Los que menos salen, incluyendo los que no se han vendido (los que conviene promocionar)
+      menos: [...lista].sort((a, b) => a.piezas - b.piezas).slice(0, MAX_TOP),
+      hayVentas: vendidos.length > 0,
+    }
+  }, [ventasConDatos, activos, periodo])
+
+  const topLista = vistaTop === 'mas' ? top.mas : top.menos
+  const sinTopProductos = !top.hayVentas
+  const sinGanancia = gananciaDiaria.length === 0
+
+  const maxGanancia = sinGanancia ? 0 : Math.max(...gananciaDiaria.map((d) => d.valor))
+  const maxTop = topLista.length === 0 ? 0 : Math.max(...topLista.map((p) => p.piezas))
+  const escalaMax = sinGanancia ? 1000 : Math.max(100, Math.ceil(maxGanancia / 100) * 100)
+  const marcasEje = [escalaMax, escalaMax / 2, 0]
+
   /* ---------- Movimientos ---------- */
 
   const ultimosMovimientos = useMemo(
@@ -208,7 +340,7 @@ export default function Dashboard() {
           let claseCantidad
 
           if (m.tipo === 'correccion') {
-            cantidad = m.stockResultante !== null ? `→ ${m.stockResultante}` : m.cantidad
+            cantidad = `${m.cantidad > 0 ? '+' : ''}${m.cantidad}`
             claseCantidad = 'is-neutra'
           } else if (m.tipo === 'entrada') {
             cantidad = `+${m.cantidad}`
@@ -236,18 +368,6 @@ export default function Dashboard() {
     [movimientos, productosPorId, usuarioActual]
   )
 
-  /* ---------- Ventas (pendiente) ---------- */
-
-  const resumen = RESULTADOS
-  const topLista = vistaTop === 'mas' ? MAS_VENDIDOS : MENOS_VENDIDOS
-  const sinTopProductos = topLista.length === 0
-  const sinGanancia = GANANCIA_DIARIA.length === 0
-
-  const maxGanancia = sinGanancia ? 0 : Math.max(...GANANCIA_DIARIA.map((d) => d.valor))
-  const maxTop = sinTopProductos ? 0 : Math.max(...topLista.map((p) => p.piezas))
-  const escalaMax = sinGanancia ? 1000 : Math.ceil(maxGanancia / 500) * 500
-  const marcasEje = sinGanancia ? [1000, 500, 0] : [escalaMax, escalaMax / 2, 0]
-
   if (cargandoUsuario) return null
 
   return (
@@ -259,22 +379,20 @@ export default function Dashboard() {
           <p className="dash-encabezado__subtitulo">Así va {NOMBRE_NEGOCIO} hoy</p>
         </div>
 
-        {esPropietario && (
-          <div className="dash-segmentado" role="tablist" aria-label="Periodo">
-            {PERIODOS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={periodo === p.id}
-                className={'dash-segmentado__opcion' + (periodo === p.id ? ' is-activo' : '')}
-                onClick={() => setPeriodo(p.id)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="dash-segmentado" role="tablist" aria-label="Periodo">
+          {PERIODOS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={periodo === p.id}
+              className={'dash-segmentado__opcion' + (periodo === p.id ? ' is-activo' : '')}
+              onClick={() => setPeriodo(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* ============ KPIs ============ */}
@@ -287,7 +405,9 @@ export default function Dashboard() {
             <p className="dash-kpi__valor">{resumen ? moneda.format(resumen.ventas) : '—'}</p>
             <p className="dash-kpi__nota">
               <Receipt size={14} aria-hidden="true" />
-              {resumen ? `${numero.format(resumen.numVentas)} ventas registradas` : 'Sin ventas registradas'}
+              {resumen
+                ? `${numero.format(resumen.numVentas)} ${resumen.numVentas === 1 ? 'venta registrada' : 'ventas registradas'}`
+                : 'Sin ventas registradas'}
             </p>
           </article>
         )}
@@ -296,17 +416,24 @@ export default function Dashboard() {
           <article className="dash-kpi">
             <div className="dash-kpi__fila">
               <span className="dash-kpi__etiqueta">Ganancia estimada</span>
-              <span className="dash-kpi__info" title="Ventas menos lo que te costó lo vendido">
+              <span
+                className="dash-kpi__info"
+                title="Ventas menos lo que te costó lo vendido (con el último costo de cada producto)"
+              >
                 <Info size={14} />
               </span>
             </div>
-            <p className={'dash-kpi__valor' + (resumen ? ' dash-kpi__valor--verde' : '')}>
+            <p className={'dash-kpi__valor' + (resumen && resumen.ganancia > 0 ? ' dash-kpi__valor--verde' : '')}>
               {resumen ? moneda.format(resumen.ganancia) : '—'}
             </p>
             {resumen && resumen.cambio !== 0 ? (
-              <span className="dash-pastilla dash-pastilla--verde">
-                <ArrowUp size={12} strokeWidth={2.6} aria-hidden="true" />
-                {resumen.cambio}% {resumen.comparado}
+              <span className={'dash-pastilla ' + (resumen.cambio > 0 ? 'dash-pastilla--verde' : 'dash-pastilla--rojo')}>
+                {resumen.cambio > 0 ? (
+                  <ArrowUp size={12} strokeWidth={2.6} aria-hidden="true" />
+                ) : (
+                  <ArrowDown size={12} strokeWidth={2.6} aria-hidden="true" />
+                )}
+                {Math.abs(resumen.cambio)}% {resumen.comparado}
               </span>
             ) : (
               <span className="dash-kpi__nota">Sin comparativa disponible</span>
@@ -379,9 +506,9 @@ export default function Dashboard() {
                   </div>
 
                   <div className="dash-chart__barras">
-                    {GANANCIA_DIARIA.map((d) => {
-                      const esMax = d.valor === maxGanancia
-                      const clases = 'dash-chart__barra' + (esMax ? ' is-max' : '') + (d.hoy ? ' is-hoy' : '')
+                    {gananciaDiaria.map((d) => {
+                      const esMax = d.valor === maxGanancia && d.valor > 0
+                      const clases = 'dash-chart__barra' + (esMax ? ' is-max' : '') + (d.hoy && !esMax ? ' is-hoy' : '')
 
                       return (
                         <div className="dash-chart__columna" key={d.dia}>
@@ -394,7 +521,7 @@ export default function Dashboard() {
                               {esMax && <span className="dash-chart__valor">{monedaCorta.format(d.valor)}</span>}
                             </div>
                           </div>
-                          <span className={'dash-chart__dia' + (esMax ? ' is-max' : '')}>{d.dia}</span>
+                          <span className={'dash-chart__dia' + (esMax ? ' is-max' : '')}>{d.hoy ? 'Hoy' : d.dia}</span>
                         </div>
                       )
                     })}
@@ -407,7 +534,10 @@ export default function Dashboard() {
 
         <article className="dash-tarjeta">
           <div className="dash-tarjeta__cabecera">
-            <h2 className="dash-tarjeta__titulo">Top productos</h2>
+            <div>
+              <h2 className="dash-tarjeta__titulo">Top productos</h2>
+              <p className="dash-tarjeta__subtitulo">Ventas {rango.texto}</p>
+            </div>
             <div className="dash-segmentado dash-segmentado--chico" role="tablist">
               <button
                 type="button"
@@ -435,7 +565,7 @@ export default function Dashboard() {
               <div className="dash-vacio__icono" aria-hidden="true">
                 <Package size={22} strokeWidth={1.8} />
               </div>
-              <p className="dash-vacio__titulo">Aún no hay ventas</p>
+              <p className="dash-vacio__titulo">Aún no hay ventas {rango.texto}</p>
               <p className="dash-vacio__texto">Cuando registres ventas, aquí verás lo que más y lo que menos sale.</p>
               <button type="button" className="dash-boton-chico" onClick={() => navigate('/registrar-venta')}>
                 Registrar venta
@@ -444,7 +574,7 @@ export default function Dashboard() {
           ) : (
             <ol className="dash-top">
               {topLista.map((p, i) => (
-                <li className="dash-top__item" key={p.nombre}>
+                <li className="dash-top__item" key={p.id}>
                   <span className="dash-top__posicion">{i + 1}</span>
                   <span className="dash-placeholder" aria-hidden="true">
                     <Candy size={15} />
@@ -452,12 +582,14 @@ export default function Dashboard() {
                   <div className="dash-top__info">
                     <div className="dash-top__fila">
                       <span className="dash-top__nombre">{p.nombre}</span>
-                      <span className="dash-top__piezas">{p.piezas} pzas</span>
+                      <span className="dash-top__piezas">
+                        {p.piezas === 0 ? 'Sin ventas' : `${p.piezas} ${textoUnidad(p.unidad, p.piezas)}`}
+                      </span>
                     </div>
                     <div className="dash-top__barra">
                       <div
                         className={'dash-top__relleno' + (vistaTop === 'menos' ? ' is-bajo' : '')}
-                        style={{ width: `${(p.piezas / maxTop) * 100}%` }}
+                        style={{ width: `${maxTop > 0 ? (p.piezas / maxTop) * 100 : 0}%` }}
                       />
                     </div>
                   </div>

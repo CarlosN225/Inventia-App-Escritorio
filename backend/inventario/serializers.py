@@ -161,3 +161,85 @@ class MovimientoSerializer(serializers.ModelSerializer):
 
         attrs["motivo"] = motivo or None
         return attrs
+
+
+
+# ============================================================
+#  VENTAS Y COMPRAS
+# ============================================================
+from decimal import Decimal
+
+from .models import Venta, DetalleVenta, Compra, DetalleCompra
+
+TIPOS_PRECIO = ["normal", "mayoreo", "promocion", "editado"]
+
+
+# ---------- Lo que manda el frontend ----------
+
+class RenglonVentaSerializer(serializers.Serializer):
+    producto = serializers.PrimaryKeyRelatedField(queryset=Producto.objects.all())
+    cantidad = serializers.IntegerField(min_value=1)
+    precio_unitario = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0"))
+    tipo_precio = serializers.ChoiceField(choices=TIPOS_PRECIO, default="normal")
+
+
+class RegistrarVentaSerializer(serializers.Serializer):
+    renglones = RenglonVentaSerializer(many=True, allow_empty=False)
+
+
+class RenglonCompraSerializer(serializers.Serializer):
+    producto = serializers.PrimaryKeyRelatedField(queryset=Producto.objects.all())
+    cantidad = serializers.IntegerField(min_value=1)  # en la unidad de venta (las cajas ya convertidas)
+    costo_unitario = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0"))
+    fecha_caducidad = serializers.DateField(required=False, allow_null=True)
+
+
+class RegistrarCompraSerializer(serializers.Serializer):
+    proveedor = serializers.CharField(max_length=120)
+    nota = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+    fecha = serializers.DateField(required=False)
+    renglones = RenglonCompraSerializer(many=True, allow_empty=False)
+
+
+# ---------- Lo que contesta el backend ----------
+
+class DetalleVentaSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+
+    class Meta:
+        model = DetalleVenta
+        fields = ["id", "producto", "producto_nombre", "cantidad", "precio_unitario", "subtotal", "tipo_precio"]
+
+
+class VentaSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source="usuario.nombre_completo", read_only=True)
+    detalles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Venta
+        fields = ["id", "fecha_venta", "usuario", "usuario_nombre", "total", "detalles"]
+
+    def get_detalles(self, obj):
+        detalles = DetalleVenta.objects.filter(venta=obj).select_related("producto")
+        return DetalleVentaSerializer(detalles, many=True).data
+
+
+class DetalleCompraSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+
+    class Meta:
+        model = DetalleCompra
+        fields = ["id", "producto", "producto_nombre", "cantidad", "costo_unitario", "fecha_caducidad", "subtotal"]
+
+
+class CompraSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source="usuario.nombre_completo", read_only=True)
+    detalles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Compra
+        fields = ["id", "proveedor", "fecha_compra", "nota", "usuario", "usuario_nombre", "total", "detalles"]
+
+    def get_detalles(self, obj):
+        detalles = DetalleCompra.objects.filter(compra=obj).select_related("producto")
+        return DetalleCompraSerializer(detalles, many=True).data

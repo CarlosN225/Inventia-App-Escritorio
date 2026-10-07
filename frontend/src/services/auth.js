@@ -143,3 +143,30 @@ export async function cambiarMiContrasena(contrasenaActual, nuevaContrasena) {
 
     return response.data;
 }
+
+
+// ¿La app ya tiene dueño? Se pregunta antes del login, sin sesión
+// TODO: el endpoint lo agrega Bryan (estado-inicial)
+export async function estadoInicial() {
+    const response = await axios.get(
+        API_URL + '/usuarios/estado-inicial/',
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+// Crea al primer propietario (y, cuando Bryan lo suba, el negocio y sus preferencias)
+export async function crearPrimerPropietario(datos) {
+    const response = await axios.post(
+        API_URL + '/usuarios/primer-propietario/',
+        datos,
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
