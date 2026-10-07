@@ -187,9 +187,8 @@ export default function Alertas() {
 
   /* ---------- Acciones ---------- */
 
-  function irACompra() {
-    // TODO: pasar el producto y la cantidad cuando Registrar compra esté conectado al backend
-    navigate('/registrar-compra')
+  function irACompra(producto) {
+    navigate('/registrar-compra', { state: { agregar: { id: producto.id, piezas: producto.aComprar } } })
   }
 
     function irAMerma(producto) {
@@ -430,7 +429,7 @@ export default function Alertas() {
                                     <button
                                       type="button"
                                       className={'al-boton al-boton--chico' + (agotado ? ' al-boton--primario' : '')}
-                                      onClick={irACompra}
+                                      onClick={() => irACompra(p)}
                                       title="Registrar compra"
                                     >
                                       <Truck size={14} aria-hidden="true" />
