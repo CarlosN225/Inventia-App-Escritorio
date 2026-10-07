@@ -27,6 +27,7 @@ import {
   ArrowLeft,
   Edit,
   Trash2,
+  Loader2,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
@@ -40,6 +41,11 @@ import {
   editarUsuario,
   eliminarUsuario,
 } from '../services/auth'
+
+import {
+  obtenerConfiguracion,
+  guardarConfiguracion,
+} from '../services/configuracion'
 
 import '../styles/configuracion.css'
 
@@ -244,6 +250,39 @@ function generarContrasena() {
 function correoValido(correo) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)
 }
+/* Lo que manda el backend -> lo que usa esta pantalla */
+function desdeBackend(config) {
+  return {
+    negocio: {
+      nombre: config.negocio.nombre ?? '',
+      direccion: config.negocio.direccion ?? '',
+      telefono: config.negocio.telefono ?? '',
+    },
+    preferencias: { ...config.preferencias },
+    whatsapp: {
+      numero: config.whatsapp.telefono_alertas ?? '',
+      hora: config.whatsapp.hora_resumen ?? '20:00',
+      diasCaducidad: config.whatsapp.dias_aviso_caducidad ?? 30,
+    },
+  }
+}
+
+/* Lo de esta pantalla -> lo que espera el backend */
+function haciaBackend(ajustes) {
+  return {
+    negocio: {
+      nombre: ajustes.negocio.nombre.trim(),
+      direccion: ajustes.negocio.direccion.trim(),
+      telefono: soloDigitos(ajustes.negocio.telefono),
+    },
+    preferencias: ajustes.preferencias,
+    whatsapp: {
+      telefono_alertas: soloDigitos(ajustes.whatsapp.numero),
+      hora_resumen: ajustes.whatsapp.hora,
+      dias_aviso_caducidad: ajustes.whatsapp.diasCaducidad,
+    },
+  }
+}
 
 /*
  * Convierte los errores del backend en mensajes
@@ -387,6 +426,12 @@ export default function Configuracion() {
 
   const [enLinea, setEnLinea] =
     useState(navigator.onLine)
+    
+  const [cargandoAjustes, setCargandoAjustes] =
+    useState(true)
+
+  const [guardando, setGuardando] =
+    useState(false)
 
   /* ============================================================
      GUARDAR PREFERENCIA DE INACTIVOS
@@ -414,15 +459,35 @@ export default function Configuracion() {
       .finally(() => setCargando(false))
   }, [])
 
+  
+  /* ============================================================
+     CARGAR LA CONFIGURACIÓN REAL DEL NEGOCIO
+     ============================================================ */
+
+  useEffect(() => {
+    if (usuarioActual?.rol !== 'propietario') return
+
+    obtenerConfiguracion(true)
+      .then((config) => {
+        const reales = desdeBackend(config)
+        setAjustes(reales)
+        setGuardados(reales)
+      })
+      .catch(() =>
+        setAviso({
+          tipo: 'error',
+          texto: 'No se pudo cargar la configuración del negocio',
+        })
+      )
+      .finally(() => setCargandoAjustes(false))
+  }, [usuarioActual])
+
   /* ============================================================
      CARGAR USUARIOS
      ============================================================ */
 
   useEffect(() => {
-    if (
-      seccion !== 'usuarios' ||
-      usuarioActual?.rol !== 'propietario'
-    ) {
+    if (usuarioActual?.rol !== 'propietario') {
       return
     }
 
@@ -463,11 +528,7 @@ export default function Configuracion() {
             'No se pudieron cargar los usuarios',
         })
       })
-  }, [
-    seccion,
-    usuarioActual,
-    mostrarInactivos,
-  ])
+  }, [usuarioActual, mostrarInactivos])
 
   /* ============================================================
      CERRAR MENÚ DE TRES PUNTOS AL HACER CLIC AFUERA
@@ -556,7 +617,7 @@ export default function Configuracion() {
 
   const errores = {}
 
-  if (!ajustes.negocio.nombre.trim()) {
+    if (!cargandoAjustes && !ajustes.negocio.nombre.trim()) {
     errores.nombre =
       'Escribe el nombre de tu negocio'
   }
@@ -585,20 +646,40 @@ export default function Configuracion() {
   const hayErrores =
     Object.keys(errores).length > 0
 
-  function guardar() {
-    if (hayErrores) return
+  async function guardar() {
+    if (hayErrores || guardando) return
 
-    setGuardados(ajustes)
+    setGuardando(true)
 
-    setUltimoGuardado({
-      hora: horaActual(),
-      nombre:
-        usuarioActual?.nombre_completo ?? '',
-    })
+    try {
+      const respuesta = await guardarConfiguracion(haciaBackend(ajustes))
+      const reales = desdeBackend(respuesta)
 
-    setAviso({
-      texto: 'Cambios guardados',
-    })
+      setAjustes(reales)
+      setGuardados(reales)
+
+      setUltimoGuardado({
+        hora: horaActual(),
+        nombre: usuarioActual?.nombre_completo ?? '',
+      })
+
+      setAviso({
+        texto: 'Cambios guardados. Ya se aplican en toda la app.',
+      })
+    } catch (error) {
+      const datos = error?.response?.data
+      const primero =
+        datos && typeof datos === 'object' ? Object.values(datos)[0] : null
+
+      setAviso({
+        tipo: 'error',
+        texto: primero
+          ? String(Array.isArray(primero) ? primero[0] : primero)
+          : 'No se pudieron guardar los cambios',
+      })
+    } finally {
+      setGuardando(false)
+    }
   }
 
   function restablecerCambios() {
@@ -1386,7 +1467,7 @@ export default function Configuracion() {
                         e.target.value
                       )
                     }
-                    placeholder="Ej. Dulcería Los Querubines"
+                    placeholder="Ej. Dulcería La Esperanza"
                   />
 
                   {errores.nombre && (
@@ -2730,19 +2811,28 @@ export default function Configuracion() {
                 <button
                   type="button"
                   className="cf-boton cf-boton--primario"
-                  disabled={
+                                   disabled={
                     !hayCambios ||
-                    hayErrores
+                    hayErrores ||
+                    guardando
                   }
                   onClick={guardar}
                 >
 
-                  <Save
-                    size={15}
-                    aria-hidden="true"
-                  />
+                  {guardando ? (
+                    <Loader2
+                      size={15}
+                      className="cf-girando"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Save
+                      size={15}
+                      aria-hidden="true"
+                    />
+                  )}
 
-                  Guardar cambios
+                  {guardando ? 'Guardando…' : 'Guardar cambios'}
 
                 </button>
 

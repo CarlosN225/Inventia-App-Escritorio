@@ -1268,3 +1268,12 @@
 .cf-aviso.is-error button {
   color: #b91c1c;
 }
+
+/* ============ GUARDANDO ============ */
+.cf-girando {
+  animation: cf-girar 0.9s linear infinite;
+}
+
+@keyframes cf-girar {
+  to { transform: rotate(360deg); }
+}
