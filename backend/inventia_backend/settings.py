@@ -1,3 +1,4 @@
+import os
 """
 Django settings for inventia_backend project.
 
@@ -86,7 +87,8 @@ WSGI_APPLICATION = 'inventia_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        # El lanzador del .exe dice qué archivo usar (limpio o demo); en desarrollo, db.sqlite3
+        'NAME': os.environ.get('INVENTIA_DB') or (BASE_DIR / 'db.sqlite3'),
     }
 }
 

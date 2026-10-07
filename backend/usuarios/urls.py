@@ -6,13 +6,14 @@ from .views import (
     me_view,
     registrar_usuario_view,
     listar_usuarios_view,
+    editar_usuario_view,
+    eliminar_usuario_view,
     cambiar_estado_usuario_view,
     restablecer_contrasena_view,
     actualizar_mi_perfil_view,
     cambiar_mi_contrasena_view,
     crear_primer_propietario_view,
-    editar_usuario_view,
-eliminar_usuario_view,
+    estado_inicial_view,
 )
 
 
@@ -24,44 +25,16 @@ urlpatterns = [
     # Administración de usuarios - propietario
     path('registrar/', registrar_usuario_view, name='registrar_usuario'),
     path('lista/', listar_usuarios_view, name='listar_usuarios'),
-    path(
-    '<int:usuario_id>/',
-    editar_usuario_view,
-    name='editar_usuario'
-),
-
-path(
-    '<int:usuario_id>/eliminar/',
-    eliminar_usuario_view,
-    name='eliminar_usuario'
-),
-    path(
-        '<int:usuario_id>/estado/',
-        cambiar_estado_usuario_view,
-        name='cambiar_estado_usuario'
-    ),
-    path(
-        '<int:usuario_id>/reset-password/',
-        restablecer_contrasena_view,
-        name='restablecer_contrasena'
-    ),
+    path('<int:usuario_id>/', editar_usuario_view, name='editar_usuario'),
+    path('<int:usuario_id>/eliminar/', eliminar_usuario_view, name='eliminar_usuario'),
+    path('<int:usuario_id>/estado/', cambiar_estado_usuario_view, name='cambiar_estado_usuario'),
+    path('<int:usuario_id>/reset-password/', restablecer_contrasena_view, name='restablecer_contrasena'),
 
     # Perfil propio - propietario y encargado
-    path(
-        'mi-perfil/',
-        actualizar_mi_perfil_view,
-        name='actualizar_mi_perfil'
-    ),
-    path(
-        'mi-contrasena/',
-        cambiar_mi_contrasena_view,
-        name='cambiar_mi_contrasena'
-    ),
+    path('mi-perfil/', actualizar_mi_perfil_view, name='actualizar_mi_perfil'),
+    path('mi-contrasena/', cambiar_mi_contrasena_view, name='cambiar_mi_contrasena'),
 
-    # Configuración inicial
-    path(
-        'primer-propietario/',
-        crear_primer_propietario_view,
-        name='crear_primer_propietario'
-    ),
+    # Configuración inicial (sin sesión: se usa antes del primer login)
+    path('primer-propietario/', crear_primer_propietario_view, name='crear_primer_propietario'),
+    path('estado-inicial/', estado_inicial_view, name='estado_inicial'),
 ]

@@ -16,12 +16,13 @@ import RegistrarMerma from './pages/RegistrarMerma.jsx'
 import CorreccionInventario from './pages/CorreccionInventario.jsx'
 import MiPerfil from './pages/MiPerfil.jsx'
 import Ayuda from './pages/Ayuda.jsx'
+import PuertaDeEntrada from './components/PuertaDeEntrada.jsx'
 
 export default function App() {
   return (
     <Routes>
       {/* Sin sidebar y sin protección: el login y el asistente de la primera vez */}
-      <Route path="/" element={<Login />} />
+       <Route path="/" element={<PuertaDeEntrada />} />
       <Route path="/bienvenida" element={<AsistenteInicial />} />
 
       {/* Todo lo interno requiere sesión activa */}

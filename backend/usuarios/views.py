@@ -6,6 +6,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 
+from django.db import transaction
+from rest_framework.permissions import AllowAny
+
+from inventario.models import Negocio, Configuracion
+
 from .models import Usuario
 from .serializers import (
     UsuarioSerializer,
@@ -414,94 +419,86 @@ def cambiar_mi_contrasena_view(request):
             'Contraseña actualizada correctamente'
     })
 
-
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def crear_primer_propietario_view(request):
     """
-    Crea el primer propietario del sistema.
+    Configuración inicial: crea al propietario, el negocio y sus preferencias,
+    todo en una sola transacción. Solo funciona cuando todavía no hay ningún usuario.
 
-    Este endpoint solamente funciona cuando todavía
-    no existe ningún usuario.
+    Acepta los datos agrupados (propietario, negocio, preferencias) o, por
+    compatibilidad con la versión anterior, los del propietario sueltos.
     """
 
     if Usuario.objects.exists():
         return Response(
-            {
-                'error':
-                    'El propietario inicial ya fue creado'
-            },
+            {'error': 'El propietario inicial ya fue creado'},
             status=status.HTTP_403_FORBIDDEN
         )
 
-    nombre_completo = request.data.get(
-        'nombre_completo'
-    )
+    datos = request.data
+    cuenta = datos.get('propietario') or datos
+    negocio = datos.get('negocio') or {}
+    preferencias = datos.get('preferencias') or {}
 
-    correo = request.data.get(
-        'correo'
-    )
+    nombre_completo = (cuenta.get('nombre_completo') or '').strip()
+    correo = (cuenta.get('correo') or '').strip().lower()
+    contrasena = cuenta.get('contrasena') or ''
+    telefono_whatsapp = (cuenta.get('telefono_whatsapp') or '').strip()
+    nombre_negocio = (negocio.get('nombre') or '').strip()
 
-    contrasena = request.data.get(
-        'contrasena'
-    )
-
-    telefono_whatsapp = request.data.get(
-        'telefono_whatsapp',
-        ''
-    )
-
-    if (
-        not nombre_completo
-        or not correo
-        or not contrasena
-    ):
+    if not nombre_completo or not correo or not contrasena:
         return Response(
-            {
-                'error': (
-                    'nombre_completo, correo y contrasena '
-                    'son obligatorios'
-                )
-            },
+            {'error': 'nombre_completo, correo y contrasena son obligatorios'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    if len(contrasena) < 6:
+    if len(contrasena) < 8:
         return Response(
-            {
-                'error':
-                    'La contraseña debe tener al menos 6 caracteres'
-            },
+            {'error': 'La contraseña debe tener al menos 8 caracteres'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    if Usuario.objects.filter(
-        correo=correo
-    ).exists():
+    if Usuario.objects.filter(correo=correo).exists():
         return Response(
-            {
-                'error':
-                    'El correo ya está registrado'
-            },
+            {'error': 'El correo ya está registrado'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    usuario = Usuario.objects.create(
-        nombre_completo=nombre_completo,
-        correo=correo,
-        telefono_whatsapp=telefono_whatsapp,
-        rol='propietario',
-        activo=True,
-        contrasena_hash=make_password(
-            contrasena
+    # Todo o nada: si algo falla, no queda un dueño sin negocio
+    with transaction.atomic():
+        usuario = Usuario.objects.create(
+            nombre_completo=nombre_completo,
+            correo=correo,
+            telefono_whatsapp=telefono_whatsapp,
+            rol='propietario',
+            activo=True,
+            contrasena_hash=make_password(contrasena)
         )
-    )
+
+        if nombre_negocio:
+            negocio_creado = Negocio.objects.create(
+                nombre=nombre_negocio,
+                propietario=nombre_completo,
+                direccion=(negocio.get('direccion') or '').strip(),
+                telefono=(negocio.get('telefono') or '').strip(),
+                usuario_admin=usuario
+            )
+
+            Configuracion.objects.create(
+                negocio=negocio_creado,
+                maneja_caducidad=bool(preferencias.get('maneja_caducidad', True)),
+                vende_mayoreo=bool(preferencias.get('vende_mayoreo', True)),
+                maneja_promociones=bool(preferencias.get('maneja_promociones', True)),
+                usa_codigo_barras=bool(preferencias.get('usa_codigo_barras', False)),
+                alertas_activas=bool(preferencias.get('alertas_activas', True)),
+                telefono_alertas=telefono_whatsapp
+            )
 
     return Response(
         {
-            'mensaje':
-                'Propietario inicial creado correctamente',
-            'usuario':
-                UsuarioSerializer(usuario).data
+            'mensaje': 'Configuración inicial creada correctamente',
+            'usuario': UsuarioSerializer(usuario).data
         },
         status=status.HTTP_201_CREATED
     )
@@ -593,3 +590,11 @@ def eliminar_usuario_view(request, usuario_id):
         },
         status=status.HTTP_200_OK
     )
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def estado_inicial_view(request):
+    """¿La app ya tiene dueño? Se consulta antes del login, sin sesión."""
+    return Response({'necesita_configuracion': not Usuario.objects.exists()})
