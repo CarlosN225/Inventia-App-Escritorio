@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { obtenerConfiguracion, EVENTO_CONFIGURACION } from '../services/configuracion'
+import { obtenerConfiguracion, EVENTO_CONFIGURACION, leerAjustes } from '../services/configuracion'
 
 /* Devuelve la configuración del negocio (null mientras carga) y se actualiza sola si alguien la cambia */
 export default function useConfiguracion() {
@@ -27,4 +27,10 @@ export default function useConfiguracion() {
   }, [])
 
   return config
+}
+
+
+/* Lo mismo, pero ya listo para usar: { maneja_caducidad, vende_mayoreo, …, diasAviso, horaResumen, telefonoAlertas } */
+export function useAjustes() {
+  return leerAjustes(useConfiguracion())
 }

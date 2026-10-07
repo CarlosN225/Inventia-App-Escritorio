@@ -7,7 +7,7 @@ from .models import Categoria, Producto, MovimientoInventario
 from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer
 from .services import registrar_movimiento
 from usuarios.permissions import EsUsuarioAutenticado, EsPropietario
-
+from usuarios.models import Usuario
 
 class CategoriaViewSet(viewsets.ModelViewSet):
     queryset = Categoria.objects.all()
@@ -33,6 +33,21 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
         # Crear, editar y eliminar productos: solo propietario
         return [EsPropietario()]
+
+    
+    def perform_create(self, serializer):
+        """Si el producto nace con existencias, queda su entrada en el historial."""
+        producto = serializer.save()
+
+        if producto.stock_actual > 0:
+            MovimientoInventario.objects.create(
+                producto=producto,
+                usuario=Usuario.objects.get(pk=self.request.session["id_usuario"]),
+                tipo_movimiento=MovimientoInventario.TIPO_ENTRADA,
+                cantidad=producto.stock_actual,
+                stock_resultante=producto.stock_actual,
+                motivo="Inventario inicial (alta del producto)",
+            )
 
 
 class MovimientoViewSet(mixins.CreateModelMixin,
@@ -203,3 +218,29 @@ class ConfiguracionView(APIView):
         negocio.save()
         config.save()
         return Response(_datos_configuracion(negocio))
+
+
+    
+
+# ============================================================
+#  PROMOCIONES
+#  Todos las consultan (para vender); solo el propietario las crea, pausa o borra.
+# ============================================================
+from .models import Promocion
+from .serializers import PromocionSerializer
+
+
+class PromocionViewSet(viewsets.ModelViewSet):
+    serializer_class = PromocionSerializer
+    queryset = Promocion.objects.all().order_by("-fecha_inicio")
+
+    def get_queryset(self):
+        consulta = super().get_queryset()
+        producto = self.request.query_params.get("producto")
+        return consulta.filter(producto_id=producto) if producto else consulta
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [EsUsuarioAutenticado()]
+        return [EsPropietario()]
+    

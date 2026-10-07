@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useAjustes } from '../hooks/useConfiguracion'
+
 import {
   ChevronRight,
   Package,
@@ -34,16 +36,13 @@ import {
   actualizarProducto,
   erroresDeCampos,
   mensajeDeError,
+  listarPromociones,
+  crearPromocion,
+  cambiarActivaPromocion,
+  borrarPromocion,
 } from '../services/productos'
 import '../styles/producto-form.css'
 
-// TODO: traer estos interruptores de la Configuración del negocio (endpoint de Héctor)
-const CONFIG = {
-  maneja_caducidad: true,
-  vende_mayoreo: true,
-  maneja_promociones: true,
-  usa_codigo_barras: true,
-}
 
 const UNIDADES = [
   { id: 'pieza', label: 'Pieza', plural: 'piezas' },
@@ -102,7 +101,7 @@ function crearFormulario(producto) {
   }
 }
 
-function validar(f) {
+function validar(f, CONFIG) {
   const errores = {}
   const precio = Number(f.precio)
 
@@ -214,6 +213,7 @@ export default function ProductoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
   const esNuevo = !id
+  const CONFIG = useAjustes() // lo que el dueño prendió en Configuración
 
   // Datos del backend
   const [producto, setProducto] = useState(null)
@@ -257,12 +257,13 @@ export default function ProductoForm() {
       setErrorCarga(null)
 
       try {
-        const [listaCategorias, productoBackend] = await Promise.all([
+                const [listaCategorias, productoBackend, listaPromos] = await Promise.all([
           listarCategorias(),
           esNuevo ? Promise.resolve(null) : obtenerProducto(id),
+          esNuevo ? Promise.resolve([]) : listarPromociones(id),
         ])
 
-        if (!sigueMontado) return
+        if (sigueMontado) setPromociones(listaPromos)
 
         setCategorias(listaCategorias)
         setProducto(productoBackend)
@@ -352,8 +353,8 @@ export default function ProductoForm() {
     setNuevaPromo((p) => ({ ...p, [campo]: valor }))
     setErrorPromo('')
   }
-
-  function agregarPromo() {
+ 
+   async function agregarPromo() {
     const valor = Number(nuevaPromo.valor)
 
     if (!valor || valor <= 0) return setErrorPromo('Escribe el valor del descuento')
@@ -364,26 +365,55 @@ export default function ProductoForm() {
     if (!nuevaPromo.inicio || !nuevaPromo.fin) return setErrorPromo('Indica las fechas de inicio y fin')
     if (nuevaPromo.fin < nuevaPromo.inicio) return setErrorPromo('La fecha de fin debe ser después del inicio')
 
-    setPromociones((lista) => [
-      ...lista,
-      { id: Date.now(), tipo: nuevaPromo.tipo, valor, inicio: nuevaPromo.inicio, fin: nuevaPromo.fin, activa: true },
-    ])
-    setNuevaPromo(null)
-  }
+    const promo = { tipo: nuevaPromo.tipo, valor, inicio: nuevaPromo.inicio, fin: nuevaPromo.fin, activa: true }
 
-  function enterEnPromo(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      agregarPromo()
+    // Producto nuevo: se guarda junto con el producto. Producto existente: se guarda ya.
+    if (esNuevo) {
+      setPromociones((lista) => [...lista, { ...promo, id: `nueva-${Date.now()}` }])
+      setNuevaPromo(null)
+      return
+    }
+
+    try {
+      const creada = await crearPromocion(producto.id, promo)
+      setPromociones((lista) => [...lista, creada])
+      setNuevaPromo(null)
+    } catch (e) {
+      const datos = e.response?.data
+      const primero = datos && typeof datos === 'object' ? Object.values(datos)[0] : null
+      setErrorPromo(primero ? String([].concat(primero)[0]) : mensajeDeError(e))
     }
   }
 
-  function alternarPromo(idPromo) {
-    setPromociones((lista) => lista.map((p) => (p.id === idPromo ? { ...p, activa: !p.activa } : p)))
+  async function alternarPromo(idPromo) {
+    const promo = promociones.find((p) => p.id === idPromo)
+    if (!promo) return
+
+    if (esNuevo) {
+      setPromociones((lista) => lista.map((p) => (p.id === idPromo ? { ...p, activa: !p.activa } : p)))
+      return
+    }
+
+    try {
+      const actualizada = await cambiarActivaPromocion(idPromo, !promo.activa)
+      setPromociones((lista) => lista.map((p) => (p.id === idPromo ? actualizada : p)))
+    } catch (e) {
+      setErrorPromo(mensajeDeError(e))
+    }
   }
 
-  function eliminarPromo(idPromo) {
-    setPromociones((lista) => lista.filter((p) => p.id !== idPromo))
+  async function eliminarPromo(idPromo) {
+    if (esNuevo) {
+      setPromociones((lista) => lista.filter((p) => p.id !== idPromo))
+      return
+    }
+
+    try {
+      await borrarPromocion(idPromo)
+      setPromociones((lista) => lista.filter((p) => p.id !== idPromo))
+    } catch (e) {
+      setErrorPromo(mensajeDeError(e))
+    }
   }
 
   /* ---------- Guardar ---------- */
@@ -392,7 +422,7 @@ export default function ProductoForm() {
     event.preventDefault()
     setErrorGuardar(null)
 
-    const nuevosErrores = validar(form)
+    const nuevosErrores = validar(form, CONFIG)
     setErrores(nuevosErrores)
 
     if (Object.keys(nuevosErrores).length > 0) {
@@ -409,8 +439,14 @@ export default function ProductoForm() {
         ? await crearProducto(datos)
         : await actualizarProducto(producto.id, datos)
 
-      // TODO: guardar imagen y promociones cuando existan sus endpoints
+      // Las promociones que se capturaron en un producto nuevo se guardan ya que existe
+      if (esNuevo) {
+        for (const promo of promociones) {
+          await crearPromocion(resultado.id, promo)
+        }
+      }
 
+      // TODO: guardar la imagen cuando exista su endpoint
       // Regresa al catálogo con la notificación y el producto resaltado
       navigate('/catalogo', {
         state: {
@@ -1033,10 +1069,15 @@ export default function ProductoForm() {
               icono={Percent}
               titulo="Promociones"
               completa
-              extra={<span className="pf-pastilla pf-pastilla--gris">Próximamente</span>}
-            >
-              <Pendiente texto="Puedes probar cómo se verán, pero todavía no se guardan: falta conectarlas con el sistema." />
-
+              extra={
+                promociones.length > 0 && (
+                  <span className="pf-pastilla pf-pastilla--gris">
+                    {promociones.length} {promociones.length === 1 ? 'promoción' : 'promociones'}
+                  </span>
+                )
+              }
+              >
+ 
               {promociones.length > 0 ? (
                 <ul className="pf-promos">
                   {promociones.map((p) => {

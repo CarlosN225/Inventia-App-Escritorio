@@ -33,3 +33,23 @@ export async function guardarConfiguracion(cambios) {
 export function nombreCorto(nombre) {
   return (nombre ?? '').replace(/^dulcer[ií]a\s+/i, '').trim()
 }
+
+// Si todavía no carga (o falla), la app se comporta como recién configurada
+export const PREFERENCIAS_POR_DEFECTO = {
+  maneja_caducidad: true,
+  vende_mayoreo: true,
+  maneja_promociones: true,
+  usa_codigo_barras: false,
+  alertas_activas: true,
+}
+
+/* Todo lo que las pantallas necesitan saber, en un solo objeto plano */
+export function leerAjustes(config) {
+  return {
+    ...PREFERENCIAS_POR_DEFECTO,
+    ...(config?.preferencias ?? {}),
+    diasAviso: config?.whatsapp?.dias_aviso_caducidad ?? 30,
+    horaResumen: config?.whatsapp?.hora_resumen ?? '20:00',
+    telefonoAlertas: config?.whatsapp?.telefono_alertas ?? '',
+  }
+}

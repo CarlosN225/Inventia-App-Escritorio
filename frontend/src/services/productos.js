@@ -34,7 +34,8 @@ export function adaptarProducto(p) {
     categoria: p.categoria_nombre || 'Otros',
     unidad: p.unidad_medida || 'pieza',
     precio: Number(p.precio_venta),
-    costo: aNumero(p.ultimo_costo), // null cuando entra un encargado
+    // null si no lo ve (encargado) o si todavía no hay ninguna compra (costo 0)
+    costo: Number(p.ultimo_costo) > 0 ? Number(p.ultimo_costo) : null,    
     precioMayoreo: aNumero(p.precio_mayoreo),
     minimoMayoreo: p.cantidad_minima_mayoreo,
     piezasEmpaque: p.piezas_por_empaque,
@@ -47,6 +48,14 @@ export function adaptarProducto(p) {
     minimo: p.stock_minimo,
     maximo: p.stock_maximo,
     activo: p.activo,
+        promocion: p.promocion_vigente
+      ? {
+          id: p.promocion_vigente.id,
+          tipo: p.promocion_vigente.tipo, // 'porcentaje' | 'monto'
+          valor: Number(p.promocion_vigente.valor),
+          fechaFin: p.promocion_vigente.fecha_fin,
+        }
+      : null,
   }
 }
 
@@ -165,4 +174,51 @@ export function erroresDeCampos(error) {
   })
 
   return Object.keys(errores).length > 0 ? errores : null
+}
+
+
+/* ============ Promociones ============ */
+
+const TIPOS_PROMO = { porcentaje: 'descuento_porcentaje', monto: 'descuento_monto' }
+
+function adaptarPromocion(p) {
+  return {
+    id: p.id,
+    tipo: p.tipo_promocion === 'descuento_monto' ? 'monto' : 'porcentaje',
+    valor: Number(p.valor),
+    inicio: p.fecha_inicio,
+    fin: p.fecha_fin,
+    activa: p.activa,
+  }
+}
+
+export async function listarPromociones(productoId) {
+  const response = await axios.get(`${API_URL}/promociones/`, { ...CON_SESION, params: { producto: productoId } })
+  const datos = Array.isArray(response.data) ? response.data : response.data.results ?? []
+  return datos.map(adaptarPromocion)
+}
+
+export async function crearPromocion(productoId, promo) {
+  const response = await axios.post(
+    `${API_URL}/promociones/`,
+    {
+      producto: productoId,
+      tipo_promocion: TIPOS_PROMO[promo.tipo],
+      valor: Number(promo.valor).toFixed(2),
+      fecha_inicio: promo.inicio,
+      fecha_fin: promo.fin,
+      activa: promo.activa ?? true,
+    },
+    CON_SESION
+  )
+  return adaptarPromocion(response.data)
+}
+
+export async function cambiarActivaPromocion(id, activa) {
+  const response = await axios.patch(`${API_URL}/promociones/${id}/`, { activa }, CON_SESION)
+  return adaptarPromocion(response.data)
+}
+
+export async function borrarPromocion(id) {
+  await axios.delete(`${API_URL}/promociones/${id}/`, CON_SESION)
 }
