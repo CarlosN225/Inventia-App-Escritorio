@@ -42,7 +42,7 @@ class MovimientoViewSet(mixins.CreateModelMixin,
     """Los movimientos se crean y consultan, pero no se editan ni se borran,
     para que el stock nunca quede descuadrado."""
 
-    queryset = MovimientoInventario.objects.all().order_by("-fecha_movimiento")
+    queryset = MovimientoInventario.objects.select_related("producto", "usuario").order_by("-fecha_movimiento")
     serializer_class = MovimientoSerializer
     permission_classes = [EsUsuarioAutenticado]
 
