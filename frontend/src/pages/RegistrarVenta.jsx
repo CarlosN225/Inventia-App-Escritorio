@@ -13,29 +13,25 @@ import {
   Check,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   Candy,
   ShoppingCart,
   CornerDownLeft,
   RotateCcw,
   PlusCircle,
   PackageOpen,
+  Loader2,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { listarProductos, mensajeDeError } from '../services/productos'
+import { listarVentas, registrarVenta } from '../services/ventas'
+import { mensajeDelBackend } from '../services/movimientos'
+import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-venta.css'
 
-/* ============================================================
-   ESTADO INICIAL — Todo vacío hasta conectar el backend
-   ------------------------------------------------------------
-   PRODUCTOS:         catálogo real del negocio
-   DETALLES:          info extra por producto (promos, mayoreo, etc.)
-   MAS_VENDIDOS_IDS:  ids de los productos más vendidos (ranking)
-   ============================================================ */
-const PRODUCTOS = []
-const DETALLES = {}
-const MAS_VENDIDOS_IDS = []
-
 const MAX_RESULTADOS = 6
+const MAX_RAPIDOS = 8
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 
@@ -49,47 +45,33 @@ function redondear(n) {
   return Math.round(n * 100) / 100
 }
 
-function diasHasta(iso) {
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  return Math.round((new Date(`${iso}T00:00:00`) - hoy) / 86400000)
-}
-
-function promoVigente(idProducto) {
-  const promos = DETALLES[idProducto]?.promociones ?? []
-  return promos.find((p) => p.activa && diasHasta(p.inicio) <= 0 && diasHasta(p.fin) >= 0) ?? null
-}
-
-function etiquetaPromo(promo) {
-  return promo.tipo === 'porcentaje' ? `-${promo.valor}%` : `-${moneda.format(promo.valor)}`
-}
-
+// El precio más bajo que aplica: normal, mayoreo (si llega a la cantidad) o el que se editó
+// TODO: sumar las promociones cuando tengan su endpoint
 function calcularPrecio(producto, cantidad, precioEditado) {
-  if (precioEditado !== null) return { precio: precioEditado, motivo: 'editado', promo: null }
+  if (precioEditado !== null) return { precio: precioEditado, motivo: 'editado' }
 
-  const detalles = DETALLES[producto.id]
-  const opciones = [{ precio: producto.precio, motivo: 'normal', promo: null }]
-
-  const promo = promoVigente(producto.id)
-  if (promo) {
-    const conPromo =
-      promo.tipo === 'porcentaje'
-        ? redondear(producto.precio * (1 - promo.valor / 100))
-        : Math.max(0, redondear(producto.precio - promo.valor))
-    opciones.push({ precio: conPromo, motivo: 'promo', promo })
+  if (producto.precioMayoreo && producto.minimoMayoreo && cantidad >= producto.minimoMayoreo && producto.precioMayoreo < producto.precio) {
+    return { precio: producto.precioMayoreo, motivo: 'mayoreo' }
   }
 
-  if (detalles?.precioMayoreo && cantidad >= detalles.minimoMayoreo) {
-    opciones.push({ precio: detalles.precioMayoreo, motivo: 'mayoreo', promo: null })
-  }
-
-  return opciones.reduce((mejor, opcion) => (opcion.precio < mejor.precio ? opcion : mejor))
+  return { precio: producto.precio, motivo: 'normal' }
 }
 
-function PastillaStock({ disponible, minimo }) {
-  if (disponible === 0) return <span className="rv-stock rv-stock--agotado">Agotado</span>
-  if (disponible < minimo) return <span className="rv-stock rv-stock--bajo">Quedan {disponible} · Stock bajo</span>
-  return <span className="rv-stock rv-stock--ok">Quedan {disponible} pzas</span>
+function PastillaStock({ producto }) {
+  const unidad = textoUnidad(producto.unidad, producto.stock)
+  if (producto.stock === 0) return <span className="rv-stock rv-stock--agotado">Agotado</span>
+  if (producto.stock < producto.minimo) {
+    return (
+      <span className="rv-stock rv-stock--bajo">
+        Quedan {producto.stock} {unidad} · Stock bajo
+      </span>
+    )
+  }
+  return (
+    <span className="rv-stock rv-stock--ok">
+      Quedan {producto.stock} {unidad}
+    </span>
+  )
 }
 
 /* ============ Pantalla ============ */
@@ -98,27 +80,82 @@ export default function RegistrarVenta() {
   const navigate = useNavigate()
   const inputRef = useRef(null)
 
+  // Datos del backend
+  const [productos, setProductos] = useState([])
+  const [rankingIds, setRankingIds] = useState([]) // ids de los más vendidos, de más a menos
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null)
+
+  // Venta en curso
   const [busqueda, setBusqueda] = useState('')
   const [resaltado, setResaltado] = useState(0)
   const [ticket, setTicket] = useState([])
-  const [stock, setStock] = useState(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p.stock])))
   const [editando, setEditando] = useState(null)
   const [ventaRegistrada, setVentaRegistrada] = useState(null)
-  const [folio, setFolio] = useState(1025)
+  const [errorVenta, setErrorVenta] = useState(null)
+  const [guardando, setGuardando] = useState(false)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
 
-  const productosPorId = useMemo(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p])), [])
-  const masVendidos = MAS_VENDIDOS_IDS.map((id) => productosPorId[id]).filter(Boolean)
+  async function cargarProductos() {
+    const lista = await listarProductos()
+    setProductos(lista.filter((p) => p.activo))
+  }
 
-  const sinProductos = PRODUCTOS.length === 0
+  // Más vendidos: suma de piezas vendidas por producto en todas las ventas
+  async function cargarRanking() {
+    const ventas = await listarVentas()
+    const piezas = {}
+
+    ventas.forEach((v) =>
+      (v.detalles ?? []).forEach((d) => {
+        piezas[d.producto] = (piezas[d.producto] || 0) + d.cantidad
+      })
+    )
+
+    setRankingIds(
+      Object.entries(piezas)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => Number(id))
+    )
+  }
+
+  async function cargarTodo() {
+    setCargando(true)
+    setErrorCarga(null)
+
+    try {
+      await cargarProductos()
+      await cargarRanking().catch(() => setRankingIds([])) // si falla, solo no hay ranking
+    } catch (e) {
+      setErrorCarga(mensajeDeError(e))
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    cargarTodo()
+  }, [])
+
+  const productosPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
+
+  // Los más vendidos de verdad; si todavía hay pocas ventas, se completa con otros con stock
+  const masVendidos = useMemo(() => {
+    const reales = rankingIds.map((id) => productosPorId.get(id)).filter(Boolean)
+    const relleno = productos.filter((p) => p.stock > 0 && !rankingIds.includes(p.id))
+    return [...reales, ...relleno].slice(0, MAX_RAPIDOS)
+  }, [rankingIds, productos, productosPorId])
+
+  const hayRankingReal = rankingIds.some((id) => productosPorId.has(id))
+  const sinProductos = !cargando && !errorCarga && productos.length === 0
 
   /* ---------- Búsqueda ---------- */
 
   const resultados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
     if (!texto) return []
-    return PRODUCTOS.filter((p) => normalizar(`${p.nombre} ${p.marca}`).includes(texto)).slice(0, MAX_RESULTADOS)
-  }, [busqueda])
+    return productos.filter((p) => normalizar(`${p.nombre} ${p.marca}`).includes(texto)).slice(0, MAX_RESULTADOS)
+  }, [busqueda, productos])
 
   const indiceResaltado = Math.min(resaltado, Math.max(resultados.length - 1, 0))
 
@@ -135,7 +172,8 @@ export default function RegistrarVenta() {
   /* ---------- Ticket ---------- */
 
   function agregar(id) {
-    if ((stock[id] ?? 0) === 0) return
+    const producto = productosPorId.get(id)
+    if (!producto || producto.stock === 0) return
 
     setTicket((t) => {
       const existe = t.find((item) => item.id === id)
@@ -143,6 +181,7 @@ export default function RegistrarVenta() {
       return [...t, { id, cantidad: 1, precioEditado: null }]
     })
     setVentaRegistrada(null)
+    setErrorVenta(null)
   }
 
   function agregarDesdeBusqueda(id) {
@@ -199,60 +238,77 @@ export default function RegistrarVenta() {
 
   /* ---------- Cálculos ---------- */
 
-  const renglones = ticket.map((item) => {
-    const producto = productosPorId[item.id]
-    const disponible = stock[item.id] ?? 0
-    const { precio, motivo, promo } = calcularPrecio(producto, item.cantidad, item.precioEditado)
-    const detalles = DETALLES[item.id]
+  const renglones = ticket
+    .filter((item) => productosPorId.has(item.id))
+    .map((item) => {
+      const producto = productosPorId.get(item.id)
+      const disponible = producto.stock
+      const { precio, motivo } = calcularPrecio(producto, item.cantidad, item.precioEditado)
 
-    const faltanMayoreo =
-      detalles?.precioMayoreo &&
-      motivo !== 'editado' &&
-      motivo !== 'mayoreo' &&
-      item.cantidad < detalles.minimoMayoreo &&
-      detalles.precioMayoreo < precio
-        ? detalles.minimoMayoreo - item.cantidad
-        : null
+      const faltanMayoreo =
+        producto.precioMayoreo &&
+        producto.minimoMayoreo &&
+        motivo === 'normal' &&
+        item.cantidad < producto.minimoMayoreo &&
+        producto.precioMayoreo < precio
+          ? producto.minimoMayoreo - item.cantidad
+          : null
 
-    return {
-      ...item,
-      producto,
-      disponible,
-      precio,
-      motivo,
-      promo,
-      subtotal: redondear(precio * item.cantidad),
-      faltan: item.cantidad > disponible,
-      faltanMayoreo,
-      precioMayoreo: detalles?.precioMayoreo ?? null,
-    }
-  })
+      return {
+        ...item,
+        producto,
+        disponible,
+        precio,
+        motivo,
+        subtotal: redondear(precio * item.cantidad),
+        faltan: item.cantidad > disponible,
+        faltanMayoreo,
+      }
+    })
 
   const conError = renglones.filter((r) => r.faltan)
   const hayErrores = conError.length > 0
   const total = redondear(renglones.filter((r) => !r.faltan).reduce((suma, r) => suma + r.subtotal, 0))
   const piezas = renglones.reduce((suma, r) => suma + r.cantidad, 0)
-  const puedeConfirmar = renglones.length > 0 && !hayErrores
+  const puedeConfirmar = renglones.length > 0 && !hayErrores && !guardando
 
   /* ---------- Confirmar y cancelar ---------- */
 
-  function confirmarVenta() {
+  async function confirmarVenta() {
     if (!puedeConfirmar) return
 
-    // TODO: mandar al backend (él genera las salidas de inventario)
-    setStock((s) => {
-      const copia = { ...s }
-      renglones.forEach((r) => {
-        copia[r.id] -= r.cantidad
-      })
-      return copia
-    })
+    setGuardando(true)
+    setErrorVenta(null)
 
-    setVentaRegistrada({ folio, total })
-    setFolio((f) => f + 1)
-    setTicket([])
-    setEditando(null)
-    enfocarBuscador()
+    try {
+      const venta = await registrarVenta(
+        renglones.map((r) => ({
+          producto: r.id,
+          cantidad: r.cantidad,
+          precio_unitario: r.precio.toFixed(2),
+          tipo_precio: r.motivo,
+        }))
+      )
+
+      // El backend ya descontó el stock; aquí lo reflejamos al instante
+      const vendidas = new Map(renglones.map((r) => [r.id, r.cantidad]))
+      setProductos((lista) =>
+        lista.map((p) => (vendidas.has(p.id) ? { ...p, stock: p.stock - vendidas.get(p.id) } : p))
+      )
+
+      setVentaRegistrada({ folio: venta.id, total: Number(venta.total) })
+      setTicket([])
+      setEditando(null)
+      enfocarBuscador()
+
+      cargarRanking().catch(() => {})
+    } catch (e) {
+      setErrorVenta(mensajeDelBackend(e) ?? mensajeDeError(e))
+      // Por si el stock cambió (ej. alguien más vendió), lo traemos de nuevo
+      cargarProductos().catch(() => {})
+    } finally {
+      setGuardando(false)
+    }
   }
 
   function pedirCancelar() {
@@ -263,6 +319,7 @@ export default function RegistrarVenta() {
     setDialogoCancelar(false)
     setTicket([])
     setEditando(null)
+    setErrorVenta(null)
     enfocarBuscador()
   }
 
@@ -332,21 +389,34 @@ export default function RegistrarVenta() {
         </ul>
       </footer>
 
-      {/* ============ SIN PRODUCTOS — empty state ============ */}
-      {sinProductos ? (
+      {cargando || errorCarga ? (
+        /* ============ CARGANDO / ERROR ============ */
+        <section className="rv-panel rv-sin-productos">
+          <span className="rv-sin-productos__icono" aria-hidden="true">
+            {cargando ? <Loader2 size={28} className="rv-girando" /> : <AlertCircle size={28} />}
+          </span>
+          <h2 className="rv-sin-productos__titulo">
+            {cargando ? 'Cargando productos…' : 'No pudimos cargar tus productos'}
+          </h2>
+          {errorCarga && (
+            <>
+              <p className="rv-sin-productos__texto">{errorCarga}</p>
+              <button type="button" className="rv-confirmar" onClick={cargarTodo}>
+                <RotateCcw size={16} aria-hidden="true" />
+                Reintentar
+              </button>
+            </>
+          )}
+        </section>
+      ) : sinProductos ? (
+        /* ============ SIN PRODUCTOS ============ */
         <section className="rv-panel rv-sin-productos">
           <span className="rv-sin-productos__icono" aria-hidden="true">
             <PackageOpen size={28} />
           </span>
           <h2 className="rv-sin-productos__titulo">Aún no tienes productos</h2>
-          <p className="rv-sin-productos__texto">
-            Para registrar ventas, primero agrega productos a tu catálogo.
-          </p>
-          <button
-            type="button"
-            className="rv-confirmar"
-            onClick={() => navigate('/catalogo/nuevo')}
-          >
+          <p className="rv-sin-productos__texto">Para registrar ventas, primero agrega productos a tu catálogo.</p>
+          <button type="button" className="rv-confirmar" onClick={() => navigate('/catalogo/nuevo')}>
             <Plus size={16} aria-hidden="true" />
             Nuevo producto
           </button>
@@ -404,16 +474,13 @@ export default function RegistrarVenta() {
                   ) : (
                     <ul className="rv-lista">
                       {resultados.map((p, i) => {
-                        const disponible = stock[p.id] ?? 0
-                        const agotado = disponible === 0
+                        const agotado = p.stock === 0
                         const activo = i === indiceResaltado
 
                         return (
                           <li
                             key={p.id}
-                            className={
-                              'rv-resultado' + (activo ? ' is-resaltado' : '') + (agotado ? ' is-agotado' : '')
-                            }
+                            className={'rv-resultado' + (activo ? ' is-resaltado' : '') + (agotado ? ' is-agotado' : '')}
                             onMouseEnter={() => setResaltado(i)}
                           >
                             <span className="rv-placeholder" aria-hidden="true">
@@ -423,16 +490,16 @@ export default function RegistrarVenta() {
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
                                 {p.nombre}
-                                <PastillaStock disponible={disponible} minimo={p.minimo} />
+                                <PastillaStock producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
-                                {p.marca} · {p.categoria}
+                                {p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}
                               </p>
                             </div>
 
                             <div className="rv-resultado__precio">
                               <strong>{moneda.format(p.precio)}</strong>
-                              <span>c/u</span>
+                              <span>c/{textoUnidad(p.unidad, 1)}</span>
                             </div>
 
                             <button
@@ -463,50 +530,39 @@ export default function RegistrarVenta() {
                   <Zap size={16} />
                 </span>
                 <div>
-                  <h2 className="rv-seccion__titulo">Más vendidos</h2>
+                  <h2 className="rv-seccion__titulo">{hayRankingReal ? 'Más vendidos' : 'Acceso rápido'}</h2>
                   <p className="rv-seccion__subtitulo">
-                    {masVendidos.length > 0
-                      ? 'Haz clic en cualquier producto para sumar 1 pieza al ticket'
-                      : 'Cuando tengas ventas registradas, aquí verás tus más vendidos'}
+                    {hayRankingReal
+                      ? 'Haz clic en cualquier producto para sumar 1 al ticket'
+                      : 'Cuando tengas más ventas, aquí aparecerán tus más vendidos'}
                   </p>
                 </div>
               </header>
 
-              {masVendidos.length === 0 ? (
-                <div className="rv-vacio-seccion">
-                  <span className="rv-vacio-seccion__icono" aria-hidden="true">
-                    <Zap size={22} />
-                  </span>
-                  <p className="rv-vacio-seccion__texto">
-                    Aún no hay suficientes ventas para calcular tus productos más vendidos.
-                  </p>
-                </div>
-              ) : (
-                <div className="rv-rapidos">
-                  {masVendidos.map((p) => {
-                    const agotado = (stock[p.id] ?? 0) === 0
+              <div className="rv-rapidos">
+                {masVendidos.map((p) => {
+                  const agotado = p.stock === 0
 
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className="rv-rapido"
-                        disabled={agotado}
-                        onClick={() => agregar(p.id)}
-                        title={agotado ? 'Agotado' : `Agregar ${p.nombre}`}
-                      >
-                        <PlusCircle size={18} className="rv-rapido__mas" aria-hidden="true" />
-                        <span className="rv-placeholder" aria-hidden="true">
-                          <Candy size={20} />
-                        </span>
-                        <span className="rv-chip rv-chip--marca">{p.marca}</span>
-                        <span className="rv-rapido__nombre">{p.nombre}</span>
-                        <span className="rv-rapido__precio">{moneda.format(p.precio)}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="rv-rapido"
+                      disabled={agotado}
+                      onClick={() => agregar(p.id)}
+                      title={agotado ? 'Agotado' : `Agregar ${p.nombre}`}
+                    >
+                      <PlusCircle size={18} className="rv-rapido__mas" aria-hidden="true" />
+                      <span className="rv-placeholder" aria-hidden="true">
+                        <Candy size={20} />
+                      </span>
+                      {p.marca && <span className="rv-chip rv-chip--marca">{p.marca}</span>}
+                      <span className="rv-rapido__nombre">{p.nombre}</span>
+                      <span className="rv-rapido__precio">{moneda.format(p.precio)}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </section>
           </div>
 
@@ -547,9 +603,7 @@ export default function RegistrarVenta() {
                   <ShoppingCart size={22} />
                 </span>
                 <p className="rv-vacio__titulo">Aún no hay productos</p>
-                <p className="rv-vacio__texto">
-                  Busca un producto o toca uno de los más vendidos para empezar.
-                </p>
+                <p className="rv-vacio__texto">Busca un producto o toca uno de acceso rápido para empezar.</p>
               </div>
             ) : (
               <ul className="rv-renglones">
@@ -587,15 +641,12 @@ export default function RegistrarVenta() {
                             </div>
                           ) : (
                             <>
-                              {r.motivo !== 'normal' && (
-                                <s className="rv-tachado">{moneda.format(r.producto.precio)}</s>
-                              )}
-                              <span className="rv-unitario">{moneda.format(r.precio)} c/u</span>
+                              {r.motivo !== 'normal' && <s className="rv-tachado">{moneda.format(r.producto.precio)}</s>}
+                              <span className="rv-unitario">
+                                {moneda.format(r.precio)} c/{textoUnidad(r.producto.unidad, 1)}
+                              </span>
 
                               {r.motivo === 'mayoreo' && <span className="rv-chip rv-chip--verde">Mayoreo</span>}
-                              {r.motivo === 'promo' && (
-                                <span className="rv-chip rv-chip--azul">Promo {etiquetaPromo(r.promo)}</span>
-                              )}
                               {r.motivo === 'editado' && <span className="rv-chip rv-chip--gris">Precio editado</span>}
 
                               <button
@@ -634,7 +685,7 @@ export default function RegistrarVenta() {
                               type="button"
                               onClick={() => cambiarCantidad(r.id, r.cantidad - 1)}
                               disabled={r.cantidad <= 1}
-                              aria-label="Quitar una pieza"
+                              aria-label="Quitar una"
                             >
                               <Minus size={14} />
                             </button>
@@ -646,11 +697,7 @@ export default function RegistrarVenta() {
                               onChange={(e) => cambiarCantidad(r.id, parseInt(e.target.value, 10))}
                               aria-label={`Cantidad de ${r.producto.nombre}`}
                             />
-                            <button
-                              type="button"
-                              onClick={() => cambiarCantidad(r.id, r.cantidad + 1)}
-                              aria-label="Agregar una pieza"
-                            >
+                            <button type="button" onClick={() => cambiarCantidad(r.id, r.cantidad + 1)} aria-label="Agregar una">
                               <Plus size={14} />
                             </button>
                           </div>
@@ -671,14 +718,14 @@ export default function RegistrarVenta() {
                         <p className="rv-renglon__error">
                           <AlertTriangle size={13} aria-hidden="true" />
                           {r.disponible === 0
-                            ? 'Ya no quedan piezas en inventario'
-                            : `Solo quedan ${r.disponible} en inventario`}
+                            ? 'Ya no quedan en inventario'
+                            : `Solo quedan ${r.disponible} ${textoUnidad(r.producto.unidad, r.disponible)} en inventario`}
                         </p>
                       )}
 
                       {!r.faltan && r.faltanMayoreo !== null && (
                         <p className="rv-renglon__sugerencia">
-                          Lleva {r.faltanMayoreo} más y paga {moneda.format(r.precioMayoreo)} c/u
+                          Lleva {r.faltanMayoreo} más y paga {moneda.format(r.producto.precioMayoreo)} c/u
                         </p>
                       )}
                     </div>
@@ -705,20 +752,21 @@ export default function RegistrarVenta() {
                   <button
                     type="button"
                     className="rv-cancelar"
-                    disabled={ticket.length === 0}
+                    disabled={ticket.length === 0 || guardando}
                     onClick={pedirCancelar}
                   >
                     <X size={15} aria-hidden="true" />
                     Cancelar
                   </button>
-                  <button
-                    type="button"
-                    className="rv-confirmar"
-                    disabled={!puedeConfirmar}
-                    onClick={confirmarVenta}
-                  >
-                    {hayErrores ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
-                    Confirmar
+                  <button type="button" className="rv-confirmar" disabled={!puedeConfirmar} onClick={confirmarVenta}>
+                    {guardando ? (
+                      <Loader2 size={16} className="rv-girando" aria-hidden="true" />
+                    ) : hayErrores ? (
+                      <Lock size={16} aria-hidden="true" />
+                    ) : (
+                      <Check size={16} aria-hidden="true" />
+                    )}
+                    {guardando ? 'Registrando…' : 'Confirmar'}
                   </button>
                 </div>
               </div>
@@ -731,6 +779,15 @@ export default function RegistrarVenta() {
                     {conError.length === 1
                       ? `corrige la cantidad de ${conError[0].producto.nombre} para poder confirmar`
                       : `corrige ${conError.length} productos para poder confirmar`}
+                  </span>
+                </div>
+              )}
+
+              {errorVenta && (
+                <div className="rv-aviso-error" role="alert">
+                  <AlertCircle size={15} aria-hidden="true" />
+                  <span>
+                    <strong>No se registró:</strong> {errorVenta}
                   </span>
                 </div>
               )}
