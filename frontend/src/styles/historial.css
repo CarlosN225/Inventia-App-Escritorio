@@ -654,3 +654,29 @@
   line-height: 1.5;
   max-width: 340px;
 }
+
+/* ============ CONECTADO AL BACKEND ============ */
+
+.hi-girando {
+  color: var(--d-azul) !important;
+  animation: hi-girar 0.9s linear infinite;
+}
+
+@keyframes hi-girar {
+  to { transform: rotate(360deg); }
+}
+
+.hi-icono-error {
+  color: #d97706 !important;
+}
+
+.hi-detalle__pendiente {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--d-borde-2);
+  color: var(--d-gris);
+  font-size: 12.5px;
+}

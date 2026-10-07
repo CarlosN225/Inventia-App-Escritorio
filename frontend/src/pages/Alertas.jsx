@@ -192,9 +192,8 @@ export default function Alertas() {
     navigate('/registrar-compra')
   }
 
-  function irAMerma() {
-    // TODO: pasar el producto cuando Registrar merma esté conectado al backend
-    navigate('/registrar-merma')
+    function irAMerma(producto) {
+    navigate('/registrar-merma', { state: { productoId: producto.id } })
   }
 
   function enviarAhora() {
@@ -497,7 +496,7 @@ export default function Alertas() {
                                     <button
                                       type="button"
                                       className="al-boton al-boton--chico"
-                                      onClick={irAMerma}
+                                      onClick={() => irAMerma(p)}
                                       title="Registrar merma"
                                     >
                                       <PackageMinus size={14} aria-hidden="true" />

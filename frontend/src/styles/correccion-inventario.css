@@ -844,6 +844,45 @@
   line-height: 1.5;
 }
 
+/* ============ CONECTADO AL BACKEND ============ */
+
+.ci-girando {
+  animation: ci-girar 0.9s linear infinite;
+}
+
+@keyframes ci-girar {
+  to { transform: rotate(360deg); }
+}
+
+/* Productos que no se pudieron corregir */
+.ci-fallidos {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #f7c9c9;
+  border-radius: 10px;
+  background: #fff5f5;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ci-fallidos svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ci-fallidos ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.ci-fallidos span {
+  color: #b91c1c;
+  font-size: 12.5px;
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 1100px) {
   .ci-motivo { padding-left: 0; border-left: none; }
