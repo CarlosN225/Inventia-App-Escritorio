@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAjustes } from '../hooks/useConfiguracion'
+
 import {
   Search,
   X,
@@ -47,15 +49,32 @@ function redondear(n) {
 
 // El precio más bajo que aplica: normal, mayoreo (si llega a la cantidad) o el que se editó
 // TODO: sumar las promociones cuando tengan su endpoint
-function calcularPrecio(producto, cantidad, precioEditado) {
-  if (precioEditado !== null) return { precio: precioEditado, motivo: 'editado' }
+function etiquetaPromo(promo) {
+  return promo.tipo === 'porcentaje' ? `-${promo.valor}%` : `-${moneda.format(promo.valor)}`
+}
 
-  if (producto.precioMayoreo && producto.minimoMayoreo && cantidad >= producto.minimoMayoreo && producto.precioMayoreo < producto.precio) {
-    return { precio: producto.precioMayoreo, motivo: 'mayoreo' }
+// El precio más bajo que aplica: normal, promoción vigente, mayoreo (si llega a la cantidad) o el editado
+function calcularPrecio(producto, cantidad, precioEditado, conMayoreo = true, conPromos = true) {
+  if (precioEditado !== null) return { precio: precioEditado, motivo: 'editado', promo: null }
+
+  const opciones = [{ precio: producto.precio, motivo: 'normal', promo: null }]
+
+  if (conPromos && producto.promocion) {
+    const p = producto.promocion
+    const conDescuento =
+      p.tipo === 'porcentaje'
+        ? redondear(producto.precio * (1 - p.valor / 100))
+        : Math.max(0, redondear(producto.precio - p.valor))
+    opciones.push({ precio: conDescuento, motivo: 'promocion', promo: p })
   }
 
-  return { precio: producto.precio, motivo: 'normal' }
+  if (conMayoreo && producto.precioMayoreo && producto.minimoMayoreo && cantidad >= producto.minimoMayoreo) {
+    opciones.push({ precio: producto.precioMayoreo, motivo: 'mayoreo', promo: null })
+  }
+
+  return opciones.reduce((mejor, opcion) => (opcion.precio < mejor.precio ? opcion : mejor))
 }
+
 
 function PastillaStock({ producto }) {
   const unidad = textoUnidad(producto.unidad, producto.stock)
@@ -79,7 +98,7 @@ function PastillaStock({ producto }) {
 export default function RegistrarVenta() {
   const navigate = useNavigate()
   const inputRef = useRef(null)
-
+  const { vende_mayoreo: conMayoreo, maneja_promociones: conPromos } = useAjustes()
   // Datos del backend
   const [productos, setProductos] = useState([])
   const [rankingIds, setRankingIds] = useState([]) // ids de los más vendidos, de más a menos
@@ -243,9 +262,9 @@ export default function RegistrarVenta() {
     .map((item) => {
       const producto = productosPorId.get(item.id)
       const disponible = producto.stock
-      const { precio, motivo } = calcularPrecio(producto, item.cantidad, item.precioEditado)
-
-      const faltanMayoreo =
+      const { precio, motivo, promo } = calcularPrecio(producto, item.cantidad, item.precioEditado, conMayoreo, conPromos)
+        const faltanMayoreo =
+        conMayoreo &&
         producto.precioMayoreo &&
         producto.minimoMayoreo &&
         motivo === 'normal' &&
@@ -260,6 +279,7 @@ export default function RegistrarVenta() {
         disponible,
         precio,
         motivo,
+        promo,
         subtotal: redondear(precio * item.cantidad),
         faltan: item.cantidad > disponible,
         faltanMayoreo,
@@ -647,6 +667,9 @@ export default function RegistrarVenta() {
                               </span>
 
                               {r.motivo === 'mayoreo' && <span className="rv-chip rv-chip--verde">Mayoreo</span>}
+                              {r.motivo === 'promocion' && (
+                                <span className="rv-chip rv-chip--azul">Promo {etiquetaPromo(r.promo)}</span>
+                              )}
                               {r.motivo === 'editado' && <span className="rv-chip rv-chip--gris">Precio editado</span>}
 
                               <button

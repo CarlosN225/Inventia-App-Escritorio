@@ -24,7 +24,7 @@ const features = [
   { icon: ShieldCheck, text: 'Control seguro de tu inventario' },
 ]
 
-export default function Login() {
+export default function Login({ nombreNegocio }) {  
   const navigate = useNavigate()
 
   const [errorMsg, setErrorMsg] = useState('')
@@ -140,7 +140,7 @@ export default function Login() {
         {/* Nombre del negocio */}
         <div className="login-negocio">
           <Store size={16} strokeWidth={2.2} aria-hidden="true" />
-          {NOMBRE_NEGOCIO}
+          {nombreNegocio || 'Tu negocio'}
         </div>
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>

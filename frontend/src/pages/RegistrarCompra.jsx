@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useAjustes } from '../hooks/useConfiguracion'
+
 import {
   Search,
   X,
@@ -38,8 +40,6 @@ import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-venta.css'
 import '../styles/registrar-compra.css'
 
-// TODO: traer de la Configuración del negocio
-const CONFIG = { maneja_caducidad: true }
 
 const MAX_RESULTADOS = 6
 const MAX_FRECUENTES = 5
@@ -102,6 +102,7 @@ export default function RegistrarCompra() {
   const inputRef = useRef(null)
   const location = useLocation()
   const navigate = useNavigate()
+  const CONFIG = useAjustes()
 
   // Datos del backend
   const [productos, setProductos] = useState([])

@@ -22,6 +22,8 @@ import { listarProductos } from '../services/productos'
 import { listarMovimientos } from '../services/movimientos'
 import { listarVentas } from '../services/ventas'
 import { textoUnidad } from '../utils/unidades'
+import useConfiguracion from '../hooks/useConfiguracion'
+import { nombreCorto } from '../services/configuracion'
 
 import '../styles/dashboard.css'
 
@@ -123,8 +125,11 @@ function hace(fechaIso) {
 /* ============================================================ */
 
 export default function Dashboard() {
-  const navigate = useNavigate()
 
+  const navigate = useNavigate()
+  const configuracion = useConfiguracion()
+  const nombreNegocio = nombreCorto(configuracion?.negocio.nombre) || 'tu negocio'
+  
   const [periodo, setPeriodo] = useState('mes')
   const [vistaTop, setVistaTop] = useState('mas')
 

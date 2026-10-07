@@ -14,6 +14,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     Al encargado no se le manda el costo (solo el propietario ve costos y ganancias)."""
 
     categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
+    promocion_vigente = serializers.SerializerMethodField()
 
     class Meta:
         model = Producto
@@ -38,6 +39,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "stock_minimo",
             "stock_maximo",
             "activo",
+            "promocion_vigente",
         ]
 
     def to_representation(self, instance):
@@ -49,6 +51,15 @@ class ProductoSerializer(serializers.ModelSerializer):
             datos.pop("ultimo_costo", None)
 
         return datos
+
+    def update(self, instance, validated_data):
+        # Al editar, el stock no se toca: solo cambia con compras, ventas, mermas o correcciones
+        validated_data.pop("stock_actual", None)
+        return super().update(instance, validated_data)
+
+    def get_promocion_vigente(self, obj):
+        return promocion_vigente(obj)
+    
 class MovimientoSerializer(serializers.ModelSerializer):
     """Movimientos de inventario, con los nombres del DER.
 
@@ -243,3 +254,56 @@ class CompraSerializer(serializers.ModelSerializer):
     def get_detalles(self, obj):
         detalles = DetalleCompra.objects.filter(compra=obj).select_related("producto")
         return DetalleCompraSerializer(detalles, many=True).data
+
+    
+
+# ============================================================
+#  PROMOCIONES
+# ============================================================
+from django.utils import timezone
+
+from .models import Promocion
+
+
+class PromocionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Promocion
+        fields = ["id", "producto", "tipo_promocion", "valor", "fecha_inicio", "fecha_fin", "activa"]
+
+    def validate(self, datos):
+        # En una edición parcial (ej. solo pausar), completa con lo que ya tenía
+        actual = self.instance
+        tipo = datos.get("tipo_promocion", getattr(actual, "tipo_promocion", None))
+        valor = datos.get("valor", getattr(actual, "valor", None))
+        inicio = datos.get("fecha_inicio", getattr(actual, "fecha_inicio", None))
+        fin = datos.get("fecha_fin", getattr(actual, "fecha_fin", None))
+        producto = datos.get("producto", getattr(actual, "producto", None))
+
+        if valor is not None and valor <= 0:
+            raise serializers.ValidationError({"valor": "El descuento debe ser mayor a 0."})
+        if tipo == Promocion.TIPO_PORCENTAJE and valor is not None and valor > 90:
+            raise serializers.ValidationError({"valor": "El descuento no puede pasar de 90%."})
+        if tipo == Promocion.TIPO_MONTO and producto and valor is not None and valor >= producto.precio_venta:
+            raise serializers.ValidationError({"valor": "El descuento debe ser menor al precio de venta."})
+        if inicio and fin and fin < inicio:
+            raise serializers.ValidationError({"fecha_fin": "La fecha de fin debe ser después del inicio."})
+
+        return datos
+
+
+def promocion_vigente(producto):
+    """La promoción activa de hoy (si hay varias, la de mayor valor)."""
+    hoy = timezone.localdate()
+    promo = (
+        producto.promociones.filter(activa=True, fecha_inicio__lte=hoy, fecha_fin__gte=hoy)
+        .order_by("-valor")
+        .first()
+    )
+    if not promo:
+        return None
+    return {
+        "id": promo.id,
+        "tipo": "porcentaje" if promo.tipo_promocion == Promocion.TIPO_PORCENTAJE else "monto",
+        "valor": str(promo.valor),
+        "fecha_fin": promo.fecha_fin.isoformat(),
+    }
