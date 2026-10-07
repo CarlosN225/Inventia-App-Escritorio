@@ -115,3 +115,31 @@ export async function restablecerContrasena(usuarioId) {
 
     return response.data;
 }
+
+
+export async function actualizarMiPerfil(datos) {
+    const response = await axios.patch(
+        API_URL + '/usuarios/mi-perfil/',
+        datos,
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
+
+export async function cambiarMiContrasena(contrasenaActual, nuevaContrasena) {
+    const response = await axios.post(
+        API_URL + '/usuarios/mi-contrasena/',
+        {
+            contrasena_actual: contrasenaActual,
+            nueva_contrasena: nuevaContrasena
+        },
+        {
+            withCredentials: true
+        }
+    );
+
+    return response.data;
+}
