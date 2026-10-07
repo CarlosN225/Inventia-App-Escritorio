@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import RutaProtegida from './components/RutaProtegida.jsx'
 import Layout from './components/Layout.jsx'
 import Login from './pages/Login.jsx'
+import AsistenteInicial from './pages/AsistenteInicial.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Catalogo from './pages/Catalogo.jsx'
 import Movimientos from './pages/Movimientos.jsx'
@@ -19,8 +20,9 @@ import Ayuda from './pages/Ayuda.jsx'
 export default function App() {
   return (
     <Routes>
-      {/* Login sin sidebar y sin protección */}
+      {/* Sin sidebar y sin protección: el login y el asistente de la primera vez */}
       <Route path="/" element={<Login />} />
+      <Route path="/bienvenida" element={<AsistenteInicial />} />
 
       {/* Todo lo interno requiere sesión activa */}
       <Route element={<RutaProtegida />}>
@@ -36,7 +38,7 @@ export default function App() {
           <Route path="/registrar-compra" element={<RegistrarCompra />} />
           <Route path="/registrar-merma" element={<RegistrarMerma />} />
           <Route path="/correccion-inventario" element={<CorreccionInventario />} />
-          <Route path="/perfil" element={<MiPerfil />} />         
+          <Route path="/perfil" element={<MiPerfil />} />
           <Route path="/ayuda" element={<Ayuda />} />
         </Route>
       </Route>
