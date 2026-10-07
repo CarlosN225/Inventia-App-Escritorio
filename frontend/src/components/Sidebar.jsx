@@ -5,7 +5,7 @@ import {
   Package,
   ArrowLeftRight,
   Bell,
-  Settings,
+  // CAMBIO 1: aquí estaba "Settings,". Se borró porque ahora el icono lo pone AjustesMenu.
   ChevronsLeft,
   ChevronsRight,
   X,
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import logoInventia from '../assets/logo-inventia-sf.png'
 import { getUsuarioActual } from '../services/auth'
+// CAMBIO 2: import nuevo del menú de ajustes
+import AjustesMenu from './AjustesMenu.jsx'
 
 /* ============================================================
    NAVEGACIÓN
@@ -176,40 +178,14 @@ export default function Sidebar({
       </nav>
 
       <div className="sidebar__footer">
-        {/* ==================================================
-            CONFIGURACIÓN
-            --------------------------------------------------
-            Solamente el propietario puede ver esta opción.
-            El encargado no verá el botón en el menú.
-            ================================================== */}
-        {rol === 'propietario' && (
-          <NavLink
-            to="/configuracion"
-            title={
-              collapsed
-                ? 'Configuración'
-                : undefined
-            }
-            className={({ isActive }) =>
-              'sidebar__link' +
-              (isActive
-                ? ' is-active'
-                : '')
-            }
-          >
-            <Settings
-              size={20}
-              strokeWidth={1.9}
-              aria-hidden="true"
-            />
-
-            {!collapsed && (
-              <span className="sidebar__link-label">
-                Configuración
-              </span>
-            )}
-          </NavLink>
-        )}
+        {/* CAMBIO 3: aquí estaba el bloque completo de
+            {rol === 'propietario' && (<NavLink to="/configuracion" ...>)}
+            Ahora el icono de ajustes abre un menú con el tema (claro/oscuro).
+            El propietario además ve ahí el enlace a Configuración. */}
+        <AjustesMenu
+          collapsed={collapsed}
+          esPropietario={rol === 'propietario'}
+        />
 
         <button
           type="button"
