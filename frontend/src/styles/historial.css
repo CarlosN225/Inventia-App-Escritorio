@@ -30,6 +30,7 @@
 }
 
 /* ============ ENCABEZADO ============ */
+
 .hi-encabezado {
   display: flex;
   flex-wrap: wrap;
@@ -81,10 +82,11 @@
   font-size: 13.5px;
 }
 
-.hi-candado svg { color: var(--d-gris); flex-shrink: 0; }
+.hi-candado svg { flex-shrink: 0; color: var(--d-gris); }
 .hi-candado strong { color: var(--d-marino); }
 
 /* ============ FILTROS ============ */
+
 .hi-filtros {
   display: flex;
   flex-wrap: wrap;
@@ -95,7 +97,7 @@
 .hi-buscador {
   position: relative;
   flex: 1;
-  min-width: 240px;
+  min-width: 220px;
 }
 
 .hi-buscador__icono {
@@ -171,6 +173,7 @@
 }
 
 .hi-usuario-select {
+  max-width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--d-borde);
   border-radius: 8px;
@@ -212,6 +215,7 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -235,18 +239,51 @@
   border-radius: 50%;
 }
 
+.hi-expandir {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--d-azul);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hi-expandir:hover { background: #eef3fb; }
+.hi-expandir svg { transition: transform 150ms ease; }
+.hi-expandir svg.is-girado { transform: rotate(180deg); }
+
 /* ============ TABLA ============ */
+
+/* La tabla se fija en cuánto espacio tiene ELLA (menú abierto o cerrado),
+   y si de plano no cabe, se desliza dentro de su panel, nunca la página */
 .hi-panel--tabla {
   padding: 0;
-  contain: inline-size;
+  overflow-x: auto;
+  container-type: inline-size;
+  container-name: tabla;
 }
 
 .hi .hi-tabla {
   width: 100%;
+  min-width: 460px;
+  table-layout: fixed;
   border: none;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13.5px;
+}
+
+.hi .hi-tabla th,
+.hi .hi-tabla td {
+  box-sizing: border-box; /* el ancho incluye el margen interno: nada se encima */
 }
 
 .hi .hi-tabla th {
@@ -261,10 +298,21 @@
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hi .hi-tabla th:first-child { padding-left: 18px; border-top-left-radius: 12px; }
 .hi .hi-tabla th:last-child { padding-right: 18px; border-top-right-radius: 12px; }
+
+/* Anchos de las columnas chicas; "Producto" (la 3) se queda con todo lo demás */
+.hi .hi-tabla th:nth-child(1) { width: 116px; } /* Fecha y hora  */
+.hi .hi-tabla th:nth-child(2) { width: 112px; } /* Tipo          */
+.hi .hi-tabla th:nth-child(4) { width: 120px; } /* Cantidad      */
+.hi .hi-tabla th:nth-child(5) { width: 124px; } /* Stock después */
+.hi .hi-tabla th:nth-child(6) { width: 112px; } /* Usuario       */
+.hi .hi-tabla th:nth-child(7) { width: 168px; } /* Origen        */
+.hi .hi-tabla th:nth-child(8) { width: 52px;  } /* Flechita      */
 
 .hi .hi-tabla td {
   padding: 10px 12px;
@@ -272,12 +320,18 @@
   border-bottom: 1px solid var(--d-borde-2);
   background: transparent;
   color: var(--d-marino);
-  white-space: nowrap;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .hi .hi-tabla td:first-child { padding-left: 18px; }
 .hi .hi-tabla td:last-child { padding-right: 18px; }
+
+/* En las filas, lo que no quepa se corta con "…" (menos la flechita) */
+.hi .hi-tabla tr.hi-fila > td:not(:last-child) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .hi .hi-tabla tbody tr,
 .hi .hi-tabla tbody tr:nth-child(odd),
@@ -294,6 +348,8 @@
 .hi .hi-tabla tbody tr.hi-fila.is-abierta { background: #f5f9ff; }
 
 .hi .hi-tabla .is-der { text-align: right; }
+
+/* ---------- Celdas ---------- */
 
 .hi-fecha {
   display: flex;
@@ -318,31 +374,49 @@
   font-weight: 700;
 }
 
-.hi-tipo--venta      { background: #e6f2fc; border-color: #c9e4f8; color: #0369a1; }
-.hi-tipo--compra     { background: #e4f7ef; border-color: #b8e6d1; color: #047857; }
-.hi-tipo--merma      { background: #fdecec; border-color: #f7c9c9; color: #b91c1c; }
-.hi-tipo--correccion { background: #f5f3ff; border-color: #ddd6fe; color: #6d28d9; }
+.hi-tipo--venta      { border-color: #c9e4f8; background: #e6f2fc; color: #0369a1; }
+.hi-tipo--compra     { border-color: #b8e6d1; background: #e4f7ef; color: #047857; }
+.hi-tipo--merma      { border-color: #f7c9c9; background: #fdecec; color: #b91c1c; }
+.hi-tipo--correccion { border-color: #ddd6fe; background: #f5f3ff; color: #6d28d9; }
 
 .hi-producto {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .hi-placeholder {
   display: grid;
+  flex-shrink: 0;
   place-items: center;
   width: 30px;
   height: 30px;
   border-radius: 7px;
   background: #eef3fb;
   color: var(--d-azul);
-  flex-shrink: 0;
 }
 
-.hi-producto__nombre {
-  font-weight: 600;
-  white-space: normal;
+.hi-grupo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hi-producto__nombre,
+.hi-grupo__sub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hi-producto__nombre { font-weight: 600; }
+
+.hi-grupo__sub {
+  color: var(--d-gris);
+  font-size: 12px;
 }
 
 .hi-cantidad {
@@ -353,17 +427,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hi-cantidad--entra { color: #059669; }
-.hi-cantidad--sale { color: #8a1f34; }
+.hi-cantidad span { font-size: 12px; font-weight: 500; }
 
-.hi-cantidad span {
-  font-size: 12px;
-  font-weight: 500;
-}
+.hi-cantidad--entra  { color: #059669; }
+.hi-cantidad--sale   { color: #8a1f34; }
+.hi-cantidad--neutra { color: #475569; font-size: 12.5px; font-weight: 600; }
 
-.hi-stock {
-  font-variant-numeric: tabular-nums;
-}
+.hi-stock { font-variant-numeric: tabular-nums; }
 
 .hi-stock span {
   margin-left: 3px;
@@ -372,13 +442,16 @@
 }
 
 .hi-usuario {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hi-avatar {
   display: grid;
+  flex-shrink: 0;
   place-items: center;
   width: 26px;
   height: 26px;
@@ -390,15 +463,28 @@
 }
 
 .hi-origen {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
   color: #475569;
   font-size: 12.5px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hi-origen svg {
+  margin-right: 5px;
+  vertical-align: -2px;
 }
 
 .hi-origen--venta { color: var(--d-azul); }
+
+.hi-total {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 
 .hi-chevron {
   color: var(--d-gris-2);
@@ -411,8 +497,10 @@
 }
 
 /* ============ DETALLE DESPLEGADO ============ */
-.hi .hi-tabla tbody tr.hi-detalle-fila td {
+
+.hi .hi-tabla tbody tr.hi-detalle-fila > td {
   padding: 0 18px 14px;
+  overflow: hidden;
   background: #f5f9ff;
   white-space: normal;
 }
@@ -441,16 +529,19 @@
 
 .hi-detalle__icono {
   display: grid;
+  flex-shrink: 0;
   place-items: center;
   width: 34px;
   height: 34px;
   border-radius: 9px;
   background: #eef3fb;
   color: var(--d-azul);
-  flex-shrink: 0;
 }
 
-.hi-detalle__titulos { flex: 1; }
+.hi-detalle__titulos {
+  flex: 1;
+  min-width: 160px;
+}
 
 .hi-detalle__titulo {
   margin: 0;
@@ -468,6 +559,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  margin-left: auto;
 }
 
 .hi-detalle__total span {
@@ -484,17 +576,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* La tablita del ticket: el producto se queda con el 42% y lo demás se reparte parejo */
 .hi .hi-detalle__tabla {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.hi .hi-detalle__tabla th {
+.hi .hi-detalle__tabla th:first-child { width: 42%; }
+
+.hi .hi-detalle__tabla th,
+.hi .hi-detalle__tabla td {
+  box-sizing: border-box;
   padding: 8px 16px;
   border: none;
   border-bottom: 1px solid var(--d-borde-2);
   background: #ffffff;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.hi .hi-detalle__tabla th {
   color: var(--d-gris);
   font-size: 10.5px;
   font-weight: 700;
@@ -503,20 +606,16 @@
   text-transform: uppercase;
 }
 
-.hi .hi-detalle__tabla td {
-  padding: 8px 16px;
-  border: none;
-  border-bottom: 1px solid var(--d-borde-2);
-  background: #ffffff;
-  white-space: nowrap;
-}
-
 .hi .hi-detalle__tabla tr:last-child td { border-bottom: none; }
 
-.hi .hi-detalle__tabla .is-der { text-align: right; font-variant-numeric: tabular-nums; }
+.hi .hi-detalle__tabla .is-der {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .hi-precio {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
@@ -529,16 +628,17 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-.hi-chip--mayoreo { background: #e4f7ef; border-color: #b8e6d1; color: #047857; }
-.hi-chip--promo   { background: #e6f2fc; border-color: #c9e4f8; color: #0369a1; }
-.hi-chip--editado { background: #f1f4f9; border-color: var(--d-borde); color: #475569; }
+.hi-chip--mayoreo { border-color: #b8e6d1; background: #e4f7ef; color: #047857; }
+.hi-chip--promo   { border-color: #c9e4f8; background: #e6f2fc; color: #0369a1; }
+.hi-chip--editado { border-color: var(--d-borde); background: #f1f4f9; color: #475569; }
 
 /* Detalle de merma y corrección */
 .hi-datos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin: 0;
   padding: 12px 16px;
@@ -556,13 +656,26 @@
   margin: 3px 0 0;
   font-size: 14px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.hi-datos dd.is-rojo { color: var(--d-rojo); }
+.hi-datos dd.is-rojo  { color: var(--d-rojo); }
 .hi-datos dd.is-verde { color: #047857; }
 .hi-datos dd.is-tenue { color: var(--d-gris-2); font-weight: 500; font-style: italic; }
 
-/* ============ VACÍO Y PAGINACIÓN ============ */
+.hi-detalle__pendiente {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--d-borde-2);
+  color: var(--d-gris);
+  font-size: 12.5px;
+}
+
+/* ============ VACÍO, CARGANDO Y ERROR ============ */
+
 .hi-vacio {
   display: flex;
   flex-direction: column;
@@ -575,6 +688,46 @@
 }
 
 .hi-vacio svg { color: var(--d-gris-2); }
+
+.hi-vacio__icono {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  background: #eef3fb;
+  color: var(--d-azul);
+}
+
+.hi-vacio__titulo {
+  margin: 0;
+  color: var(--d-marino);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.hi-vacio__texto {
+  max-width: 340px;
+  margin: 0;
+  color: var(--d-gris);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.hi-girando {
+  color: var(--d-azul) !important;
+  animation: hi-girar 0.9s linear infinite;
+}
+
+@keyframes hi-girar {
+  to { transform: rotate(360deg); }
+}
+
+.hi-icono-error { color: #d97706 !important; }
+
+/* ============ PAGINACIÓN ============ */
 
 .hi-paginacion {
   display: flex;
@@ -592,6 +745,7 @@
 
 .hi-paginacion__botones {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
@@ -627,107 +781,64 @@
   color: var(--d-gris-2);
 }
 
-/* ============ ESTADO VACÍO (sin movimientos) ============ */
-.hi-vacio__icono {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  background: #eef3fb;
-  color: var(--d-azul);
-  margin-bottom: 4px;
+/* ============================================================
+   RESPONSIVE
+   La tabla se acomoda según el espacio que tiene ELLA:
+   funciona igual con el menú lateral abierto o cerrado.
+   Se esconde primero lo que también se ve al desplegar el ticket.
+   (La fila del detalle es un solo <td>, así que no le afecta.)
+   ============================================================ */
+
+@container tabla (max-width: 1000px) {
+  .hi .hi-tabla th:nth-child(5),
+  .hi .hi-tabla tr.hi-fila > td:nth-child(5) {
+    display: none; /* Stock después */
+  }
 }
 
-.hi-vacio__titulo {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--d-marino);
-  letter-spacing: -0.01em;
+@container tabla (max-width: 820px) {
+  .hi .hi-tabla th:nth-child(6),
+  .hi .hi-tabla tr.hi-fila > td:nth-child(6) {
+    display: none; /* Usuario */
+  }
 }
 
-.hi-vacio__texto {
-  margin: 0;
-  color: var(--d-gris);
-  font-size: 13.5px;
-  line-height: 1.5;
-  max-width: 340px;
+@container tabla (max-width: 640px) {
+  .hi .hi-tabla th:nth-child(4),
+  .hi .hi-tabla tr.hi-fila > td:nth-child(4) {
+    display: none; /* Cantidad */
+  }
+
+  .hi .hi-tabla th:nth-child(7) { width: 130px; }
+
+  /* En el ticket, el total baja debajo del título */
+  .hi-detalle__total {
+    align-items: flex-start;
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
-/* ============ CONECTADO AL BACKEND ============ */
+/* Pantallas angostas: filtros uno debajo del otro */
+@media (max-width: 720px) {
+  .hi-filtros > * {
+    flex: 1 1 100%;
+  }
 
-.hi-girando {
-  color: var(--d-azul) !important;
-  animation: hi-girar 0.9s linear infinite;
+  .hi-segmentado {
+    justify-content: space-between;
+  }
+
+  .hi-segmentado button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .hi-expandir {
+    margin-left: 0;
+  }
+
+  .hi-titulo {
+    font-size: 21px;
+  }
 }
-
-@keyframes hi-girar {
-  to { transform: rotate(360deg); }
-}
-
-.hi-icono-error {
-  color: #d97706 !important;
-}
-
-.hi-detalle__pendiente {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  padding: 10px 16px;
-  border-top: 1px solid var(--d-borde-2);
-  color: var(--d-gris);
-  font-size: 12.5px;
-}
-
-/* ============ VENTAS Y COMPRAS AGRUPADAS ============ */
-
-.hi-grupo {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.hi-grupo__sub {
-  max-width: 280px;
-  overflow: hidden;
-  color: var(--d-gris);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hi-cantidad--neutra {
-  color: #475569;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.hi-total {
-  font-size: 13.5px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ============ EXPANDIR / CONTRAER TODO ============ */
-.hi-expandir {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  padding: 4px 6px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--d-azul);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.hi-expandir:hover { background: #eef3fb; }
-
-.hi-expandir svg { transition: transform 150ms ease; }
-.hi-expandir svg.is-girado { transform: rotate(180deg); }

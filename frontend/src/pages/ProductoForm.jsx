@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAjustes } from '../hooks/useConfiguracion'
+import { notificar } from '../services/notificar'
 
 import {
   ChevronRight,
@@ -462,17 +463,10 @@ export default function ProductoForm() {
 
       // TODO: guardar la imagen cuando exista su endpoint
       // Regresa al catálogo con la notificación y el producto resaltado
-      navigate('/catalogo', {
-        state: {
-          aviso: {
-            tipo: 'ok',
-            texto: esNuevo
-              ? `${resultado.nombre} se agregó al catálogo.`
-              : `${resultado.nombre} se actualizó.`,
-          },
-          resaltar: resultado.id,
-        },
+       notificar({
+        texto: esNuevo ? `${resultado.nombre} se agregó al catálogo` : `${resultado.nombre} se actualizó`,
       })
+      navigate('/catalogo', { state: { resaltar: resultado.id } })
     } catch (e) {
       const deCampos = erroresDeCampos(e)
 

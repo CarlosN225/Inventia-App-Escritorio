@@ -48,6 +48,7 @@ import {
 } from '../services/configuracion'
 
 import '../styles/configuracion.css'
+import { notificar } from '../services/notificar.js'
 
 /* ============================================================
    ESTADO INICIAL
@@ -662,7 +663,7 @@ export default function Configuracion() {
         nombre: usuarioActual?.nombre_completo ?? '',
       })
 
-      setAviso({
+      notificar({
         texto: 'Cambios guardados. Ya se aplican en toda la app.',
       })
     } catch (error) {
@@ -1000,7 +1001,7 @@ export default function Configuracion() {
       setEditar(null)
       setIntentoEditar(false)
 
-      setAviso({
+      notificar({
         texto:
           'Usuario actualizado correctamente',
       })
@@ -1058,7 +1059,7 @@ export default function Configuracion() {
         )
       )
 
-      setAviso({
+      notificar({
         texto: `${confirmarBaja.nombre} ya no podrá entrar a INVENTIA`,
       })
 
@@ -1103,7 +1104,7 @@ export default function Configuracion() {
         )
       )
 
-      setAviso({
+      notificar({
         texto: `${usuario.nombre} puede volver a entrar a INVENTIA`,
       })
     } catch (error) {
@@ -1147,7 +1148,7 @@ export default function Configuracion() {
         )
       )
 
-      setAviso({
+      notificar({
         texto: `${confirmarEliminar.nombre} fue eliminado definitivamente`,
       })
 

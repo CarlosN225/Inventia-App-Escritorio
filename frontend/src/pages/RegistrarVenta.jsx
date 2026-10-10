@@ -31,6 +31,7 @@ import { listarVentas, registrarVenta } from '../services/ventas'
 import { mensajeDelBackend } from '../services/movimientos'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-venta.css'
+import { notificar } from '../services/notificar'
 
 const MAX_RESULTADOS = 6
 const MAX_RAPIDOS = 8
@@ -110,7 +111,6 @@ export default function RegistrarVenta() {
   const [resaltado, setResaltado] = useState(0)
   const [ticket, setTicket] = useState([])
   const [editando, setEditando] = useState(null)
-  const [ventaRegistrada, setVentaRegistrada] = useState(null)
   const [errorVenta, setErrorVenta] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
@@ -199,8 +199,7 @@ export default function RegistrarVenta() {
       if (existe) return t.map((item) => (item.id === id ? { ...item, cantidad: item.cantidad + 1 } : item))
       return [...t, { id, cantidad: 1, precioEditado: null }]
     })
-    setVentaRegistrada(null)
-    setErrorVenta(null)
+     setErrorVenta(null)
   }
 
   function agregarDesdeBusqueda(id) {
@@ -316,7 +315,7 @@ export default function RegistrarVenta() {
         lista.map((p) => (vendidas.has(p.id) ? { ...p, stock: p.stock - vendidas.get(p.id) } : p))
       )
 
-      setVentaRegistrada({ folio: venta.id, total: Number(venta.total) })
+      notificar({ texto: `Venta #${venta.id} registrada · ${moneda.format(Number(venta.total))}` })
       setTicket([])
       setEditando(null)
       enfocarBuscador()
@@ -588,18 +587,7 @@ export default function RegistrarVenta() {
 
           {/* ============ TICKET ============ */}
           <aside className="rv-panel rv-ticket" aria-label="Venta actual">
-            {ventaRegistrada && (
-              <div className="rv-exito" role="status">
-                <CheckCircle2 size={18} aria-hidden="true" />
-                <span>
-                  <strong>Venta #{ventaRegistrada.folio} registrada</strong> · {moneda.format(ventaRegistrada.total)} · el
-                  inventario ya se actualizó
-                </span>
-                <button type="button" aria-label="Cerrar aviso" onClick={() => setVentaRegistrada(null)}>
-                  <X size={15} />
-                </button>
-              </div>
-            )}
+            
 
             <header className="rv-ticket__cabecera">
               <span className="rv-seccion__icono" aria-hidden="true">

@@ -23,7 +23,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 
 
 class ProductoViewSet(viewsets.ModelViewSet):
-    queryset = Producto.objects.all()
+    queryset = Producto.objects.select_related("categoria").prefetch_related("promociones")
     serializer_class = ProductoSerializer
 
     def get_permissions(self):
@@ -82,7 +82,7 @@ class VentaViewSet(mixins.CreateModelMixin,
                    mixins.ListModelMixin,
                    mixins.RetrieveModelMixin,
                    viewsets.GenericViewSet):
-    queryset = Venta.objects.all().order_by("-fecha_venta")
+    queryset = Venta.objects.select_related("usuario").prefetch_related("detalles__producto").order_by("-fecha_venta")
     serializer_class = VentaSerializer
     permission_classes = [EsUsuarioAutenticado]
 

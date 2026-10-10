@@ -70,8 +70,13 @@ export async function cambiarActivoProducto(id, activo) {
   return adaptarProducto(response.data)
 }
 
-/* Mensaje entendible para el usuario según lo que falló */
+ /* Mensaje entendible para el usuario según lo que falló */
 export function mensajeDeError(error) {
+  // Un error de programación en la pantalla (no del backend): se avisa distinto y se deja en la consola
+  if (!error?.isAxiosError) {
+    console.error(error)
+    return 'Algo falló en la pantalla. Revisa el Historial antes de volver a intentarlo.'
+  }
   if (!error.response) {
     return 'No se pudo conectar con el servidor. Revisa que el backend esté encendido.'
   }

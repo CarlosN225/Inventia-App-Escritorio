@@ -231,9 +231,9 @@ class VentaSerializer(serializers.ModelSerializer):
         fields = ["id", "fecha_venta", "usuario", "usuario_nombre", "total", "detalles"]
 
     def get_detalles(self, obj):
-        detalles = DetalleVenta.objects.filter(venta=obj).select_related("producto")
-        return DetalleVentaSerializer(detalles, many=True).data
-
+        # Usa lo que ya se trajo con prefetch_related (sin consultar otra vez)
+        return DetalleVentaSerializer(obj.detalles.all(), many=True).data
+ 
 
 class DetalleCompraSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
@@ -292,15 +292,17 @@ class PromocionSerializer(serializers.ModelSerializer):
 
 
 def promocion_vigente(producto):
-    """La promoción activa de hoy (si hay varias, la de mayor valor)."""
+    """La promoción activa de hoy (si hay varias, la de mayor valor).
+    Usa las promociones ya traídas con prefetch_related: no hace otra consulta por producto."""
     hoy = timezone.localdate()
-    promo = (
-        producto.promociones.filter(activa=True, fecha_inicio__lte=hoy, fecha_fin__gte=hoy)
-        .order_by("-valor")
-        .first()
-    )
-    if not promo:
+    vigentes = [
+        p for p in producto.promociones.all()
+        if p.activa and p.fecha_inicio <= hoy <= p.fecha_fin
+    ]
+    if not vigentes:
         return None
+
+    promo = max(vigentes, key=lambda p: p.valor)
     return {
         "id": promo.id,
         "tipo": "porcentaje" if promo.tipo_promocion == Promocion.TIPO_PORCENTAJE else "monto",

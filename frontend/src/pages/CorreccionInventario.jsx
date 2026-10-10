@@ -27,6 +27,7 @@ import { listarProductos, mensajeDeError } from '../services/productos'
 import { registrarMovimiento, mensajeDelBackend } from '../services/movimientos'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/correccion-inventario.css'
+import { notificar } from '../services/notificar'
 
 const POR_PAGINA = 15
 
@@ -335,6 +336,9 @@ export default function CorreccionInventario() {
 
     setIntento(false)
     setAplicada({ ok, fallidos, motivo: motivoFinal })
+    if (ok > 0) {
+      notificar({ texto: `Corrección aplicada · ${ok} ${ok === 1 ? 'producto ajustado' : 'productos ajustados'}` })
+    }
     setAplicando(false)
 
     // Trae el stock ya corregido
@@ -397,20 +401,6 @@ export default function CorreccionInventario() {
           <strong>no cambia</strong>.
         </span>
       </p>
-
-      {aplicada && aplicada.ok > 0 && (
-        <div className="ci-exito" role="status">
-          <CheckCircle2 size={18} aria-hidden="true" />
-          <span>
-            <strong>Corrección aplicada</strong> · {aplicada.ok}{' '}
-            {aplicada.ok === 1 ? 'producto ajustado' : 'productos ajustados'} · "{aplicada.motivo}" · registrada a nombre
-            de {usuario.nombre_completo}
-          </span>
-          <button type="button" aria-label="Cerrar aviso" onClick={() => setAplicada(null)}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
 
       {aplicada && aplicada.fallidos.length > 0 && (
         <div className="ci-fallidos" role="alert">

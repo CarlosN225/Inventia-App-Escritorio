@@ -15,26 +15,25 @@ import {
   Bell,
   ShoppingCart,
   History,
+  X,
+  Loader2,
 } from 'lucide-react'
 
 import { getUsuarioActual } from '../services/auth'
 import { listarProductos } from '../services/productos'
 import { listarMovimientos } from '../services/movimientos'
 import { listarVentas } from '../services/ventas'
-import { textoUnidad } from '../utils/unidades'
+import { nombreCorto, leerAjustes } from '../services/configuracion'
+import { leerMemoria, guardarMemoria } from '../services/memoria'
 import useConfiguracion from '../hooks/useConfiguracion'
-import { nombreCorto } from '../services/configuracion'
-
+import { textoUnidad } from '../utils/unidades'
+import ModalAtencion from '../components/ModalAtencion.jsx'
 import '../styles/dashboard.css'
 
-// TODO: traer de Configuración › Negocio (endpoint de Héctor)
-const NOMBRE_NEGOCIO = 'Los Querubines'
-
-// TODO: traer dias_aviso_caducidad de la Configuración
-const DIAS_AVISO_CADUCIDAD = 30
 const MAX_AVISOS = 5
 const MAX_MOVIMIENTOS = 6
 const MAX_TOP = 5
+const RETRASO_CARGA = 250 // ms: si carga más rápido que esto, ni se muestra la pantallita
 
 const PERIODOS = [
   { id: 'hoy', label: 'Hoy' },
@@ -61,6 +60,8 @@ const monedaCorta = new Intl.NumberFormat('es-MX', { style: 'currency', currency
 const numero = new Intl.NumberFormat('es-MX')
 const formatoDiaMes = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
 const formatoDiaSemana = new Intl.DateTimeFormat('es-MX', { weekday: 'short' })
+
+/* ============ Utilidades ============ */
 
 function primerNombre(nombreCompleto) {
   return nombreCompleto?.trim().split(/\s+/)[0] ?? ''
@@ -125,36 +126,61 @@ function hace(fechaIso) {
 /* ============================================================ */
 
 export default function Dashboard() {
-
   const navigate = useNavigate()
+
+  // Configuración del negocio: nombre, caducidad y días de aviso
   const configuracion = useConfiguracion()
+  const ajustes = leerAjustes(configuracion)
   const nombreNegocio = nombreCorto(configuracion?.negocio.nombre) || 'tu negocio'
-  
+  const diasAviso = ajustes.diasAviso
+  const conCaducidad = ajustes.maneja_caducidad
+
   const [periodo, setPeriodo] = useState('mes')
   const [vistaTop, setVistaTop] = useState('mas')
 
-  const [usuarioActual, setUsuarioActual] = useState(null)
-  const [cargandoUsuario, setCargandoUsuario] = useState(true)
+  /* ---------- Datos: la primera vez se cargan; al regresar, salen al instante de la memoria ---------- */
 
-  const [productos, setProductos] = useState([])
-  const [movimientos, setMovimientos] = useState([])
-  const [ventas, setVentas] = useState([])
-  const [cargando, setCargando] = useState(true)
+  const enMemoria = leerMemoria('panel')
+  const [datos, setDatos] = useState(enMemoria) // { usuario, productos, movimientos, ventas }
+  const [mostrarCarga, setMostrarCarga] = useState(false)
 
   useEffect(() => {
-    getUsuarioActual()
-      .then(setUsuarioActual)
-      .catch(() => setUsuarioActual(null))
-      .finally(() => setCargandoUsuario(false))
+    let sigueMontado = true
 
-    // Si una falla, las demás se muestran igual
-    Promise.allSettled([listarProductos(), listarMovimientos(), listarVentas()]).then(([prods, movs, vtas]) => {
-      if (prods.status === 'fulfilled') setProductos(prods.value)
-      if (movs.status === 'fulfilled') setMovimientos(movs.value)
-      if (vtas.status === 'fulfilled') setVentas(vtas.value)
-      setCargando(false)
-    })
+    // La pantallita de carga solo si no hay nada en memoria y tarda más de un instante
+    const temporizador = enMemoria ? null : setTimeout(() => sigueMontado && setMostrarCarga(true), RETRASO_CARGA)
+
+    // Todo en paralelo; si algo falla, se queda lo que ya se tenía
+    Promise.allSettled([getUsuarioActual(), listarProductos(), listarMovimientos(), listarVentas()]).then(
+      ([usuario, productos, movimientos, ventas]) => {
+        if (!sigueMontado) return
+
+        const anterior = leerMemoria('panel')
+        const nuevos = {
+          usuario: usuario.status === 'fulfilled' ? usuario.value : anterior?.usuario ?? null,
+          productos: productos.status === 'fulfilled' ? productos.value : anterior?.productos ?? [],
+          movimientos: movimientos.status === 'fulfilled' ? movimientos.value : anterior?.movimientos ?? [],
+          ventas: ventas.status === 'fulfilled' ? ventas.value : anterior?.ventas ?? [],
+        }
+
+        guardarMemoria('panel', nuevos)
+        setDatos(nuevos)
+        if (temporizador) clearTimeout(temporizador)
+      }
+    )
+
+    return () => {
+      sigueMontado = false
+      if (temporizador) clearTimeout(temporizador)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const cargando = datos === null
+  const usuarioActual = datos?.usuario ?? null
+  const productos = useMemo(() => datos?.productos ?? [], [datos])
+  const movimientos = useMemo(() => datos?.movimientos ?? [], [datos])
+  const ventas = useMemo(() => datos?.ventas ?? [], [datos])
 
   /*
      Solo el propietario puede ver:
@@ -165,16 +191,20 @@ export default function Dashboard() {
   const esPropietario = usuarioActual?.rol === 'propietario'
   const nombreUsuario = primerNombre(usuarioActual?.nombre_completo) || 'de nuevo'
 
-  /* ---------- Inventario (de los productos reales) ---------- */
+  /* ---------- Inventario ---------- */
 
   const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
   const productosPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
 
   const stockBajo = useMemo(() => activos.filter((p) => p.stock < p.minimo), [activos])
+  const agotados = useMemo(() => activos.filter((p) => p.stock === 0).length, [activos])
 
   const porCaducar = useMemo(
-    () => activos.filter((p) => p.diasCaducar !== null && p.diasCaducar <= DIAS_AVISO_CADUCIDAD && p.stock > 0),
-    [activos]
+    () =>
+      activos.filter(
+        (p) => conCaducidad && p.diasCaducar !== null && p.diasCaducar <= diasAviso && p.stock > 0
+      ),
+    [activos, conCaducidad, diasAviso]
   )
 
   // Los avisos más urgentes primero
@@ -235,7 +265,49 @@ export default function Dashboard() {
     return lista.sort((a, b) => a.orden - b.orden)
   }, [activos, stockBajo, porCaducar])
 
-  /* ---------- Ventas (de las ventas reales) ---------- */
+  /* ---------- Modal de "Atención": una vez por sesión ---------- */
+
+  const [verAtencion, setVerAtencion] = useState(false)
+  const claveAtencion = usuarioActual ? `inventia_atencion_${usuarioActual.id}` : null
+
+  useEffect(() => {
+    if (cargando || !claveAtencion) return
+
+    let yaLoVio = false
+    try {
+      yaLoVio = !!sessionStorage.getItem(claveAtencion)
+    } catch {
+      // Sin sessionStorage simplemente se muestra
+    }
+
+    if (!yaLoVio && stockBajo.length + porCaducar.length > 0) setVerAtencion(true)
+  }, [cargando, claveAtencion, stockBajo.length, porCaducar.length])
+
+  // Se anota como "visto" al cerrarlo (no al mostrarlo), para no perderlo si algo falla
+  function cerrarAtencion() {
+    setVerAtencion(false)
+    try {
+      if (claveAtencion) sessionStorage.setItem(claveAtencion, '1')
+    } catch {
+      // nada
+    }
+  }
+
+  function irDesdeAtencion(ruta) {
+    cerrarAtencion()
+    navigate(ruta)
+  }
+
+  // Esc cierra el modal
+  useEffect(() => {
+    if (!verAtencion) return
+    const alPresionar = (e) => e.key === 'Escape' && cerrarAtencion()
+    window.addEventListener('keydown', alPresionar)
+    return () => window.removeEventListener('keydown', alPresionar)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verAtencion])
+
+  /* ---------- Ventas ---------- */
 
   // Cada venta con su ganancia: (precio de venta - costo actual) × cantidad
   // TODO: usar el costo del día de la venta cuando DetalleVenta lo guarde
@@ -356,8 +428,7 @@ export default function Dashboard() {
           }
 
           const usuario =
-            m.usuarioNombre ??
-            (usuarioActual && m.usuarioId === usuarioActual.id ? usuarioActual.nombre_completo : null)
+            m.usuarioNombre ?? (usuarioActual && m.usuarioId === usuarioActual.id ? usuarioActual.nombre_completo : null)
 
           return {
             id: m.id,
@@ -373,7 +444,18 @@ export default function Dashboard() {
     [movimientos, productosPorId, usuarioActual]
   )
 
-  if (cargandoUsuario) return null
+  /* ---------- Primera carga ---------- */
+
+  if (cargando) {
+    if (!mostrarCarga) return null // si carga rapidísimo, ni se nota
+
+    return (
+      <div className="dash-cargando" role="status">
+        <Loader2 size={30} className="dash-girando" aria-hidden="true" />
+        <p>Cargando información…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="dash">
@@ -381,7 +463,7 @@ export default function Dashboard() {
       <header className="dash-encabezado">
         <div>
           <h1 className="dash-encabezado__titulo">Hola, {nombreUsuario}</h1>
-          <p className="dash-encabezado__subtitulo">Así va {NOMBRE_NEGOCIO} hoy</p>
+          <p className="dash-encabezado__subtitulo">Así va {nombreNegocio} hoy</p>
         </div>
 
         <div className="dash-segmentado" role="tablist" aria-label="Periodo">
@@ -448,25 +530,25 @@ export default function Dashboard() {
 
         <article className="dash-kpi dash-kpi--clic" onClick={() => navigate('/alertas')} title="Ver en Alertas">
           <span className="dash-kpi__etiqueta">Stock bajo</span>
-          <p className={'dash-kpi__valor' + (stockBajo.length > 0 ? ' dash-kpi__valor--ambar' : '')}>
-            {cargando ? '—' : stockBajo.length}
-          </p>
+          <p className={'dash-kpi__valor' + (stockBajo.length > 0 ? ' dash-kpi__valor--ambar' : '')}>{stockBajo.length}</p>
           <p className="dash-kpi__nota">
             <AlertTriangle size={14} className="dash-icono--ambar" aria-hidden="true" />
             productos por debajo del mínimo
           </p>
         </article>
 
-        <article className="dash-kpi dash-kpi--clic" onClick={() => navigate('/alertas')} title="Ver en Alertas">
-          <span className="dash-kpi__etiqueta">Por caducar</span>
-          <p className={'dash-kpi__valor' + (porCaducar.length > 0 ? ' dash-kpi__valor--rojo' : '')}>
-            {cargando ? '—' : porCaducar.length}
-          </p>
-          <p className="dash-kpi__nota">
-            <CalendarX size={14} className="dash-icono--rojo" aria-hidden="true" />
-            en los próximos {DIAS_AVISO_CADUCIDAD} días
-          </p>
-        </article>
+        {conCaducidad && (
+          <article className="dash-kpi dash-kpi--clic" onClick={() => navigate('/alertas')} title="Ver en Alertas">
+            <span className="dash-kpi__etiqueta">Por caducar</span>
+            <p className={'dash-kpi__valor' + (porCaducar.length > 0 ? ' dash-kpi__valor--rojo' : '')}>
+              {porCaducar.length}
+            </p>
+            <p className="dash-kpi__nota">
+              <CalendarX size={14} className="dash-icono--rojo" aria-hidden="true" />
+              en los próximos {diasAviso} días
+            </p>
+          </article>
+        )}
       </section>
 
       {/* ============ GRÁFICA + TOP ============ */}
@@ -616,7 +698,7 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {!cargando && ultimosMovimientos.length === 0 ? (
+          {ultimosMovimientos.length === 0 ? (
             <div className="dash-vacio">
               <div className="dash-vacio__icono" aria-hidden="true">
                 <History size={22} strokeWidth={1.8} />
@@ -675,7 +757,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          {!cargando && avisos.length === 0 ? (
+          {avisos.length === 0 ? (
             <div className="dash-vacio">
               <div className="dash-vacio__icono" aria-hidden="true">
                 <Bell size={22} strokeWidth={1.8} />
@@ -707,6 +789,20 @@ export default function Dashboard() {
           )}
         </article>
       </section>
+
+      {/* ============ MODAL DE ATENCIÓN (una vez por sesión) ============ */}
+      {verAtencion && (
+        <ModalAtencion
+          nombre={nombreUsuario}
+          agotados={activos.filter((p) => p.stock === 0)}
+          stockBajo={stockBajo.filter((p) => p.stock > 0)}
+          porCaducar={porCaducar}
+          diasAviso={diasAviso}
+          onCerrar={cerrarAtencion}
+          onIr={irDesdeAtencion}
+        />
+      )}
+
     </div>
   )
 }

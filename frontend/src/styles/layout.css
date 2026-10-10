@@ -287,7 +287,11 @@
   min-width: 0;
 }
 
-
+/* El área de contenido nunca empuja al menú lateral: lo que no quepa se acomoda adentro */
+.app-main,
+.app-main > .page {
+  min-width: 0;
+}
 
 /* ============ PAGE ============ */
 .page {
@@ -375,3 +379,4 @@
 }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+

@@ -32,6 +32,7 @@ import { getUsuarioActual } from '../services/auth'
 import { listarProductos, cambiarActivoProducto, mensajeDeError } from '../services/productos'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/catalogo.css'
+import { notificar } from '../services/notificar.js'
 
 const POR_PAGINA = 15
 const DIAS_AVISO_CADUCIDAD = 30
@@ -145,7 +146,6 @@ export default function Catalogo() {
   const [productos, setProductos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
-  const [aviso, setAviso] = useState(null) // { texto, tipo: 'ok' | 'error' }
   const [aCambiar, setACambiar] = useState(null) // producto que se va a desactivar o reactivar
   const [resaltado, setResaltado] = useState(null) // id del producto recién guardado
 
@@ -176,23 +176,16 @@ export default function Catalogo() {
   }
   // Aviso que manda el formulario al guardar (ej. "Chocolate Carlos V se actualizó.")
   useEffect(() => {
-    const { aviso: avisoRecibido, resaltar } = location.state ?? {}
-    if (!avisoRecibido) return
+    const { resaltar } = location.state ?? {}
+    if (!resaltar) return
 
-    setAviso(avisoRecibido)
-    setResaltado(resaltar ?? null)
+    setResaltado(resaltar)
 
     // Lo borra para que no vuelva a salir si recargas la página
     navigate(location.pathname, { replace: true, state: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // La notificación se va sola a los 4 segundos
-  useEffect(() => {
-    if (!aviso) return
-    const temporizador = setTimeout(() => setAviso(null), 4000)
-    return () => clearTimeout(temporizador)
-  }, [aviso])
+ 
 
 
   useEffect(() => {
@@ -330,14 +323,14 @@ export default function Catalogo() {
     try {
       const actualizado = await cambiarActivoProducto(producto.id, !producto.activo)
       setProductos((lista) => lista.map((p) => (p.id === actualizado.id ? actualizado : p)))
-      setAviso({
+      notificar({
         tipo: 'ok',
         texto: actualizado.activo
           ? `${actualizado.nombre} se reactivó y vuelve a aparecer en ventas.`
           : `${actualizado.nombre} se desactivó. Su historial se conserva.`,
       })
     } catch (e) {
-      setAviso({ tipo: 'error', texto: mensajeDeError(e) })
+      notificar({ tipo: 'error', texto: mensajeDeError(e) })
     }
   }
 
@@ -401,19 +394,7 @@ export default function Catalogo() {
         )}
       </header>
 
-      {aviso && (
-        <div className={'cat-toast' + (aviso.tipo === 'error' ? ' is-error' : '')} role="status">          
-        {aviso.tipo === 'error' ? (
-            <AlertCircle size={17} aria-hidden="true" />
-          ) : (
-            <CheckCircle2 size={17} aria-hidden="true" />
-          )}
-          <span>{aviso.texto}</span>
-          <button type="button" aria-label="Cerrar aviso" onClick={() => setAviso(null)}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      
 
       {/* ============ FILTROS ============ */}
       <section className="cat-panel">
