@@ -513,7 +513,7 @@ export default function RegistrarVenta() {
                                 <PastillaStock producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
-                                {p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}
+                                {[p.marca, p.categoria, p.descripcion].filter(Boolean).join(' · ')}
                               </p>
                             </div>
 

@@ -558,6 +558,7 @@ export default function RegistrarCompra() {
                     <input
                       id="rc-fecha"
                       type="date"
+                      min={hoyISO()}
                       max={hoyISO()}
                       value={fecha}
                       onChange={(e) => setFecha(e.target.value)}
@@ -681,7 +682,7 @@ export default function RegistrarCompra() {
                                 <PastillaHay producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
-                                {p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}
+                                {[p.marca, p.categoria, p.descripcion].filter(Boolean).join(' · ')}
                               </p>
                             </div>
 

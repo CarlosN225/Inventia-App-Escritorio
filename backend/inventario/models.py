@@ -45,6 +45,7 @@ class Configuracion(models.Model):
     alertas_activas = models.BooleanField(default=True)
     vende_mayoreo = models.BooleanField(default=False)
     telefono_alertas = models.CharField(max_length=20, blank=True, default="")
+    contacto_alertas = models.CharField(max_length=120, blank=True, default="")  # de quién es el WhatsApp
     hora_resumen = models.TimeField(default=time(20, 0))
     dias_aviso_caducidad = models.PositiveIntegerField(default=30)
     

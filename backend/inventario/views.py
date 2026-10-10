@@ -140,6 +140,7 @@ def _datos_configuracion(negocio):
         },
         "preferencias": {campo: getattr(config, campo) for campo in PREFERENCIAS},
         "whatsapp": {
+            "contacto_alertas": config.contacto_alertas or "",
             "telefono_alertas": config.telefono_alertas or "",
             "hora_resumen": config.hora_resumen.strftime("%H:%M") if config.hora_resumen else "20:00",
             "dias_aviso_caducidad": config.dias_aviso_caducidad,
@@ -179,8 +180,8 @@ class ConfiguracionView(APIView):
             negocio.direccion = (datos_negocio.get("direccion") or "").strip()
         if "telefono" in datos_negocio:
             telefono = _solo_digitos(datos_negocio.get("telefono"))
-            if telefono and len(telefono) != 10:
-                errores["telefono"] = "El teléfono debe tener 10 dígitos."
+            if len(telefono) != 10:
+                errores["telefono"] = "El teléfono de la dulcería es obligatorio (10 dígitos)."
             else:
                 negocio.telefono = telefono
 
@@ -194,10 +195,16 @@ class ConfiguracionView(APIView):
         whatsapp = request.data.get("whatsapp") or {}
         if "telefono_alertas" in whatsapp:
             telefono = _solo_digitos(whatsapp.get("telefono_alertas"))
-            if telefono and len(telefono) != 10:
-                errores["telefono_alertas"] = "El WhatsApp debe tener 10 dígitos."
+            if len(telefono) != 10:
+                errores["telefono_alertas"] = "El WhatsApp es obligatorio (10 dígitos)."
             else:
                 config.telefono_alertas = telefono
+            if "contacto_alertas" in whatsapp:
+                contacto = (whatsapp.get("contacto_alertas") or "").strip()
+                if not contacto:
+                    errores["contacto_alertas"] = "Escribe de quién es este WhatsApp."
+                else:
+                    config.contacto_alertas = contacto       
         if "hora_resumen" in whatsapp:
             try:
                 config.hora_resumen = datetime.strptime(str(whatsapp["hora_resumen"]), "%H:%M").time()

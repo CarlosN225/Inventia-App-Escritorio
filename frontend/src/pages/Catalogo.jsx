@@ -592,8 +592,12 @@ export default function Catalogo() {
                             {p.nombre}
                             {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
                           </p>
-                          {p.marca && <p className="cat-producto__marca">{p.marca}</p>}
-                        </div>
+                          {(p.marca || p.descripcion) && (
+                            <p className="cat-producto__marca" title={p.descripcion || undefined}>
+                              {[p.marca, p.descripcion].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                         </div>
                       </div>
                     </td>
                     <td>
@@ -699,7 +703,11 @@ export default function Catalogo() {
                   </div>
 
                   <p className="cat-tarjeta__nombre">{p.nombre}</p>
-                  <p className="cat-tarjeta__marca">{p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}</p>
+                  <div className="cat-tarjeta__etiquetas">
+                    <span className="cat-chip">{p.categoria}</span>
+                    {p.marca && <span className="cat-tarjeta__marca-texto">{p.marca}</span>}
+                  </div>
+                  {p.descripcion && <p className="cat-tarjeta__desc">{p.descripcion}</p>}
 
                   <div className="cat-tarjeta__precio">
                     <span className="cat-precio">{moneda.format(p.precio)}</span>

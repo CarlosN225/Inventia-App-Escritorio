@@ -79,6 +79,11 @@ function diasHasta(iso) {
 function aTexto(valor) {
   return valor === null || valor === undefined ? '' : String(valor)
 }
+// "2026-10-09" de hoy, para que los calendarios no dejen elegir días pasados
+function hoyISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // Arma el formulario a partir de un producto del backend (ya traducido)
 function crearFormulario(producto) {
@@ -362,7 +367,7 @@ export default function ProductoForm() {
     if (nuevaPromo.tipo === 'monto' && precio > 0 && valor >= precio) {
       return setErrorPromo('El descuento debe ser menor al precio de venta')
     }
-    if (!nuevaPromo.inicio || !nuevaPromo.fin) return setErrorPromo('Indica las fechas de inicio y fin')
+    if (nuevaPromo.inicio < hoyISO()) return setErrorPromo('La promoción no puede empezar en una fecha que ya pasó')    
     if (nuevaPromo.fin < nuevaPromo.inicio) return setErrorPromo('La fecha de fin debe ser después del inicio')
 
     const promo = { tipo: nuevaPromo.tipo, valor, inicio: nuevaPromo.inicio, fin: nuevaPromo.fin, activa: true }
@@ -423,6 +428,15 @@ export default function ProductoForm() {
     setErrorGuardar(null)
 
     const nuevosErrores = validar(form, CONFIG)
+
+        // Una caducidad pasada solo se acepta si ya la tenía (para poder editar otras cosas de un producto vencido)
+    if (
+      form.fechaCaducidad &&
+      form.fechaCaducidad < hoyISO() &&
+      form.fechaCaducidad !== (producto?.fechaCaducidad ?? '')
+    ) {
+      nuevosErrores.fechaCaducidad = 'Esa fecha ya pasó; elige una de hoy en adelante'
+    }
     setErrores(nuevosErrores)
 
     if (Object.keys(nuevosErrores).length > 0) {
@@ -1024,7 +1038,7 @@ export default function ProductoForm() {
               >
                 <input
                   id="pf-caducidad"
-                  type="date"
+                  type="date" min={hoyISO()}
                   className="pf-input"
                   value={form.fechaCaducidad}
                   onChange={(e) => cambiar('fechaCaducidad', e.target.value)}
@@ -1165,7 +1179,7 @@ export default function ProductoForm() {
                     <Campo etiqueta="Inicia" htmlFor="pf-promo-inicio">
                       <input
                         id="pf-promo-inicio"
-                        type="date"
+                        type="date" min={hoyISO()}
                         className="pf-input"
                         value={nuevaPromo.inicio}
                         onChange={(e) => cambiarPromo('inicio', e.target.value)}
@@ -1176,7 +1190,7 @@ export default function ProductoForm() {
                     <Campo etiqueta="Termina" htmlFor="pf-promo-fin">
                       <input
                         id="pf-promo-fin"
-                        type="date"
+                        type="date" min={nuevaPromo.inicio || hoyISO()}
                         className="pf-input"
                         value={nuevaPromo.fin}
                         onChange={(e) => cambiarPromo('fin', e.target.value)}

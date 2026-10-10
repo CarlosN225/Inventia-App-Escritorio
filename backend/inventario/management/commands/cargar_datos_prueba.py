@@ -223,6 +223,7 @@ class Command(BaseCommand):
                 "alertas_activas": True,
                 "vende_mayoreo": True,
                 "telefono_alertas": propietaria.telefono_whatsapp,
+                "contacto_alertas": propietaria.nombre_completo,
             },
         )
 
