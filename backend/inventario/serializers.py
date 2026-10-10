@@ -24,6 +24,8 @@ class ProductoSerializer(serializers.ModelSerializer):
             "nombre",
             "descripcion",
             "marca",
+            "contenido_neto",
+            "unidad_contenido",
             "categoria",
             "categoria_nombre",
             "unidad_medida",

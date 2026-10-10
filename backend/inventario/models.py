@@ -89,6 +89,13 @@ class Producto(models.Model):
         ("bolsa", "Bolsa"),
         ("paquete", "Paquete"),
     ]
+    
+    UNIDADES_CONTENIDO = [
+        ("g", "g"),
+        ("kg", "kg"),
+        ("ml", "ml"),
+        ("l", "L"),
+    ]
 
     id = models.AutoField(primary_key=True, db_column="id_producto")
     codigo_barras = models.CharField(max_length=50, unique=True, null=True, blank=True)
@@ -110,6 +117,8 @@ class Producto(models.Model):
     fecha_caducidad = models.DateField(null=True, blank=True)
     imagen = models.ImageField(upload_to="productos/", null=True, blank=True)
     marca = models.CharField(max_length=80, blank=True, default="")
+    contenido_neto = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)  # el gramaje: 28, 600…
+    unidad_contenido = models.CharField(max_length=3, choices=UNIDADES_CONTENIDO, null=True, blank=True)  # g, kg, ml, L
     stock_actual = models.IntegerField(default=0)
     stock_minimo = models.IntegerField()
     stock_maximo = models.IntegerField(null=True, blank=True)

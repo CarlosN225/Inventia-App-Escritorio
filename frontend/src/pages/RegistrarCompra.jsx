@@ -673,7 +673,7 @@ export default function RegistrarCompra() {
 
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
-                                {p.nombre}
+                                {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                                 <PastillaHay producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
@@ -807,7 +807,7 @@ export default function RegistrarCompra() {
                     <div className="rv-renglon__cuerpo">
                       {/* Línea 1: nombre + subtotal */}
                       <div className="rv-renglon__arriba">
-                        <p className="rv-renglon__nombre">{r.producto.nombre}</p>
+                        <p className="rv-renglon__nombre">{r.producto.nombre} {r.producto.gramaje && <span className="gramaje">{r.producto.gramaje}</span>}</p>
                         <span className="rv-renglon__subtotal">{r.costoValido ? moneda.format(r.subtotal) : '—'}</span>
                       </div>
 

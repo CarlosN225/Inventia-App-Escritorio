@@ -91,6 +91,8 @@ function crearFormulario(producto) {
   return {
     nombre: producto?.nombre ?? '',
     marca: producto?.marca ?? '',
+    contenido: aTexto(producto?.contenido),
+    unidadContenido: producto?.unidadContenido ?? 'g',
     categoria: producto ? String(producto.categoriaId) : '',
     descripcion: producto?.descripcion ?? '',
     precio: aTexto(producto?.precio),
@@ -137,6 +139,7 @@ function validar(f, CONFIG) {
       errores.minimoMayoreo = 'Mínimo 2 piezas'
     }
   }
+  if (f.contenido !== '' && Number(f.contenido) <= 0) errores.contenido = 'Debe ser mayor a 0'
 
   return errores
 }
@@ -735,7 +738,36 @@ export default function ProductoForm() {
                     </select>
                   </Campo>
                 </div>
-
+                <Campo
+                  etiqueta="Contenido neto (gramaje)"
+                  htmlFor="pf-contenido"
+                  error={errores.contenido}
+                  ayuda="Ej. 28 g o 600 ml · ayuda a distinguir presentaciones"
+                >
+                  <div className={'pf-grupo' + (errores.contenido ? ' is-error' : '')}>
+                    <input
+                      id="pf-contenido"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputMode="decimal"
+                      placeholder="Ej. 28"
+                      value={form.contenido}
+                      onChange={(e) => cambiar('contenido', e.target.value)}
+                    />
+                    <select
+                      className="pf-grupo__select"
+                      value={form.unidadContenido}
+                      onChange={(e) => cambiar('unidadContenido', e.target.value)}
+                      aria-label="Unidad del contenido"
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">L</option>
+                    </select>
+                  </div>
+                </Campo>
                 <Campo etiqueta="Descripción (opcional)" htmlFor="pf-descripcion" error={errores.descripcion}>
                   <textarea
                     id="pf-descripcion"
@@ -1241,7 +1273,14 @@ export default function ProductoForm() {
                 {imagen ? <img src={imagen.url} alt="" /> : <Candy size={30} aria-hidden="true" />}
               </div>
               {form.marca && <span className="pf-chip">{form.marca}</span>}
-              <p className="pf-vista__nombre">{form.nombre || 'Nombre del producto'}</p>
+              <p className="pf-vista__nombre">
+                {form.nombre || 'Nombre del producto'}
+                {form.contenido && (
+                  <span className="gramaje">
+                    {form.contenido} {form.unidadContenido === 'l' ? 'L' : form.unidadContenido}
+                  </span>
+                )}
+              </p>
               <div className="pf-vista__pie">
                 <span className="pf-vista__precio">{moneda.format(precio)}</span>
                 <span className="pf-vista__stock">{stockActual} disp.</span>

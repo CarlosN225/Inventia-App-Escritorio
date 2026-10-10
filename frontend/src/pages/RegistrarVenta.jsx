@@ -508,7 +508,7 @@ export default function RegistrarVenta() {
 
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
-                                {p.nombre}
+                                {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                                 <PastillaStock producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
@@ -576,7 +576,7 @@ export default function RegistrarVenta() {
                         <Candy size={20} />
                       </span>
                       {p.marca && <span className="rv-chip rv-chip--marca">{p.marca}</span>}
-                      <span className="rv-rapido__nombre">{p.nombre}</span>
+                      <span className="rv-rapido__nombre">{p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}</span>
                       <span className="rv-rapido__precio">{moneda.format(p.precio)}</span>
                     </button>
                   )
@@ -623,8 +623,11 @@ export default function RegistrarVenta() {
 
                     <div className="rv-renglon__cuerpo">
                       <div className="rv-renglon__arriba">
-                        <p className="rv-renglon__nombre">{r.producto.nombre}</p>
-                        <span className="rv-renglon__subtotal">
+                         <p className="rv-renglon__nombre">
+                          {r.producto.nombre}
+                          {r.producto.gramaje && <span className="gramaje">{r.producto.gramaje}</span>}
+                        </p>
+                         <span className="rv-renglon__subtotal">
                           {r.faltan ? <span className="rv-espera">En espera</span> : moneda.format(r.subtotal)}
                         </span>
                       </div>

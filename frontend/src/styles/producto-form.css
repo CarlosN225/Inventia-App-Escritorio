@@ -867,3 +867,16 @@ textarea.pf-input {
 .pf-lateral .pf-pendiente {
   margin: 8px 0 0;
 }
+/* La unidad del gramaje dentro del mismo campo */
+.pf-grupo__select {
+  border: none;
+  border-left: 1px solid #e6eaf0;
+  background: #f8fafc;
+  padding: 0 10px;
+  color: #475569;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}

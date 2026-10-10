@@ -570,7 +570,7 @@ export default function Catalogo() {
                         <FotoProducto producto={p} />
                         <div>
                           <p className="cat-producto__nombre">
-                            {p.nombre}
+                            {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                             {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
                           </p>
                           {(p.marca || p.descripcion) && (
@@ -683,7 +683,7 @@ export default function Catalogo() {
                     <span className="cat-tarjeta__numero">No. {inicio + indice + 1}</span>
                   </div>
 
-                  <p className="cat-tarjeta__nombre">{p.nombre}</p>
+                  <p className="cat-tarjeta__nombre">{p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}</p>
                   <div className="cat-tarjeta__etiquetas">
                     <span className="cat-chip">{p.categoria}</span>
                     {p.marca && <span className="cat-tarjeta__marca-texto">{p.marca}</span>}

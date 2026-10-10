@@ -140,6 +140,40 @@ PRODUCTOS = [
     ("Bolsa de regalo mediana", 15, "pieza", 15.0, 12.0, 10, 20, False),
 ]
 
+# Contenido neto de cada presentación (las bebidas y salsas ya lo traen en el nombre)
+GRAMAJES = {
+    "Chocolate Carlos V": (20, "g"),
+    "Chocolate Kinder Bueno": (43, "g"),
+    "Chocolate Ferrero Rocher 3pz": (37.5, "g"),
+    "Chocolate Snickers": (52.7, "g"),
+    "Chocolate Hershey's barra": (40, "g"),
+    "Chocolate M&M's bolsa": (47.9, "g"),
+    "Chocolate Turín oblea": (12, "g"),
+    "Chocolate Abuelita tableta": (90, "g"),
+    "Chocolate Lindt trufa": (12.5, "g"),
+    "Galletas Emperador": (91, "g"),
+    "Obleas rellenas": (25, "g"),
+    "Gomitas Trululu bolsa": (50, "g"),
+    "Gomitas osito Haribo": (100, "g"),
+    "Gomitas ácidas Sonric's": (60, "g"),
+    "Paleta Payaso": (45, "g"),
+    "Paleta Hot Wheels": (14, "g"),
+    "Paleta Vero Mango": (14, "g"),
+    "Pulparindo": (14, "g"),
+    "Dulce de tamarindo enchilado": (20, "g"),
+    "Mazapán De la Rosa": (28, "g"),
+    "Caramelos macizos surtidos": (200, "g"),
+    "Chicle Trident sin azúcar": (30, "g"),
+    "Papas Sabritas original": (45, "g"),
+    "Cacahuate japonés": (100, "g"),
+    "Chicharrón de cerdo": (30, "g"),
+    "Doritos queso": (58, "g"),
+    "Cheetos Flamin' Hot": (52, "g"),
+    "Palomitas para microondas": (80, "g"),
+    "Cacahuate garapiñado": (100, "g"),
+    "Takis Fuego": (56, "g"),
+}
+
 
 def momento(dia, hora, minuto):
     return timezone.make_aware(datetime.combine(dia, time(hora, minuto)))
@@ -345,6 +379,8 @@ class Command(BaseCommand):
                     "stock_actual": stock_inicial,
                     "stock_minimo": plan["stock_minimo"],
                     "stock_maximo": plan["stock_maximo"],
+                    "contenido_neto": GRAMAJES.get(plan["nombre"], (None, None))[0],
+                    "unidad_contenido": GRAMAJES.get(plan["nombre"], (None, None))[1],
                     "activo": True,
                 },
             )

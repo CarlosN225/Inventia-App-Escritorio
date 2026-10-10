@@ -21,6 +21,12 @@ function diasHasta(iso) {
 function aNumero(valor) {
   return valor === null || valor === undefined ? null : Number(valor)
 }
+// 28 + "g" -> "28 g" · 1.5 + "l" -> "1.5 L"
+export function textoGramaje(contenido, unidad) {
+  if (!contenido) return ''
+  const numero = Number(contenido)
+  return `${Number.isInteger(numero) ? numero : numero.toFixed(1)} ${unidad === 'l' ? 'L' : unidad}`
+}
 
 /* Traduce un producto del backend (nombres del DER) a lo que usan las pantallas */
 export function adaptarProducto(p) {
@@ -28,6 +34,9 @@ export function adaptarProducto(p) {
     id: p.id,
     nombre: p.nombre,
     marca: p.marca || '',
+    contenido: p.contenido_neto ? Number(p.contenido_neto) : null,
+    unidadContenido: p.unidad_contenido ?? 'g',
+    gramaje: textoGramaje(p.contenido_neto, p.unidad_contenido),
     descripcion: p.descripcion || '',
     codigoBarras: p.codigo_barras || '',
     categoriaId: p.categoria,
@@ -112,6 +121,8 @@ export function aDatosBackend(form, esNuevo) {
   const datos = {
     nombre: form.nombre.trim(),
     marca: form.marca.trim(),
+    contenido_neto: aNumeroONulo(form.contenido),
+    unidad_contenido: form.contenido ? form.unidadContenido : null,
     descripcion: form.descripcion.trim() || null,
     categoria: Number(form.categoria),
     unidad_medida: form.unidad,
