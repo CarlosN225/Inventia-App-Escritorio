@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAjustes } from '../hooks/useConfiguracion'
+import { notificar } from '../services/notificar'
 
 import {
   ChevronRight,
@@ -79,12 +80,19 @@ function diasHasta(iso) {
 function aTexto(valor) {
   return valor === null || valor === undefined ? '' : String(valor)
 }
+// "2026-10-09" de hoy, para que los calendarios no dejen elegir días pasados
+function hoyISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // Arma el formulario a partir de un producto del backend (ya traducido)
 function crearFormulario(producto) {
   return {
     nombre: producto?.nombre ?? '',
     marca: producto?.marca ?? '',
+    contenido: aTexto(producto?.contenido),
+    unidadContenido: producto?.unidadContenido ?? 'g',
     categoria: producto ? String(producto.categoriaId) : '',
     descripcion: producto?.descripcion ?? '',
     precio: aTexto(producto?.precio),
@@ -131,6 +139,7 @@ function validar(f, CONFIG) {
       errores.minimoMayoreo = 'Mínimo 2 piezas'
     }
   }
+  if (f.contenido !== '' && Number(f.contenido) <= 0) errores.contenido = 'Debe ser mayor a 0'
 
   return errores
 }
@@ -362,7 +371,7 @@ export default function ProductoForm() {
     if (nuevaPromo.tipo === 'monto' && precio > 0 && valor >= precio) {
       return setErrorPromo('El descuento debe ser menor al precio de venta')
     }
-    if (!nuevaPromo.inicio || !nuevaPromo.fin) return setErrorPromo('Indica las fechas de inicio y fin')
+    if (nuevaPromo.inicio < hoyISO()) return setErrorPromo('La promoción no puede empezar en una fecha que ya pasó')    
     if (nuevaPromo.fin < nuevaPromo.inicio) return setErrorPromo('La fecha de fin debe ser después del inicio')
 
     const promo = { tipo: nuevaPromo.tipo, valor, inicio: nuevaPromo.inicio, fin: nuevaPromo.fin, activa: true }
@@ -423,6 +432,15 @@ export default function ProductoForm() {
     setErrorGuardar(null)
 
     const nuevosErrores = validar(form, CONFIG)
+
+        // Una caducidad pasada solo se acepta si ya la tenía (para poder editar otras cosas de un producto vencido)
+    if (
+      form.fechaCaducidad &&
+      form.fechaCaducidad < hoyISO() &&
+      form.fechaCaducidad !== (producto?.fechaCaducidad ?? '')
+    ) {
+      nuevosErrores.fechaCaducidad = 'Esa fecha ya pasó; elige una de hoy en adelante'
+    }
     setErrores(nuevosErrores)
 
     if (Object.keys(nuevosErrores).length > 0) {
@@ -448,17 +466,10 @@ export default function ProductoForm() {
 
       // TODO: guardar la imagen cuando exista su endpoint
       // Regresa al catálogo con la notificación y el producto resaltado
-      navigate('/catalogo', {
-        state: {
-          aviso: {
-            tipo: 'ok',
-            texto: esNuevo
-              ? `${resultado.nombre} se agregó al catálogo.`
-              : `${resultado.nombre} se actualizó.`,
-          },
-          resaltar: resultado.id,
-        },
+       notificar({
+        texto: esNuevo ? `${resultado.nombre} se agregó al catálogo` : `${resultado.nombre} se actualizó`,
       })
+      navigate('/catalogo', { state: { resaltar: resultado.id } })
     } catch (e) {
       const deCampos = erroresDeCampos(e)
 
@@ -727,7 +738,36 @@ export default function ProductoForm() {
                     </select>
                   </Campo>
                 </div>
-
+                <Campo
+                  etiqueta="Contenido neto (gramaje)"
+                  htmlFor="pf-contenido"
+                  error={errores.contenido}
+                  ayuda="Ej. 28 g o 600 ml · ayuda a distinguir presentaciones"
+                >
+                  <div className={'pf-grupo' + (errores.contenido ? ' is-error' : '')}>
+                    <input
+                      id="pf-contenido"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputMode="decimal"
+                      placeholder="Ej. 28"
+                      value={form.contenido}
+                      onChange={(e) => cambiar('contenido', e.target.value)}
+                    />
+                    <select
+                      className="pf-grupo__select"
+                      value={form.unidadContenido}
+                      onChange={(e) => cambiar('unidadContenido', e.target.value)}
+                      aria-label="Unidad del contenido"
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">L</option>
+                    </select>
+                  </div>
+                </Campo>
                 <Campo etiqueta="Descripción (opcional)" htmlFor="pf-descripcion" error={errores.descripcion}>
                   <textarea
                     id="pf-descripcion"
@@ -1024,7 +1064,7 @@ export default function ProductoForm() {
               >
                 <input
                   id="pf-caducidad"
-                  type="date"
+                  type="date" min={hoyISO()}
                   className="pf-input"
                   value={form.fechaCaducidad}
                   onChange={(e) => cambiar('fechaCaducidad', e.target.value)}
@@ -1165,7 +1205,7 @@ export default function ProductoForm() {
                     <Campo etiqueta="Inicia" htmlFor="pf-promo-inicio">
                       <input
                         id="pf-promo-inicio"
-                        type="date"
+                        type="date" min={hoyISO()}
                         className="pf-input"
                         value={nuevaPromo.inicio}
                         onChange={(e) => cambiarPromo('inicio', e.target.value)}
@@ -1176,7 +1216,7 @@ export default function ProductoForm() {
                     <Campo etiqueta="Termina" htmlFor="pf-promo-fin">
                       <input
                         id="pf-promo-fin"
-                        type="date"
+                        type="date" min={nuevaPromo.inicio || hoyISO()}
                         className="pf-input"
                         value={nuevaPromo.fin}
                         onChange={(e) => cambiarPromo('fin', e.target.value)}
@@ -1233,7 +1273,14 @@ export default function ProductoForm() {
                 {imagen ? <img src={imagen.url} alt="" /> : <Candy size={30} aria-hidden="true" />}
               </div>
               {form.marca && <span className="pf-chip">{form.marca}</span>}
-              <p className="pf-vista__nombre">{form.nombre || 'Nombre del producto'}</p>
+              <p className="pf-vista__nombre">
+                {form.nombre || 'Nombre del producto'}
+                {form.contenido && (
+                  <span className="gramaje">
+                    {form.contenido} {form.unidadContenido === 'l' ? 'L' : form.unidadContenido}
+                  </span>
+                )}
+              </p>
               <div className="pf-vista__pie">
                 <span className="pf-vista__precio">{moneda.format(precio)}</span>
                 <span className="pf-vista__stock">{stockActual} disp.</span>

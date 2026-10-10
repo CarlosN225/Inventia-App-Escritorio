@@ -871,12 +871,54 @@
   animation: cat-resaltar 3s ease-out;
 }
 
+
+
 @keyframes cat-resaltar {
   0%, 40% { background: #dbeafe; }
   100%    { background: transparent; }
 }
 
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 1100px) {
   .cat-buscador { min-width: 100%; }
+}
+
+/* ============ DESCRIPCIÓN DEL PRODUCTO ============ */
+.cat-producto__marca {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cat-tarjeta__desc {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12.5px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Categoría en pastilla y marca a un lado, para que no se confunda con la descripción */
+.cat-tarjeta__etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+
+.cat-tarjeta__marca-texto {
+  color: #475569;
+  font-size: 8.5px;
+  font-weight: 600;
+}
+
+/* La descripción, más suave y en cursiva para distinguirla */
+.cat-tarjeta__desc {
+  font-style: italic;
 }

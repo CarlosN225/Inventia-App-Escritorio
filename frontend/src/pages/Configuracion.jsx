@@ -48,6 +48,7 @@ import {
 } from '../services/configuracion'
 
 import '../styles/configuracion.css'
+import { notificar } from '../services/notificar.js'
 
 /* ============================================================
    ESTADO INICIAL
@@ -72,6 +73,7 @@ const AJUSTES_INICIALES = {
     numero: '',
     hora: '20:00',
     diasCaducidad: 30,
+    contacto: '',
   },
 }
 
@@ -260,6 +262,7 @@ function desdeBackend(config) {
     },
     preferencias: { ...config.preferencias },
     whatsapp: {
+      contacto: config.whatsapp.contacto_alertas ?? '',
       numero: config.whatsapp.telefono_alertas ?? '',
       hora: config.whatsapp.hora_resumen ?? '20:00',
       diasCaducidad: config.whatsapp.dias_aviso_caducidad ?? 30,
@@ -277,6 +280,7 @@ function haciaBackend(ajustes) {
     },
     preferencias: ajustes.preferencias,
     whatsapp: {
+      contacto_alertas: ajustes.whatsapp.contacto.trim(),
       telefono_alertas: soloDigitos(ajustes.whatsapp.numero),
       hora_resumen: ajustes.whatsapp.hora,
       dias_aviso_caducidad: ajustes.whatsapp.diasCaducidad,
@@ -617,9 +621,8 @@ export default function Configuracion() {
 
   const errores = {}
 
-    if (!cargandoAjustes && !ajustes.negocio.nombre.trim()) {
-    errores.nombre =
-      'Escribe el nombre de tu negocio'
+  if (!cargandoAjustes && soloDigitos(ajustes.negocio.telefono).length !== 10) {
+    errores.telefono = 'Escribe el teléfono de la dulcería (10 dígitos)'
   }
 
   if (
@@ -632,15 +635,12 @@ export default function Configuracion() {
       'Deben ser 10 dígitos'
   }
 
-  if (
-    ajustes.preferencias
-      .alertas_activas &&
-    soloDigitos(
-      ajustes.whatsapp.numero
-    ).length !== 10
-  ) {
-    errores.numero =
-      'Escribe un WhatsApp de 10 dígitos'
+    if (!cargandoAjustes && soloDigitos(ajustes.whatsapp.numero).length !== 10) {
+    errores.numero = 'Escribe un WhatsApp de 10 dígitos'
+  }
+
+  if (!cargandoAjustes && !ajustes.whatsapp.contacto.trim()) {
+    errores.contacto = 'Escribe de quién es este WhatsApp'
   }
 
   const hayErrores =
@@ -663,7 +663,7 @@ export default function Configuracion() {
         nombre: usuarioActual?.nombre_completo ?? '',
       })
 
-      setAviso({
+      notificar({
         texto: 'Cambios guardados. Ya se aplican en toda la app.',
       })
     } catch (error) {
@@ -1001,7 +1001,7 @@ export default function Configuracion() {
       setEditar(null)
       setIntentoEditar(false)
 
-      setAviso({
+      notificar({
         texto:
           'Usuario actualizado correctamente',
       })
@@ -1059,7 +1059,7 @@ export default function Configuracion() {
         )
       )
 
-      setAviso({
+      notificar({
         texto: `${confirmarBaja.nombre} ya no podrá entrar a INVENTIA`,
       })
 
@@ -1104,7 +1104,7 @@ export default function Configuracion() {
         )
       )
 
-      setAviso({
+      notificar({
         texto: `${usuario.nombre} puede volver a entrar a INVENTIA`,
       })
     } catch (error) {
@@ -1148,7 +1148,7 @@ export default function Configuracion() {
         )
       )
 
-      setAviso({
+      notificar({
         texto: `${confirmarEliminar.nombre} fue eliminado definitivamente`,
       })
 
@@ -1513,8 +1513,9 @@ export default function Configuracion() {
                     className="cf-etiqueta"
                     htmlFor="cf-telefono"
                   >
-                    Teléfono del negocio
-                  </label>
+                  Teléfono de la dulcería{' '}
+                    <span className="cf-requerido">*</span>
+                   </label>
 
                   <input
                     id="cf-telefono"
@@ -1553,7 +1554,7 @@ export default function Configuracion() {
                     </p>
                   ) : (
                     <p className="cf-ayuda">
-                      Opcional
+                      Para que te localicen clientes y proveedores
                     </p>
                   )}
                 </div>
@@ -2551,7 +2552,6 @@ export default function Configuracion() {
                     }
                     disabled={
                       !ajustes.preferencias
-                        .alertas_activas
                     }
                     onChange={(e) =>
                       cambiar(
@@ -2578,10 +2578,34 @@ export default function Configuracion() {
                     </p>
                   ) : (
                     <p className="cf-ayuda">
-                      Normalmente el del dueño
+                     Aquí llegan los avisos y el resumen diario
                     </p>
                   )}
 
+                </div>
+
+                <div className="cf-campo">
+                  <label className="cf-etiqueta" htmlFor="cf-contacto">
+                    ¿De quién es este WhatsApp? <span className="cf-requerido">*</span>
+                  </label>
+
+                  <input
+                    id="cf-contacto"
+                    className={'cf-input' + (errores.contacto ? ' is-error' : '')}
+                    value={ajustes.whatsapp.contacto}
+                    onChange={(e) => cambiar('whatsapp', 'contacto', e.target.value)}
+                    placeholder="Ej. Ana Luisa · dueña"
+                    maxLength={120}
+                  />
+
+                  {errores.contacto ? (
+                    <p className="cf-error">
+                      <AlertCircle size={13} aria-hidden="true" />
+                      {errores.contacto}
+                    </p>
+                  ) : (
+                    <p className="cf-ayuda">Para saber a quién le llegan las notificaciones</p>
+                  )}
                 </div>
 
                 <div className="cf-campo">

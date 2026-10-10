@@ -464,7 +464,19 @@ def crear_primer_propietario_view(request):
             {'error': 'El correo ya está registrado'},
             status=status.HTTP_400_BAD_REQUEST
         )
-
+    if nombre_negocio:
+        digitos = lambda t: ''.join(c for c in str(t or '') if c.isdigit())
+        if len(digitos(negocio.get('telefono'))) != 10:
+            return Response(
+                {'error': 'El teléfono de la dulcería es obligatorio (10 dígitos)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(digitos(telefono_whatsapp)) != 10:
+            return Response(
+                {'error': 'El WhatsApp es obligatorio (10 dígitos)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
     # Todo o nada: si algo falla, no queda un dueño sin negocio
     with transaction.atomic():
         usuario = Usuario.objects.create(
@@ -492,7 +504,8 @@ def crear_primer_propietario_view(request):
                 maneja_promociones=bool(preferencias.get('maneja_promociones', True)),
                 usa_codigo_barras=bool(preferencias.get('usa_codigo_barras', False)),
                 alertas_activas=bool(preferencias.get('alertas_activas', True)),
-                telefono_alertas=telefono_whatsapp
+                telefono_alertas=telefono_whatsapp,
+                contacto_alertas=nombre_completo
             )
 
     return Response(

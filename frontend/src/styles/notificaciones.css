@@ -1,0 +1,75 @@
+/* ============ NOTIFICACIONES FLOTANTES ============ */
+.notis {
+  position: fixed;
+  top: 84px;
+  right: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.noti {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(380px, calc(100vw - 40px));
+  overflow: hidden;
+  padding: 12px 12px 14px 14px;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 14px 34px rgba(11, 18, 32, 0.22);
+  pointer-events: auto;
+  animation: noti-entrar 0.25s ease-out;
+}
+
+.noti--ok    { background: #059669; }
+.noti--error { background: #dc2626; }
+.noti--aviso { background: #d97706; }
+
+.noti svg { flex-shrink: 0; }
+
+.noti__texto { flex: 1; }
+
+.noti button {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.noti button:hover { background: rgba(255, 255, 255, 0.18); }
+
+/* La barrita que se va acabando */
+.noti__barra {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.55);
+  transform-origin: left;
+  animation: noti-tiempo linear forwards;
+}
+
+@keyframes noti-entrar {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes noti-tiempo {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}

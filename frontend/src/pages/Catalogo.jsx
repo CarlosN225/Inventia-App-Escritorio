@@ -32,6 +32,7 @@ import { getUsuarioActual } from '../services/auth'
 import { listarProductos, cambiarActivoProducto, mensajeDeError } from '../services/productos'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/catalogo.css'
+import { notificar } from '../services/notificar.js'
 
 const POR_PAGINA = 15
 const DIAS_AVISO_CADUCIDAD = 30
@@ -145,7 +146,6 @@ export default function Catalogo() {
   const [productos, setProductos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
-  const [aviso, setAviso] = useState(null) // { texto, tipo: 'ok' | 'error' }
   const [aCambiar, setACambiar] = useState(null) // producto que se va a desactivar o reactivar
   const [resaltado, setResaltado] = useState(null) // id del producto recién guardado
 
@@ -176,23 +176,16 @@ export default function Catalogo() {
   }
   // Aviso que manda el formulario al guardar (ej. "Chocolate Carlos V se actualizó.")
   useEffect(() => {
-    const { aviso: avisoRecibido, resaltar } = location.state ?? {}
-    if (!avisoRecibido) return
+    const { resaltar } = location.state ?? {}
+    if (!resaltar) return
 
-    setAviso(avisoRecibido)
-    setResaltado(resaltar ?? null)
+    setResaltado(resaltar)
 
     // Lo borra para que no vuelva a salir si recargas la página
     navigate(location.pathname, { replace: true, state: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // La notificación se va sola a los 4 segundos
-  useEffect(() => {
-    if (!aviso) return
-    const temporizador = setTimeout(() => setAviso(null), 4000)
-    return () => clearTimeout(temporizador)
-  }, [aviso])
+ 
 
 
   useEffect(() => {
@@ -330,14 +323,14 @@ export default function Catalogo() {
     try {
       const actualizado = await cambiarActivoProducto(producto.id, !producto.activo)
       setProductos((lista) => lista.map((p) => (p.id === actualizado.id ? actualizado : p)))
-      setAviso({
+      notificar({
         tipo: 'ok',
         texto: actualizado.activo
           ? `${actualizado.nombre} se reactivó y vuelve a aparecer en ventas.`
           : `${actualizado.nombre} se desactivó. Su historial se conserva.`,
       })
     } catch (e) {
-      setAviso({ tipo: 'error', texto: mensajeDeError(e) })
+      notificar({ tipo: 'error', texto: mensajeDeError(e) })
     }
   }
 
@@ -401,19 +394,7 @@ export default function Catalogo() {
         )}
       </header>
 
-      {aviso && (
-        <div className={'cat-toast' + (aviso.tipo === 'error' ? ' is-error' : '')} role="status">          
-        {aviso.tipo === 'error' ? (
-            <AlertCircle size={17} aria-hidden="true" />
-          ) : (
-            <CheckCircle2 size={17} aria-hidden="true" />
-          )}
-          <span>{aviso.texto}</span>
-          <button type="button" aria-label="Cerrar aviso" onClick={() => setAviso(null)}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      
 
       {/* ============ FILTROS ============ */}
       <section className="cat-panel">
@@ -589,11 +570,15 @@ export default function Catalogo() {
                         <FotoProducto producto={p} />
                         <div>
                           <p className="cat-producto__nombre">
-                            {p.nombre}
+                            {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                             {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
                           </p>
-                          {p.marca && <p className="cat-producto__marca">{p.marca}</p>}
-                        </div>
+                          {(p.marca || p.descripcion) && (
+                            <p className="cat-producto__marca" title={p.descripcion || undefined}>
+                              {[p.marca, p.descripcion].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                         </div>
                       </div>
                     </td>
                     <td>
@@ -698,8 +683,12 @@ export default function Catalogo() {
                     <span className="cat-tarjeta__numero">No. {inicio + indice + 1}</span>
                   </div>
 
-                  <p className="cat-tarjeta__nombre">{p.nombre}</p>
-                  <p className="cat-tarjeta__marca">{p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}</p>
+                  <p className="cat-tarjeta__nombre">{p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}</p>
+                  <div className="cat-tarjeta__etiquetas">
+                    <span className="cat-chip">{p.categoria}</span>
+                    {p.marca && <span className="cat-tarjeta__marca-texto">{p.marca}</span>}
+                  </div>
+                  {p.descripcion && <p className="cat-tarjeta__desc">{p.descripcion}</p>}
 
                   <div className="cat-tarjeta__precio">
                     <span className="cat-precio">{moneda.format(p.precio)}</span>

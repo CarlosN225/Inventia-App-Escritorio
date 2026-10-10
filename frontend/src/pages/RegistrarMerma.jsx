@@ -30,6 +30,7 @@ import { listarProductos, mensajeDeError } from '../services/productos'
 import { listarMovimientos, registrarMovimiento, mensajeDelBackend } from '../services/movimientos'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-merma.css'
+import { notificar } from '../services/notificar'
 
 const MAX_RESULTADOS = 5
 
@@ -115,7 +116,6 @@ export default function RegistrarMerma() {
   const [intento, setIntento] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
   const [guardando, setGuardando] = useState(false)
-  const [registrada, setRegistrada] = useState(null)
   const [errorGuardar, setErrorGuardar] = useState(null)
 
   async function cargarDatos() {
@@ -181,7 +181,6 @@ export default function RegistrarMerma() {
     setProductoId(id)
     setCantidad(1)
     cambiarBusqueda('')
-    setRegistrada(null)
     setErrorGuardar(null)
   }
 
@@ -292,7 +291,11 @@ export default function RegistrarMerma() {
         lista.map((p) => (p.id === producto.id ? { ...p, stock: movimiento.stockResultante ?? p.stock - cantidad } : p))
       )
       setMermas((lista) => [movimiento, ...lista])
-      setRegistrada({ nombre: producto.nombre, cantidad, unidad: producto.unidad, perdida })
+      notificar({
+        texto: `Merma registrada · ${cantidad} ${textoUnidad(producto.unidad, cantidad, true)} de ${producto.nombre}${
+          perdida !== null ? ` · ${moneda.format(perdida)} de pérdida` : ''
+        }`,
+      })
       limpiar()
     } catch (e) {
       setErrorGuardar(mensajeDelBackend(e) ?? mensajeDeError(e))
@@ -343,19 +346,7 @@ export default function RegistrarMerma() {
     <div className="rm">
       {/* ============ FORMULARIO ============ */}
       <section className="rm-panel">
-        {registrada && (
-          <div className="rm-exito" role="status">
-            <CheckCircle2 size={18} aria-hidden="true" />
-            <span>
-              <strong>Merma registrada</strong> · se descontaron {registrada.cantidad}{' '}
-              {textoUnidad(registrada.unidad, registrada.cantidad, true)} de {registrada.nombre}
-              {registrada.perdida !== null && ` · ${moneda.format(registrada.perdida)} de pérdida`}
-            </span>
-            <button type="button" aria-label="Cerrar aviso" onClick={() => setRegistrada(null)}>
-              <X size={15} />
-            </button>
-          </div>
-        )}
+         
 
         {errorGuardar && (
           <div className="rm-aviso-error" role="alert">

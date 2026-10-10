@@ -118,7 +118,7 @@ function reglasContrasena(contrasena) {
 function erroresNegocio(n) {
   const e = {}
   if (!n.nombre.trim()) e.nombre = 'Escribe el nombre de tu dulcería'
-  if (n.telefono && soloDigitos(n.telefono).length !== 10) e.telefono = 'Deben ser 10 dígitos'
+  if (soloDigitos(n.telefono).length !== 10) e.telefono = 'Escribe el teléfono de la dulcería (10 dígitos)'
   return e
 }
 
@@ -127,7 +127,7 @@ function erroresCuenta(p) {
   if (!p.nombre_completo.trim()) e.nombre_completo = 'Escribe tu nombre'
   if (!p.correo.trim()) e.correo = 'Escribe tu correo'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.correo.trim())) e.correo = 'Revisa que el correo esté bien escrito'
-  if (p.telefono_whatsapp && soloDigitos(p.telefono_whatsapp).length !== 10) e.telefono_whatsapp = 'Deben ser 10 dígitos'
+  if (soloDigitos(p.telefono_whatsapp).length !== 10) e.telefono_whatsapp = 'Escribe tu WhatsApp (10 dígitos)'
   if (reglasContrasena(p.contrasena).some((r) => !r.ok)) e.contrasena = 'Cumple todas las reglas de abajo'
   if (!p.confirmar || p.confirmar !== p.contrasena) e.confirmar = 'Las contraseñas no coinciden'
   return e
@@ -405,10 +405,10 @@ export default function AsistenteInicial() {
 
               <Campo
                 id="as-tel-negocio"
-                etiqueta="Teléfono del negocio (opcional)"
+                etiqueta="Teléfono de la dulcería" required
                 icono={Phone}
                 error={errorDe(1, 'telefono')}
-                ayuda="10 dígitos"
+                ayuda="Para que te localicen clientes y proveedores · 10 dígitos"
               >
                 <input
                   id="as-tel-negocio"
@@ -449,11 +449,11 @@ export default function AsistenteInicial() {
               </Campo>
 
               <Campo
-                id="as-whatsapp"
+                id="as-whatsapp" required
                 etiqueta="Tu WhatsApp"
                 icono={Phone}
                 error={errorDe(2, 'telefono_whatsapp')}
-                ayuda="Aquí te llega el resumen diario · 10 dígitos"
+                ayuda="Aquí te llegan los avisos y el resumen diario · 10 dígitos"
               >
                 <input
                   id="as-whatsapp"

@@ -761,7 +761,7 @@ export default function Movimientos() {
                       </>
                     )
                     celdaOrigen = (
-                      <span className="hi-origen">
+                       <span className="hi-origen" title={textoOrigen(r)}>
                         <Icono size={13} aria-hidden="true" />
                         {textoOrigen(r)}
                       </span>

@@ -39,7 +39,7 @@ import { mensajeDelBackend } from '../services/movimientos'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-venta.css'
 import '../styles/registrar-compra.css'
-
+import { notificar } from '../services/notificar'
 
 const MAX_RESULTADOS = 6
 const MAX_FRECUENTES = 5
@@ -121,7 +121,6 @@ export default function RegistrarCompra() {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [errorRegistro, setErrorRegistro] = useState(null)
-  const [compraRegistrada, setCompraRegistrada] = useState(null)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
 
   async function cargarProductos() {
@@ -237,7 +236,6 @@ export default function RegistrarCompra() {
 
       return [...c, nuevoRenglon(id, cantidadPiezas)]
     })
-    setCompraRegistrada(null)
     setErrorRegistro(null)
   }
 
@@ -362,11 +360,8 @@ export default function RegistrarCompra() {
         })
       )
 
-      setCompraRegistrada({
-        folio: resultado.id,
-        proveedor: proveedor.trim(),
-        piezas: totalPiezas,
-        total: Number(resultado.total),
+      notificar({
+        texto: `Compra #${resultado.id} registrada · ${proveedor.trim()} · ${moneda.format(Number(resultado.total))}`,
       })
       setCompra([])
       setProveedor('')
@@ -558,6 +553,7 @@ export default function RegistrarCompra() {
                     <input
                       id="rc-fecha"
                       type="date"
+                      min={hoyISO()}
                       max={hoyISO()}
                       value={fecha}
                       onChange={(e) => setFecha(e.target.value)}
@@ -677,11 +673,11 @@ export default function RegistrarCompra() {
 
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
-                                {p.nombre}
+                                {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                                 <PastillaHay producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
-                                {p.marca ? `${p.marca} · ${p.categoria}` : p.categoria}
+                                {[p.marca, p.categoria, p.descripcion].filter(Boolean).join(' · ')}
                               </p>
                             </div>
 
@@ -778,18 +774,7 @@ export default function RegistrarCompra() {
 
           {/* ============ COMPRA ACTUAL ============ */}
           <aside className="rv-panel rv-ticket" aria-label="Compra actual">
-            {compraRegistrada && (
-              <div className="rv-exito" role="status">
-                <CheckCircle2 size={18} aria-hidden="true" />
-                <span>
-                  <strong>Compra #{compraRegistrada.folio} registrada</strong> · {compraRegistrada.proveedor} ·{' '}
-                  {moneda.format(compraRegistrada.total)} · el inventario ya se actualizó
-                </span>
-                <button type="button" aria-label="Cerrar aviso" onClick={() => setCompraRegistrada(null)}>
-                  <X size={15} />
-                </button>
-              </div>
-            )}
+             
 
             <header className="rv-ticket__cabecera">
               <span className="rv-seccion__icono" aria-hidden="true">
@@ -822,7 +807,7 @@ export default function RegistrarCompra() {
                     <div className="rv-renglon__cuerpo">
                       {/* Línea 1: nombre + subtotal */}
                       <div className="rv-renglon__arriba">
-                        <p className="rv-renglon__nombre">{r.producto.nombre}</p>
+                        <p className="rv-renglon__nombre">{r.producto.nombre} {r.producto.gramaje && <span className="gramaje">{r.producto.gramaje}</span>}</p>
                         <span className="rv-renglon__subtotal">{r.costoValido ? moneda.format(r.subtotal) : '—'}</span>
                       </div>
 
