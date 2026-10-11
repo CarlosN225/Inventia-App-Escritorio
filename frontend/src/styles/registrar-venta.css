@@ -1045,3 +1045,19 @@
   .rv-izquierda { max-height: none; }
   .rv-rapidos { max-height: 380px; }
 }
+
+/* Precio cambiado con autorización: quién lo autorizó (el motivo sale al pasar el mouse) */
+.rv-chip--autorizado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  cursor: help;
+}
+
+.rv-rapido__gramaje {
+  align-self: flex-start;
+  margin: 2px 0 0;
+}

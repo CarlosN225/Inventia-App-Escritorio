@@ -46,6 +46,10 @@ class Configuracion(models.Model):
     vende_mayoreo = models.BooleanField(default=False)
     telefono_alertas = models.CharField(max_length=20, blank=True, default="")
     contacto_alertas = models.CharField(max_length=120, blank=True, default="")  # de quién es el WhatsApp
+        # PIN del propietario para autorizar cambios de precio (cifrado, nunca en texto)
+    pin_hash = models.CharField(max_length=128, blank=True, default="")
+    pin_intentos_fallidos = models.PositiveSmallIntegerField(default=0)
+    pin_bloqueado_hasta = models.DateTimeField(null=True, blank=True)
     hora_resumen = models.TimeField(default=time(20, 0))
     dias_aviso_caducidad = models.PositiveIntegerField(default=30)
     
@@ -209,7 +213,18 @@ class DetalleVenta(models.Model):
         ("editado", "Editado"),
     ]
     tipo_precio = models.CharField(max_length=10, choices=TIPO_PRECIO_CHOICES, default="normal")
-
+    # Bitácora de precios: cuánto costaba, por qué se cambió y quién lo autorizó
+    precio_lista = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    motivo_precio = models.CharField(max_length=120, blank=True, default="")
+    autorizado_por = models.ForeignKey(
+        Usuario,
+        db_column="id_autorizo",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="precios_autorizados",
+    )
+    
     class Meta:
         db_table = "DetalleVenta"
    

@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAjustes } from '../hooks/useConfiguracion'
-
 import {
   Search,
   X,
@@ -13,7 +11,6 @@ import {
   Receipt,
   Lock,
   Check,
-  CheckCircle2,
   AlertTriangle,
   AlertCircle,
   Candy,
@@ -23,15 +20,19 @@ import {
   PlusCircle,
   PackageOpen,
   Loader2,
+  ShieldCheck,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import ModalAutorizacion from '../components/ModalAutorizacion.jsx'
+import { useAjustes } from '../hooks/useConfiguracion'
+import { getUsuarioActual } from '../services/auth'
 import { listarProductos, mensajeDeError } from '../services/productos'
 import { listarVentas, registrarVenta } from '../services/ventas'
 import { mensajeDelBackend } from '../services/movimientos'
+import { notificar } from '../services/notificar'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-venta.css'
-import { notificar } from '../services/notificar'
 
 const MAX_RESULTADOS = 6
 const MAX_RAPIDOS = 8
@@ -48,8 +49,10 @@ function redondear(n) {
   return Math.round(n * 100) / 100
 }
 
-// El precio más bajo que aplica: normal, mayoreo (si llega a la cantidad) o el que se editó
-// TODO: sumar las promociones cuando tengan su endpoint
+function primerNombre(nombreCompleto) {
+  return nombreCompleto?.trim().split(/\s+/)[0] ?? ''
+}
+
 function etiquetaPromo(promo) {
   return promo.tipo === 'porcentaje' ? `-${promo.valor}%` : `-${moneda.format(promo.valor)}`
 }
@@ -76,7 +79,6 @@ function calcularPrecio(producto, cantidad, precioEditado, conMayoreo = true, co
   return opciones.reduce((mejor, opcion) => (opcion.precio < mejor.precio ? opcion : mejor))
 }
 
-
 function PastillaStock({ producto }) {
   const unidad = textoUnidad(producto.unidad, producto.stock)
   if (producto.stock === 0) return <span className="rv-stock rv-stock--agotado">Agotado</span>
@@ -99,10 +101,12 @@ function PastillaStock({ producto }) {
 export default function RegistrarVenta() {
   const navigate = useNavigate()
   const inputRef = useRef(null)
-  const { vende_mayoreo: conMayoreo, maneja_promociones: conPromos } = useAjustes()
+  const { vende_mayoreo: conMayoreo, maneja_promociones: conPromos, pinConfigurado } = useAjustes()
+
   // Datos del backend
   const [productos, setProductos] = useState([])
   const [rankingIds, setRankingIds] = useState([]) // ids de los más vendidos, de más a menos
+  const [usuarioActual, setUsuarioActual] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState(null)
 
@@ -111,9 +115,12 @@ export default function RegistrarVenta() {
   const [resaltado, setResaltado] = useState(0)
   const [ticket, setTicket] = useState([])
   const [editando, setEditando] = useState(null)
+  const [pendientePrecio, setPendientePrecio] = useState(null) // { id, precioNormal, precioNuevo } mientras se autoriza
   const [errorVenta, setErrorVenta] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
+
+  const esPropietario = usuarioActual?.rol === 'propietario'
 
   async function cargarProductos() {
     const lista = await listarProductos()
@@ -143,8 +150,11 @@ export default function RegistrarVenta() {
     setErrorCarga(null)
 
     try {
-      await cargarProductos()
-      await cargarRanking().catch(() => setRankingIds([])) // si falla, solo no hay ranking
+      await Promise.all([
+        cargarProductos(),
+        cargarRanking().catch(() => setRankingIds([])), // si falla, solo no hay ranking
+        getUsuarioActual().then(setUsuarioActual).catch(() => setUsuarioActual(null)),
+      ])
     } catch (e) {
       setErrorCarga(mensajeDeError(e))
     } finally {
@@ -154,6 +164,7 @@ export default function RegistrarVenta() {
 
   useEffect(() => {
     cargarTodo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const productosPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
@@ -197,9 +208,9 @@ export default function RegistrarVenta() {
     setTicket((t) => {
       const existe = t.find((item) => item.id === id)
       if (existe) return t.map((item) => (item.id === id ? { ...item, cantidad: item.cantidad + 1 } : item))
-      return [...t, { id, cantidad: 1, precioEditado: null }]
+      return [...t, { id, cantidad: 1, precioEditado: null, autorizacion: null, motivoPrecio: '', autorizadoPor: null }]
     })
-     setErrorVenta(null)
+    setErrorVenta(null)
   }
 
   function agregarDesdeBusqueda(id) {
@@ -218,25 +229,65 @@ export default function RegistrarVenta() {
     if (editando?.id === id) setEditando(null)
   }
 
+  /* ---------- Cambio de precio (con autorización) ---------- */
+
   function empezarEdicion(renglon) {
     setEditando({ id: renglon.id, valor: String(renglon.precio) })
+  }
+
+  // Lo que costaría sin editar (normal, promo o mayoreo)
+  function precioSinEditar(item) {
+    const producto = productosPorId.get(item.id)
+    return calcularPrecio(producto, item.cantidad, null, conMayoreo, conPromos).precio
+  }
+
+  function restablecerPrecio(id) {
+    setTicket((t) =>
+      t.map((item) =>
+        item.id === id ? { ...item, precioEditado: null, autorizacion: null, motivoPrecio: '', autorizadoPor: null } : item
+      )
+    )
   }
 
   function guardarPrecio() {
     if (!editando) return
 
-    const valor = editando.valor.trim()
-    const numero = Number(valor)
+    const { id, valor } = editando
+    const texto = valor.trim()
+    const numero = redondear(Number(texto))
+    setEditando(null)
+
+    const item = ticket.find((i) => i.id === id)
+    if (!item) return
+
+    // Vacío: regresa a su precio normal
+    if (texto === '') return restablecerPrecio(id)
+    if (!(numero > 0)) return
+
+    const normal = precioSinEditar(item)
+    const actual = item.precioEditado ?? normal
+
+    if (numero === actual) return // no cambió
+    if (numero === normal) return restablecerPrecio(id) // lo regresó a su precio
+
+    // Cambió: se pide la autorización antes de aplicarlo
+    setPendientePrecio({ id, precioNormal: normal, precioNuevo: numero })
+  }
+
+  function aplicarPrecioAutorizado({ motivo, autorizacion, autorizadoPor }) {
+    const { id, precioNuevo } = pendientePrecio
+    const quien = autorizadoPor ?? usuarioActual?.nombre_completo ?? ''
 
     setTicket((t) =>
-      t.map((item) => {
-        if (item.id !== editando.id) return item
-        if (valor === '') return { ...item, precioEditado: null }
-        if (numero > 0) return { ...item, precioEditado: redondear(numero) }
-        return item
-      })
+      t.map((item) =>
+        item.id === id
+          ? { ...item, precioEditado: precioNuevo, autorizacion, motivoPrecio: motivo, autorizadoPor: quien }
+          : item
+      )
     )
-    setEditando(null)
+
+    setPendientePrecio(null)
+    notificar({ texto: `Precio cambiado a ${moneda.format(precioNuevo)} · autorizó ${primerNombre(quien)}` })
   }
 
   function teclaPrecio(event) {
@@ -250,10 +301,6 @@ export default function RegistrarVenta() {
     }
   }
 
-  function restablecerPrecio(id) {
-    setTicket((t) => t.map((item) => (item.id === id ? { ...item, precioEditado: null } : item)))
-  }
-
   /* ---------- Cálculos ---------- */
 
   const renglones = ticket
@@ -262,7 +309,7 @@ export default function RegistrarVenta() {
       const producto = productosPorId.get(item.id)
       const disponible = producto.stock
       const { precio, motivo, promo } = calcularPrecio(producto, item.cantidad, item.precioEditado, conMayoreo, conPromos)
-        const faltanMayoreo =
+      const faltanMayoreo =
         conMayoreo &&
         producto.precioMayoreo &&
         producto.minimoMayoreo &&
@@ -289,7 +336,9 @@ export default function RegistrarVenta() {
   const hayErrores = conError.length > 0
   const total = redondear(renglones.filter((r) => !r.faltan).reduce((suma, r) => suma + r.subtotal, 0))
   const piezas = renglones.reduce((suma, r) => suma + r.cantidad, 0)
-  const puedeConfirmar = renglones.length > 0 && !hayErrores && !guardando
+  const puedeConfirmar = renglones.length > 0 && !hayErrores && !guardando && !pendientePrecio
+
+  const renglonPendiente = pendientePrecio ? renglones.find((r) => r.id === pendientePrecio.id) : null
 
   /* ---------- Confirmar y cancelar ---------- */
 
@@ -306,6 +355,11 @@ export default function RegistrarVenta() {
           cantidad: r.cantidad,
           precio_unitario: r.precio.toFixed(2),
           tipo_precio: r.motivo,
+          // Solo los precios editados llevan su autorización firmada y su motivo
+          ...(r.motivo === 'editado' && {
+            autorizacion: r.autorizacion ?? '',
+            motivo_precio: r.motivoPrecio,
+          }),
         }))
       )
 
@@ -321,9 +375,21 @@ export default function RegistrarVenta() {
       enfocarBuscador()
 
       cargarRanking().catch(() => {})
-    } catch (e) {
-      setErrorVenta(mensajeDelBackend(e) ?? mensajeDeError(e))
-      // Por si el stock cambió (ej. alguien más vendió), lo traemos de nuevo
+    }  catch (e) {
+      // Si a un renglón se le venció la autorización, regresa solo a su precio normal
+      const idVencido = Number([].concat(e?.response?.data?.producto_autorizacion ?? [])[0])
+      const vencido = idVencido ? productosPorId.get(idVencido) : null
+
+      if (vencido) {
+        restablecerPrecio(idVencido)
+        setErrorVenta(
+          `La autorización del precio de ${vencido.nombre} ya venció, así que regresó a su precio normal. ` +
+            'Si quieres el otro precio, vuelve a pedirla; si no, confirma la venta.'
+        )
+      } else {
+        setErrorVenta(mensajeDelBackend(e) ?? mensajeDeError(e))
+      }
+    // Por si el stock cambió (ej. alguien más vendió), lo traemos de nuevo
       cargarProductos().catch(() => {})
     } finally {
       setGuardando(false)
@@ -345,11 +411,17 @@ export default function RegistrarVenta() {
   /* ---------- Atajos ---------- */
 
   const atajosRef = useRef({})
-  atajosRef.current = { confirmarVenta, pedirCancelar, dialogoAbierto: dialogoCancelar }
+  atajosRef.current = {
+    confirmarVenta,
+    pedirCancelar,
+    // Con cualquier ventana abierta, los atajos de la venta no actúan
+    hayVentanaAbierta: dialogoCancelar || pendientePrecio !== null,
+  }
 
   useEffect(() => {
     function alPresionar(event) {
       const a = atajosRef.current
+      if (a.hayVentanaAbierta) return
 
       if (event.key === 'F2') {
         event.preventDefault()
@@ -357,7 +429,7 @@ export default function RegistrarVenta() {
       } else if (event.key === 'F12') {
         event.preventDefault()
         a.confirmarVenta()
-      } else if (event.key === 'Escape' && !a.dialogoAbierto) {
+      } else if (event.key === 'Escape') {
         a.pedirCancelar()
       }
     }
@@ -508,7 +580,8 @@ export default function RegistrarVenta() {
 
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
-                                {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                                {p.nombre}
+                                {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                                 <PastillaStock producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
@@ -576,7 +649,8 @@ export default function RegistrarVenta() {
                         <Candy size={20} />
                       </span>
                       {p.marca && <span className="rv-chip rv-chip--marca">{p.marca}</span>}
-                      <span className="rv-rapido__nombre">{p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}</span>
+                      <span className="rv-rapido__nombre">{p.nombre}</span>
+                      {p.gramaje && <span className="gramaje rv-rapido__gramaje">{p.gramaje}</span>}
                       <span className="rv-rapido__precio">{moneda.format(p.precio)}</span>
                     </button>
                   )
@@ -587,8 +661,6 @@ export default function RegistrarVenta() {
 
           {/* ============ TICKET ============ */}
           <aside className="rv-panel rv-ticket" aria-label="Venta actual">
-            
-
             <header className="rv-ticket__cabecera">
               <span className="rv-seccion__icono" aria-hidden="true">
                 <Receipt size={16} />
@@ -623,11 +695,11 @@ export default function RegistrarVenta() {
 
                     <div className="rv-renglon__cuerpo">
                       <div className="rv-renglon__arriba">
-                         <p className="rv-renglon__nombre">
+                        <p className="rv-renglon__nombre">
                           {r.producto.nombre}
                           {r.producto.gramaje && <span className="gramaje">{r.producto.gramaje}</span>}
                         </p>
-                         <span className="rv-renglon__subtotal">
+                        <span className="rv-renglon__subtotal">
                           {r.faltan ? <span className="rv-espera">En espera</span> : moneda.format(r.subtotal)}
                         </span>
                       </div>
@@ -661,16 +733,21 @@ export default function RegistrarVenta() {
                               {r.motivo === 'promocion' && (
                                 <span className="rv-chip rv-chip--azul">Promo {etiquetaPromo(r.promo)}</span>
                               )}
-                              {r.motivo === 'editado' && <span className="rv-chip rv-chip--gris">Precio editado</span>}
+                              {r.motivo === 'editado' && (
+                                <span className="rv-chip rv-chip--autorizado" title={r.motivoPrecio}>
+                                  <ShieldCheck size={12} aria-hidden="true" />
+                                  Autorizó {primerNombre(r.autorizadoPor)}
+                                </span>
+                              )}
 
                               <button
                                 type="button"
                                 className="rv-icono"
                                 onClick={() => empezarEdicion(r)}
-                                aria-label={`Editar precio de ${r.producto.nombre}`}
-                                title="Editar precio"
+                                aria-label={`Cambiar precio de ${r.producto.nombre}`}
+                                title={esPropietario ? 'Cambiar precio' : 'Cambiar precio (pide el PIN del dueño)'}
                               >
-                                <Pencil size={13} />
+                                {esPropietario ? <Pencil size={13} /> : <Lock size={13} />}
                               </button>
 
                               {r.motivo === 'editado' && (
@@ -808,6 +885,19 @@ export default function RegistrarVenta() {
             </div>
           </aside>
         </>
+      )}
+
+      {/* ============ AUTORIZACIÓN DEL CAMBIO DE PRECIO ============ */}
+      {pendientePrecio && renglonPendiente && (
+        <ModalAutorizacion
+          producto={renglonPendiente.producto}
+          precioNormal={pendientePrecio.precioNormal}
+          precioNuevo={pendientePrecio.precioNuevo}
+          esPropietario={esPropietario}
+          pinConfigurado={pinConfigurado}
+          onAutorizar={aplicarPrecioAutorizado}
+          onCancelar={() => setPendientePrecio(null)}
+        />
       )}
 
       <ConfirmDialog
