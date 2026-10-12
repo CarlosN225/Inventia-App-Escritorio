@@ -65,6 +65,8 @@ export function adaptarProducto(p) {
           fechaFin: p.promocion_vigente.fecha_fin,
         }
       : null,
+    actualizadoEn: p.actualizado_en ?? null,
+
   }
 }
 

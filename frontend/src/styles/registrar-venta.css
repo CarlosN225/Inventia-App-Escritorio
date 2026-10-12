@@ -1061,3 +1061,15 @@
   align-self: flex-start;
   margin: 2px 0 0;
 }
+/* "+ Bolsa (25)": agrega el empaque completo */
+.rv-mas-empaque {
+  border-color: #c9e4f8;
+  background: #eef6fd;
+  color: #0369a1;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rv-mas-empaque:hover {
+  border-color: #0369a1;
+}

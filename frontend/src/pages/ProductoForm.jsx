@@ -128,6 +128,11 @@ function validar(f, CONFIG) {
   if (f.piezasEmpaque !== '' && Number(f.piezasEmpaque) < 1) {
     errores.piezasEmpaque = 'Debe ser al menos 1'
   }
+  
+  if (f.piezasEmpaque !== '' && f.tipoEmpaque === f.unidad) {
+    errores.piezasEmpaque = 'Lo que te llega no puede ser igual a lo que vendes (ej. 1 bolsa = 20 bolsas)'
+  }
+
 
   // El mayoreo es opcional, pero si se llena se llenan los dos campos
   if (CONFIG.vende_mayoreo && (f.precioMayoreo !== '' || f.minimoMayoreo !== '')) {
@@ -232,6 +237,8 @@ export default function ProductoForm() {
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState(null) // null | 'no-encontrado' | mensaje
   const [ventasMes, setVentasMes] = useState(null) // { piezas, ingreso } de este producto en el mes
+  const [empaqueAbierto, setEmpaqueAbierto] = useState(false) // eligió un empaque pero aún no escribe cuántas trae
+
 
   const [usuarioActual, setUsuarioActual] = useState(null)
   const [cargandoUsuario, setCargandoUsuario] = useState(true)
@@ -544,6 +551,13 @@ export default function ProductoForm() {
     piezasEmpaque > 0 && minimoMayoreo > 0 && minimoMayoreo % piezasEmpaque === 0
       ? minimoMayoreo / piezasEmpaque
       : null
+  
+      // "Suelto" = no llega en empaque; se capturan las piezas directo al comprar
+  const llegaSuelto = form.piezasEmpaque === '' && !empaqueAbierto
+  const empaqueTexto = empaque.label.toLowerCase()
+  const empaqueCompleto = empaque.id === 'paquete' ? `el ${empaqueTexto} completo` : `la ${empaqueTexto} completa`
+  const precioMayoreoNum = Number(form.precioMayoreo) || 0
+
 
   const stockActual = Number(form.stock) || 0
   const stockMinimo = Number(form.minimo) || 0
@@ -924,11 +938,34 @@ export default function ProductoForm() {
                   </Campo>
                 </div>
 
-                <p className="pf-ayuda">
-                  Se aplica solo al registrar la venta, cuando se llega a la cantidad mínima.
-                  {empaquesMayoreo !== null &&
-                    ` ${minimoMayoreo} ${unidad.plural} = ${empaquesMayoreo} ${empaque.label.toLowerCase()}${empaquesMayoreo === 1 ? '' : 's'}.`}
-                </p>
+                {/* Atajo: el mayoreo empieza justo en el empaque completo */}
+                {piezasEmpaque > 1 && minimoMayoreo !== piezasEmpaque && (
+                  <button
+                    type="button"
+                    className="pf-atajo"
+                    onClick={() => cambiar('minimoMayoreo', String(piezasEmpaque))}
+                  >
+                    <Boxes size={14} aria-hidden="true" />
+                    Usar {empaqueCompleto} ({piezasEmpaque} {unidad.plural})
+                  </button>
+                )}
+
+                {precioMayoreoNum > 0 && minimoMayoreo > 0 ? (
+                  <p className="pf-frase">
+                    {empaquesMayoreo === 1
+                      ? `${empaqueCompleto.charAt(0).toUpperCase()}${empaqueCompleto.slice(1)}: `
+                      : `Desde ${minimoMayoreo} ${unidad.plural}: `}
+                    <strong>
+                      {minimoMayoreo} × {moneda.format(precioMayoreoNum)} = {moneda.format(minimoMayoreo * precioMayoreoNum)}
+                    </strong>
+                    {precio > 0 && <> (en lugar de {moneda.format(minimoMayoreo * precio)})</>}
+                  </p>
+                ) : (
+                  <p className="pf-ayuda">
+                    Se aplica solo al vender, cuando se llega a la cantidad mínima. Ideal para cobrar{' '}
+                    {piezasEmpaque > 1 ? empaqueCompleto : 'la caja completa'} a precio especial.
+                  </p>
+                )}
               </div>
             </Seccion>
           )}
@@ -936,9 +973,10 @@ export default function ProductoForm() {
           {/* Unidad y empaque */}
           <Seccion icono={Box} titulo="Unidad y empaque">
             <div className="pf-pila">
+              {/* 1. Lo que se lleva el cliente: es la unidad del stock */}
               <div className="pf-campo">
                 <span className="pf-etiqueta">
-                  Se vende por <span className="pf-requerido">*</span>
+                  ¿Cuál es lo mínimo que vendes? <span className="pf-requerido">*</span>
                 </span>
                 <div className="pf-segmentado" role="group" aria-label="Unidad de venta">
                   {UNIDADES.map((u) => (
@@ -953,56 +991,92 @@ export default function ProductoForm() {
                     </button>
                   ))}
                 </div>
+                <p className="pf-ayuda">
+                  Lo que se lleva el cliente cuando compra uno. Si a veces lo vendes suelto, elige <strong>Pieza</strong>:
+                  el stock se cuenta en esa unidad.
+                </p>
               </div>
 
-              <Campo
-                etiqueta="¿Cuántas trae cada empaque del proveedor?"
-                htmlFor="pf-empaque"
-                error={errores.piezasEmpaque}
-              >
-                <div className={'pf-grupo' + (errores.piezasEmpaque ? ' is-error' : '')}>
-                  <input
-                    id="pf-empaque"
-                    type="number"
-                    min="1"
-                    step="1"
-                    inputMode="numeric"
-                    placeholder="Ej. 30"
-                    value={form.piezasEmpaque}
-                    onChange={(e) => cambiar('piezasEmpaque', e.target.value)}
-                  />
-                  <span className="pf-grupo__extra">{unidad.plural}</span>
+              {/* 2. Cómo llega: nunca en lo mismo que se vende */}
+              <div className="pf-campo">
+                <span className="pf-etiqueta">¿Cómo te llega del proveedor?</span>
+                <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Cómo llega del proveedor">
+                  <button
+                    type="button"
+                    aria-pressed={llegaSuelto}
+                    className={'pf-segmentado__opcion' + (llegaSuelto ? ' is-activo' : '')}
+                    onClick={() => {
+                      setEmpaqueAbierto(false)
+                      cambiar('piezasEmpaque', '')
+                    }}
+                  >
+                    Suelto
+                  </button>
+                  {EMPAQUES.filter((e) => e.id !== form.unidad).map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      aria-pressed={!llegaSuelto && form.tipoEmpaque === e.id}
+                      className={
+                        'pf-segmentado__opcion' + (!llegaSuelto && form.tipoEmpaque === e.id ? ' is-activo' : '')
+                      }
+                      onClick={() => {
+                        setEmpaqueAbierto(true)
+                        cambiar('tipoEmpaque', e.id)
+                      }}
+                    >
+                      {e.label}
+                    </button>
+                  ))}
                 </div>
-              </Campo>
+              </div>
 
-              {piezasEmpaque > 0 ? (
-                <>
-                  <div className="pf-campo">
-                    <span className="pf-etiqueta">El proveedor lo manda en</span>
-                    <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Tipo de empaque">
-                      {EMPAQUES.map((e) => (
-                        <button
-                          key={e.id}
-                          type="button"
-                          aria-pressed={form.tipoEmpaque === e.id}
-                          className={'pf-segmentado__opcion' + (form.tipoEmpaque === e.id ? ' is-activo' : '')}
-                          onClick={() => cambiar('tipoEmpaque', e.id)}
-                        >
-                          {e.label}
-                        </button>
-                      ))}
-                    </div>
+              {/* 3. Cuántas trae (solo si llega en empaque) */}
+              {!llegaSuelto && (
+                <Campo
+                  etiqueta={`¿Cuántas ${unidad.plural} trae cada ${empaqueTexto}?`}
+                  htmlFor="pf-empaque"
+                  error={errores.piezasEmpaque}
+                >
+                  <div className={'pf-grupo' + (errores.piezasEmpaque ? ' is-error' : '')}>
+                    <input
+                      id="pf-empaque"
+                      type="number"
+                      min="2"
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="Ej. 25"
+                      value={form.piezasEmpaque}
+                      onChange={(e) => cambiar('piezasEmpaque', e.target.value)}
+                    />
+                    <span className="pf-grupo__extra">{unidad.plural}</span>
                   </div>
-
-                  <span className="pf-conversion">
-                    1 {empaque.label.toLowerCase()} = {piezasEmpaque} {unidad.plural}
-                  </span>
-                </>
-              ) : (
-                <p className="pf-ayuda">Ayuda a registrar compras por caja sin hacer cuentas.</p>
+                </Campo>
               )}
+
+              {/* La frase en vivo, para que no haya dudas */}
+              <p className="pf-frase">
+                {llegaSuelto ? (
+                  <>
+                    Te llega <strong>suelto</strong>: al registrar una compra capturas directo cuántas {unidad.plural}{' '}
+                    entraron.
+                  </>
+                ) : piezasEmpaque > 0 && form.tipoEmpaque !== form.unidad ? (
+                  <>
+                    Te llega <strong>1 {empaqueTexto} con {piezasEmpaque} {unidad.plural}</strong>. Puedes vender cada{' '}
+                    {unidad.label.toLowerCase()} o {empaqueCompleto}.
+                  </>
+                ) : form.tipoEmpaque === form.unidad ? (
+                  <>Elige cómo te llega: no puede ser igual a lo que vendes.</>
+                ) : (
+                  <>
+                    Escribe cuántas {unidad.plural} trae cada {empaqueTexto}.
+                  </>
+                )}
+              </p>
             </div>
           </Seccion>
+
 
           {/* Inventario */}
           <Seccion
@@ -1294,7 +1368,12 @@ export default function ProductoForm() {
                   <Plus size={15} aria-hidden="true" />
                   Agregar promoción
                 </button>
-              )}
+            
+              )} 
+               <p className="pf-ayuda-promos">
+                Puedes programar varias promociones en fechas distintas (ej. Día de Muertos, Navidad). Solo se aplica la
+                que está vigente hoy, y no se pueden encimar.
+              </p>
             </Seccion>
           )}
         </div>

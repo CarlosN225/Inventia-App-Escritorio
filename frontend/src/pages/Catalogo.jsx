@@ -18,6 +18,7 @@ import {
   History,
   EyeOff,
   Eye,
+  FileText,
   SearchX,
   PackageOpen,
   Loader2,
@@ -26,9 +27,11 @@ import {
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import FichaProducto from '../components/FichaProducto.jsx'
 import { useAjustes } from '../hooks/useConfiguracion'
 import { getUsuarioActual } from '../services/auth'
 import { listarProductos, cambiarActivoProducto, mensajeDeError } from '../services/productos'
+import { listarVentas } from '../services/ventas'
 import { notificar } from '../services/notificar'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/catalogo.css'
@@ -36,6 +39,13 @@ import '../styles/catalogo.css'
 const POR_PAGINA = 15
 const DIAS_AVISO_CADUCIDAD = 30 // solo si la configuración todavía no carga
 const MARGEN_BAJO = 25
+
+const ORDENES = [
+  { id: 'nombre', label: 'Nombre (A–Z)' },
+  { id: 'nombre-desc', label: 'Nombre (Z–A)' },
+  { id: 'vendidos', label: 'Más vendidos' },
+  { id: 'recientes', label: 'Recientes' },
+]
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 
@@ -96,7 +106,11 @@ function PastillaStock({ producto }) {
 
 function Caducidad({ producto, aviso = DIAS_AVISO_CADUCIDAD }) {
   if (!producto.caducidad) {
-    return <span className="cat-sin-fecha">Sin fecha de caducidad registrada</span>
+    return (
+      <span className="cat-sin-fecha" title="Sin fecha de caducidad registrada">
+        Sin fecha
+      </span>
+    )
   }
 
   const dias = producto.diasCaducar
@@ -145,6 +159,9 @@ export default function Catalogo() {
   const ajustes = useAjustes()
   const aviso = ajustes.diasAviso
   const conCaducidad = ajustes.maneja_caducidad
+  const conMayoreo = ajustes.vende_mayoreo
+  const conPromos = ajustes.maneja_promociones
+  const conCodigo = ajustes.usa_codigo_barras
 
   const [usuarioActual, setUsuarioActual] = useState(null)
   const [productos, setProductos] = useState([])
@@ -152,10 +169,14 @@ export default function Catalogo() {
   const [error, setError] = useState(null)
   const [aCambiar, setACambiar] = useState(null) // producto que se va a desactivar o reactivar
   const [resaltado, setResaltado] = useState(null) // id del producto recién guardado
+  const [fichaDe, setFichaDe] = useState(null) // el producto que se está viendo en la ficha
 
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState('Todas')
   const [estado, setEstado] = useState('todos')
+  const [orden, setOrden] = useState('nombre')
+  const [vendidos, setVendidos] = useState(() => new Map()) // id -> piezas vendidas en 30 días
+
   const [vista, setVista] = useState('tabla')
   const [pagina, setPagina] = useState(1)
   const [menuAbierto, setMenuAbierto] = useState(null)
@@ -197,6 +218,20 @@ export default function Catalogo() {
       .catch(() => setUsuarioActual(null))
 
     cargarProductos()
+
+    // Para "Más vendidos" y la ficha: piezas de los últimos 30 días (si falla, simplemente no se muestran)
+    listarVentas()
+      .then((ventas) => {
+        const desde = Date.now() - 30 * 24 * 60 * 60 * 1000
+        const piezas = new Map()
+        ventas
+          .filter((v) => new Date(v.fecha_venta).getTime() >= desde)
+          .forEach((v) =>
+            (v.detalles ?? []).forEach((d) => piezas.set(d.producto, (piezas.get(d.producto) || 0) + d.cantidad))
+          )
+        setVendidos(piezas)
+      })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -232,17 +267,6 @@ export default function Catalogo() {
   const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
   const desactivados = useMemo(() => productos.filter((p) => !p.activo), [productos])
 
-  // Lleva a la página del producto recién guardado y le quita el resaltado a los 3 segundos
-  useEffect(() => {
-    if (resaltado === null || cargando) return
-
-    const indice = activos.findIndex((p) => p.id === resaltado)
-    if (indice >= 0) setPagina(Math.floor(indice / POR_PAGINA) + 1)
-
-    const temporizador = setTimeout(() => setResaltado(null), 3000)
-    return () => clearTimeout(temporizador)
-  }, [resaltado, cargando, activos])
-
   const resumen = useMemo(
     () => ({
       total: activos.length,
@@ -271,8 +295,9 @@ export default function Catalogo() {
   const filtrados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
     const base = estado === 'desactivados' ? desactivados : activos
+    const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
 
-    return base.filter((p) => {
+    const lista = base.filter((p) => {
       if (texto && !normalizar(`${p.nombre} ${p.marca} ${p.descripcion}`).includes(texto)) return false
       if (categoria !== 'Todas' && p.categoria !== categoria) return false
       if (estado === 'bajo' && estadoStock(p) !== 'bajo') return false
@@ -280,7 +305,30 @@ export default function Catalogo() {
       if (estado === 'caducar' && !porCaducar(p, aviso)) return false
       return true
     })
-  }, [activos, desactivados, busqueda, categoria, estado, aviso])
+
+    return [...lista].sort((a, b) => {
+      if (orden === 'nombre-desc') return porNombre(b, a)
+      if (orden === 'vendidos') return (vendidos.get(b.id) || 0) - (vendidos.get(a.id) || 0) || porNombre(a, b)
+      if (orden === 'recientes') {
+        // Con fecha primero (la más nueva arriba); los que no tienen, del más nuevo al más viejo
+        const fa = a.actualizadoEn ? new Date(a.actualizadoEn).getTime() : 0
+        const fb = b.actualizadoEn ? new Date(b.actualizadoEn).getTime() : 0
+        return fb - fa || b.id - a.id
+      }
+      return porNombre(a, b)
+    })
+  }, [activos, desactivados, busqueda, categoria, estado, aviso, orden, vendidos])
+
+  // Lleva a la página del producto recién guardado y le quita el resaltado a los 3 segundos
+  useEffect(() => {
+    if (resaltado === null || cargando) return
+
+    const indice = filtrados.findIndex((p) => p.id === resaltado)
+    if (indice >= 0) setPagina(Math.floor(indice / POR_PAGINA) + 1)
+
+    const temporizador = setTimeout(() => setResaltado(null), 3000)
+    return () => clearTimeout(temporizador)
+  }, [resaltado, cargando, filtrados])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
@@ -317,6 +365,11 @@ export default function Catalogo() {
 
   function irAEditar(id) {
     navigate(`/catalogo/${id}/editar`)
+  }
+
+  function verFicha(producto) {
+    setMenuAbierto(null)
+    setFichaDe(producto)
   }
 
   function pedirCambioActivo(producto) {
@@ -446,6 +499,24 @@ export default function Catalogo() {
             </select>
           </label>
 
+          <label className="cat-estado">
+            <span className="cat-estado__etiqueta">Ordenar</span>
+            <select
+              value={orden}
+              onChange={(e) => {
+                setOrden(e.target.value)
+                setPagina(1)
+              }}
+              disabled={cargando || !!error}
+            >
+              {ORDENES.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="cat-segmentado" role="tablist" aria-label="Vista">
             <button
               type="button"
@@ -557,14 +628,14 @@ export default function Catalogo() {
             <thead>
               <tr>
                 <th className="cat-col-num">No.</th>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th className="is-der">Precio</th>
-                {esPropietario && <th className="is-der">Último costo</th>}
-                {esPropietario && <th className="is-der">Margen</th>}
-                <th>Stock</th>
-                {conCaducidad && <th>Caducidad</th>}
-                <th className="is-der">Acciones</th>
+                <th className="cat-col-producto">Producto</th>
+                <th className="cat-col-categoria">Categoría</th>
+                <th className="is-der cat-col-precio">Precio</th>
+                {esPropietario && <th className="is-der cat-col-costo">Último costo</th>}
+                {esPropietario && <th className="is-der cat-col-margen">Margen</th>}
+                <th className="cat-col-stock">Stock</th>
+                {conCaducidad && <th className="cat-col-caducidad">Caducidad</th>}
+                <th className="is-der cat-col-acciones">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -588,9 +659,15 @@ export default function Catalogo() {
                             {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                             {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
                           </p>
-                          {(p.marca || p.descripcion) && (
+                          {(p.marca || p.descripcion || orden === 'vendidos') && (
                             <p className="cat-producto__marca" title={p.descripcion || undefined}>
-                              {[p.marca, p.descripcion].filter(Boolean).join(' · ')}
+                              {[
+                                orden === 'vendidos' && `${vendidos.get(p.id) || 0} vendidas en 30 días`,
+                                p.marca,
+                                p.descripcion,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </p>
                           )}
                         </div>
@@ -620,6 +697,17 @@ export default function Catalogo() {
                     )}
                     <td className="is-der">
                       <div className="cat-acciones" ref={menuAbierto === p.id ? menuRef : null}>
+                        {/* Ver ficha: lo ven todos */}
+                        <button
+                          type="button"
+                          className="cat-icono-boton"
+                          title="Ver ficha"
+                          aria-label={`Ver ficha de ${p.nombre}`}
+                          onClick={() => verFicha(p)}
+                        >
+                          <Eye size={16} />
+                        </button>
+
                         {esPropietario && p.activo && (
                           <button
                             type="button"
@@ -631,6 +719,7 @@ export default function Catalogo() {
                             <Pencil size={16} />
                           </button>
                         )}
+
                         <button
                           type="button"
                           className="cat-icono-boton"
@@ -644,6 +733,10 @@ export default function Catalogo() {
 
                         {menuAbierto === p.id && (
                           <div className={'cat-menu' + (abreArriba ? ' cat-menu--arriba' : '')} role="menu">
+                            <button type="button" role="menuitem" onClick={() => verFicha(p)}>
+                              <FileText size={14} aria-hidden="true" />
+                              Ver ficha
+                            </button>
                             {esPropietario && p.activo && (
                               <button type="button" role="menuitem" onClick={() => irAEditar(p.id)}>
                                 <Pencil size={14} aria-hidden="true" />
@@ -722,18 +815,25 @@ export default function Catalogo() {
                     {conCaducidad && porCaducar(p, aviso) && <Caducidad producto={p} aviso={aviso} />}
                   </div>
 
-                  {esPropietario &&
-                    (p.activo ? (
-                      <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
-                        <Pencil size={14} aria-hidden="true" />
-                        Editar
-                      </button>
-                    ) : (
-                      <button type="button" className="cat-boton-secundario" onClick={() => pedirCambioActivo(p)}>
-                        <Eye size={14} aria-hidden="true" />
-                        Reactivar
-                      </button>
-                    ))}
+                  <div className="cat-tarjeta__botones">
+                    <button type="button" className="cat-boton-secundario" onClick={() => verFicha(p)}>
+                      <Eye size={14} aria-hidden="true" />
+                      Ver ficha
+                    </button>
+
+                    {esPropietario &&
+                      (p.activo ? (
+                        <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
+                          <Pencil size={14} aria-hidden="true" />
+                          Editar
+                        </button>
+                      ) : (
+                        <button type="button" className="cat-boton-secundario" onClick={() => pedirCambioActivo(p)}>
+                          <Eye size={14} aria-hidden="true" />
+                          Reactivar
+                        </button>
+                      ))}
+                  </div>
                 </article>
               )
             })}
@@ -789,6 +889,28 @@ export default function Catalogo() {
           </footer>
         )}
       </section>
+
+      {/* ============ FICHA DEL PRODUCTO ============ */}
+      {fichaDe && (
+        <FichaProducto
+          producto={fichaDe}
+          esPropietario={esPropietario}
+          conCaducidad={conCaducidad}
+          conMayoreo={conMayoreo}
+          conPromos={conPromos}
+          conCodigo={conCodigo}
+          aviso={aviso}
+          vendidas30={vendidos.get(fichaDe.id) || 0}
+          onCerrar={() => setFichaDe(null)}
+          onEditar={() => irAEditar(fichaDe.id)}
+          onVerMovimientos={() => navigate('/movimientos')}
+          onComprar={() =>
+            navigate('/registrar-compra', {
+              state: { agregar: { id: fichaDe.id, piezas: fichaDe.piezasEmpaque || 1 } },
+            })
+          }
+        />
+      )}
 
       <ConfirmDialog
         open={aCambiar !== null}

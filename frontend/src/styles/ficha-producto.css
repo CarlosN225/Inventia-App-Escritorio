@@ -1,0 +1,285 @@
+/* ============================================================
+   FICHA DEL PRODUCTO (todo en una sola vista)
+   ============================================================ */
+
+.fp {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(11, 18, 32, 0.45);
+  backdrop-filter: blur(3px);
+  animation: fp-fondo 0.18s ease-out;
+}
+
+.fp-caja {
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 30px 70px rgba(11, 18, 32, 0.3);
+  scrollbar-width: none;
+  animation: fp-entrar 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+.fp-caja::-webkit-scrollbar { display: none; }
+
+/* ---------- Encabezado ---------- */
+
+.fp-cabecera {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #eef1f5;
+  background: linear-gradient(135deg, #f5f9ff, #ffffff 60%);
+}
+
+.fp-foto {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #eef3fb;
+  color: #1668e3;
+}
+
+.fp-foto img { width: 100%; height: 100%; object-fit: cover; }
+
+.fp-titulos { flex: 1; min-width: 0; }
+
+.fp-nombre {
+  margin: 0;
+  color: #0b1220;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.fp-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fp-chip {
+  padding: 2px 8px;
+  border: 1px solid #e6eaf0;
+  border-radius: 6px;
+  background: #f1f4f9;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.fp-desc {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.fp-estado {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fp-estado span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.fp-estado.is-activo   { background: #e4f7ef; color: #047857; }
+.fp-estado.is-inactivo { background: #f1f4f9; color: #64748b; }
+
+.fp-cerrar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.fp-cerrar:hover { background: #f1f4f9; color: #0b1220; }
+
+/* ---------- Lo principal ---------- */
+
+.fp-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid #eef1f5;
+}
+
+.fp-kpis--dos { grid-template-columns: repeat(2, 1fr); }
+
+.fp-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  border-right: 1px solid #eef1f5;
+}
+
+.fp-kpi:last-child { border-right: none; }
+
+.fp-kpi span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fp-kpi strong {
+  color: #0b1220;
+  font-size: 21px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.fp-kpi small { color: #94a3b8; font-size: 12px; }
+
+.fp-kpi.is-rojo strong,  .fp-kpi.is-rojo small  { color: #dc2626; }
+.fp-kpi.is-ambar strong, .fp-kpi.is-ambar small { color: #b45309; }
+.fp-kpi.is-verde small { color: #047857; font-weight: 600; }
+
+/* ---------- Las 3 columnas ---------- */
+
+.fp-columnas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.fp-bloque {
+  padding: 12px 14px;
+  border: 1px solid #eef1f5;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.fp-bloque h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: #1668e3;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.fp-bloque dl { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+
+.fp-dato dt {
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.fp-dato dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 1px 0 0;
+  color: #0b1220;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.fp-dato dd.is-fuerte { font-size: 15px; font-weight: 800; }
+.fp-dato dd.is-azul   { color: #0369a1; }
+.fp-dato dd.is-rojo   { color: #dc2626; }
+.fp-dato dd.is-ambar  { color: #b45309; }
+.fp-dato dd.is-tenue  { color: #94a3b8; font-weight: 500; font-style: italic; }
+
+/* ---------- Pie ---------- */
+
+.fp-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #eef1f5;
+}
+
+.fp-editado {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.fp-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.fp-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0b1220;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fp-boton:hover { background: #f8fafc; }
+
+.fp-boton--primario {
+  border-color: transparent;
+  background: linear-gradient(135deg, #22c5b8, #1668e3);
+  color: #ffffff;
+}
+
+.fp-boton--primario:hover { background: linear-gradient(135deg, #22c5b8, #1668e3); }
+
+/* ---------- Animaciones ---------- */
+
+@keyframes fp-fondo { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes fp-entrar {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---------- Pantallas angostas ---------- */
+
+@media (max-width: 760px) {
+  .fp-kpis { grid-template-columns: repeat(2, 1fr); }
+  .fp-kpi:nth-child(2n) { border-right: none; }
+  .fp-columnas { grid-template-columns: 1fr; }
+}
