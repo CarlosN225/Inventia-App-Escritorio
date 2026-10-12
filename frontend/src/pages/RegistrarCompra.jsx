@@ -898,12 +898,13 @@ export default function RegistrarCompra() {
 
                         {CONFIG.maneja_caducidad && (
                           <label className={'rc-fecha' + (r.caducidadVencida ? ' is-error' : '')} title="Caducidad (opcional)">
-                            <CalendarDays size={13} aria-hidden="true" />
+                          <CalendarDays size={14} aria-hidden="true" />
                             <input
                               type="date"
+                              min={hoyISO()}
                               value={r.caducidad}
-                              onChange={(e) => actualizar(r.id, { caducidad: e.target.value })}
-                              aria-label={`Caducidad de ${r.producto.nombre} (opcional)`}
+                              onChange={(e) => cambiarCaducidad(r.id, e.target.value)}
+                              aria-label={`Caducidad de ${r.producto.nombre}`}
                             />
                           </label>
                         )}

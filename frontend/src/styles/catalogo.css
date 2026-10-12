@@ -1018,3 +1018,46 @@
   justify-content: center;
   width: 100%;
 }
+/* La etiqueta de caducidad cabe completa en su columna */
+.cat-tabla th.cat-col-caducidad {
+  width: 156px;
+}
+
+.cat-tabla .cat-caduca {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============ Varias categorías a la vez ============ */
+
+.cat-categoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cat-categorias__elegidas {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  color: #64748b;
+  font-size: 12.5px;
+}
+
+.cat-categorias__elegidas button {
+  padding: 2px 4px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: #1668e3;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cat-categorias__elegidas button:hover {
+  background: #eef3fb;
+}

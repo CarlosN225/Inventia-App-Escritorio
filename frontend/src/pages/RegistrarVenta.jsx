@@ -881,10 +881,12 @@ export default function RegistrarVenta() {
                   <Lock size={15} aria-hidden="true" />
                   <span>
                     <strong>Venta pausada:</strong>{' '}
-                    {conError.length === 1
-                      ? `corrige la cantidad de ${conError[0].producto.nombre} para poder confirmar`
-                      : `corrige ${conError.length} productos para poder confirmar`}
-                  </span>
+                                        {conError.length === 1
+                      ? conError[0].disponible === 0
+                        ? `${conError[0].producto.nombre} ya no tiene existencias. Quítalo del ticket para poder confirmar.`
+                        : `pediste ${conError[0].cantidad} ${textoUnidad(conError[0].producto.unidad, conError[0].cantidad)} de ${conError[0].producto.nombre}, pero solo hay ${conError[0].disponible}. Toca "Ajustar a ${conError[0].disponible}" o bájale la cantidad para poder confirmar.`
+                      : `${conError.length} productos piden más de lo que hay en inventario. Ajusta sus cantidades para poder confirmar.`}
+                    </span>
                 </div>
               )}
 
