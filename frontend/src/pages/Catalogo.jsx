@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Candy,
   X,
+  Check,
   History,
   EyeOff,
   Eye,
@@ -172,7 +173,7 @@ export default function Catalogo() {
   const [fichaDe, setFichaDe] = useState(null) // el producto que se está viendo en la ficha
 
   const [busqueda, setBusqueda] = useState('')
-  const [categoria, setCategoria] = useState('Todas')
+  const [elegidas, setElegidas] = useState(() => new Set()) // categorías elegidas; vacío = todas
   const [estado, setEstado] = useState('todos')
   const [orden, setOrden] = useState('nombre')
   const [vendidos, setVendidos] = useState(() => new Map()) // id -> piezas vendidas en 30 días
@@ -299,7 +300,7 @@ export default function Catalogo() {
 
     const lista = base.filter((p) => {
       if (texto && !normalizar(`${p.nombre} ${p.marca} ${p.descripcion}`).includes(texto)) return false
-      if (categoria !== 'Todas' && p.categoria !== categoria) return false
+      if (elegidas.size > 0 && !elegidas.has(p.categoria)) return false
       if (estado === 'bajo' && estadoStock(p) !== 'bajo') return false
       if (estado === 'agotado' && estadoStock(p) !== 'agotado') return false
       if (estado === 'caducar' && !porCaducar(p, aviso)) return false
@@ -317,8 +318,8 @@ export default function Catalogo() {
       }
       return porNombre(a, b)
     })
-  }, [activos, desactivados, busqueda, categoria, estado, aviso, orden, vendidos])
-
+  }, [activos, desactivados, busqueda, elegidas, estado, aviso, orden, vendidos])
+  
   // Lleva a la página del producto recién guardado y le quita el resaltado a los 3 segundos
   useEffect(() => {
     if (resaltado === null || cargando) return
@@ -334,8 +335,8 @@ export default function Catalogo() {
   const paginaActual = Math.min(pagina, totalPaginas)
   const inicio = (paginaActual - 1) * POR_PAGINA
   const visibles = filtrados.slice(inicio, inicio + POR_PAGINA)
-  const hayFiltros = busqueda !== '' || categoria !== 'Todas' || estado !== 'todos'
-
+  const hayFiltros = busqueda !== '' || elegidas.size > 0 || estado !== 'todos'
+  
   const sinProductos = !cargando && !error && productos.length === 0
   const sinResultados = !cargando && !error && !sinProductos && filtrados.length === 0
 
@@ -346,8 +347,14 @@ export default function Catalogo() {
     setPagina(1)
   }
 
-  function cambiarCategoria(valor) {
-    setCategoria(valor)
+   // Prende o apaga una categoría; "Todas" limpia la selección
+  function alternarCategoria(nombre) {
+    setElegidas((actual) => {
+      if (nombre === 'Todas') return new Set()
+      const copia = new Set(actual)
+      copia.has(nombre) ? copia.delete(nombre) : copia.add(nombre)
+      return copia
+    })
     setPagina(1)
   }
 
@@ -358,7 +365,7 @@ export default function Catalogo() {
 
   function limpiarFiltros() {
     setBusqueda('')
-    setCategoria('Todas')
+    setElegidas(new Set())    
     setEstado('todos')
     setPagina(1)
   }
@@ -541,29 +548,46 @@ export default function Catalogo() {
           </div>
         </div>
 
-        {categorias.length > 0 && estado !== 'desactivados' && (
-          <div className="cat-categorias">
+                {categorias.length > 0 && estado !== 'desactivados' && (
+          <div className="cat-categorias" role="group" aria-label="Filtrar por categorías">
             <button
               type="button"
-              className={'cat-categoria' + (categoria === 'Todas' ? ' is-activa' : '')}
-              onClick={() => cambiarCategoria('Todas')}
+              aria-pressed={elegidas.size === 0}
+              className={'cat-categoria' + (elegidas.size === 0 ? ' is-activa' : '')}
+              onClick={() => alternarCategoria('Todas')}
             >
               Todas<span className="cat-categoria__conteo">({activos.length})</span>
             </button>
 
-            {categorias.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={'cat-categoria' + (categoria === c ? ' is-activa' : '')}
-                onClick={() => cambiarCategoria(c)}
-              >
-                {c}
-                <span className="cat-categoria__conteo">({conteoCategorias[c] || 0})</span>
-              </button>
-            ))}
+            {categorias.map((c) => {
+              const prendida = elegidas.has(c)
+
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={prendida}
+                  className={'cat-categoria' + (prendida ? ' is-activa' : '')}
+                  onClick={() => alternarCategoria(c)}
+                >
+                  {prendida && <Check size={13} strokeWidth={3} aria-hidden="true" />}
+                  {c}
+                  <span className="cat-categoria__conteo">({conteoCategorias[c] || 0})</span>
+                </button>
+              )
+            })}
+
+            {elegidas.size > 0 && (
+              <span className="cat-categorias__elegidas">
+                {elegidas.size} {elegidas.size === 1 ? 'categoría elegida' : 'categorías elegidas'} ·{' '}
+                <button type="button" onClick={() => alternarCategoria('Todas')}>
+                  Quitar
+                </button>
+              </span>
+            )}
           </div>
         )}
+        
       </section>
 
       {/* ============ RESULTADOS ============ */}

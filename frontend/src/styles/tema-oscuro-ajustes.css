@@ -876,3 +876,19 @@ html:root[data-theme='dark'] .ay-faq__chevron {
 html:root[data-theme='dark'] .ay-faq__respuesta {
   color: #b0b0b0;
 }
+
+/* ============================================================
+   18. CATÁLOGO — varias categorías a la vez
+   ============================================================ */
+
+html:root[data-theme='dark'] .cat-categorias__elegidas {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .cat-categorias__elegidas button {
+  color: #7dd3fc;
+}
+
+html:root[data-theme='dark'] .cat-categorias__elegidas button:hover {
+  background: #1e2126;
+}
