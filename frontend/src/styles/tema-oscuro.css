@@ -4,27 +4,27 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-bg:           #0b1220;
-  --color-surface:      #131c2e;
-  --color-surface-2:    #182338;
-  --color-border:       #243148;
-  --color-border-2:     #31415d;
-  --color-text:         #e8edf6;
-  --color-text-muted:   #9aa8bf;
-  --color-text-soft:    #6f7f98;
+  --color-bg:           #121212;
+  --color-surface:      #1e1e1e;
+  --color-surface-2:    #262626;
+  --color-border:       #2e2e2e;
+  --color-border-2:     #3a3a3a;
+  --color-text:         #e0e0e0;
+  --color-text-muted:   #b0b0b0;
+  --color-text-soft:    #8a8a8a;
 
-  --color-brand:        #3b82f6;
-  --color-brand-soft:   #14284d;
+  --color-brand:        #5b8def;
+  --color-brand-soft:   #1b2638;
   --color-brand-ring:   rgba(90, 160, 255, 0.38);
 
-  --color-success:      #34d399;
-  --color-success-soft: #0f2d25;
-  --color-warning:      #fbbf24;
-  --color-warning-soft: #33250e;
-  --color-danger:       #f87171;
-  --color-danger-soft:  #3a1618;
-  --color-info:         #3b82f6;
-  --color-info-soft:    #14284d;
+  --color-success:      #4cc38a;
+  --color-success-soft: #15291f;
+  --color-warning:      #e5a54b;
+  --color-warning-soft: #2e2414;
+  --color-danger:       #f07171;
+  --color-danger-soft:  #331b1b;
+  --color-info:         #5b8def;
+  --color-info-soft:    #1b2638;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -32,8 +32,8 @@
   --shadow-4: 0 14px 38px rgba(0, 0, 0, 0.5), 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
-:root[data-theme='dark'] ::-webkit-scrollbar-thumb { background: #31415d; border-color: var(--color-bg); }
-:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: #41547a; }
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb { background: #3a3a3a; border-color: var(--color-bg); }
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
 
 /* ---------- Menú lateral ---------- */
 :root[data-theme='dark'] .sidebar {
@@ -44,7 +44,7 @@
       rgba(42, 169, 224, 0.07) 40%,
       rgba(22, 104, 227, 0.03) 70%,
       rgba(0, 0, 0, 0) 100%),
-    linear-gradient(180deg, #0f1828 0%, #0d1524 55%, #101a2c 100%);
+    linear-gradient(180deg, #181818 0%, #161616 55%, #181818 100%);
 }
 :root[data-theme='dark'] .sidebar__footer { border-top-color: var(--color-border); }
 :root[data-theme='dark'] .sidebar__link:hover { background: rgba(255, 255, 255, 0.06); }
@@ -55,17 +55,17 @@
 
 /* ---------- Barra superior ---------- */
 :root[data-theme='dark'] .topbar {
-  --tb-fondo-inicio: #0f1828;
-  --tb-fondo-medio:  #0f1828;
-  --tb-fondo-fin:    #0d1524;
-  --tb-borde:        #243148;
-  --tb-borde-2:      #1c2840;
-  --tb-azul:         #3b82f6;
-  --tb-marino:       #e8edf6;
-  --tb-gris:         #9aa8bf;
-  --tb-gris-2:       #6f7f98;
-  --tb-verde:        #34d399;
-  --tb-rojo:         #f87171;
+  --tb-fondo-inicio: #181818;
+  --tb-fondo-medio:  #181818;
+  --tb-fondo-fin:    #161616;
+  --tb-borde:        #2e2e2e;
+  --tb-borde-2:      #262626;
+  --tb-azul:         #5b8def;
+  --tb-marino:       #e0e0e0;
+  --tb-gris:         #b0b0b0;
+  --tb-gris-2:       #8a8a8a;
+  --tb-verde:        #4cc38a;
+  --tb-rojo:         #f07171;
 }
 :root[data-theme='dark'] .topbar__negocio-icono,
 :root[data-theme='dark'] .topbar__sync {
@@ -75,7 +75,7 @@
 :root[data-theme='dark'] .topbar__fecha { color: var(--color-text-muted); }
 :root[data-theme='dark'] .topbar__conexion.is-en-linea {
   background: var(--color-success-soft);
-  border-color: #14532d;
+  border-color: #1f4d36;
 }
 :root[data-theme='dark'] .topbar__perfil.is-open { border-color: var(--color-brand); }
 :root[data-theme='dark'] .user-menu {
@@ -92,16 +92,16 @@
 
 /* Paleta local del Catálogo */
 :root[data-theme='dark'] .cat {
-  --d-azul:    #3b82f6;
-  --d-marino:  #e8edf6;
-  --d-gris:    #9aa8bf;
-  --d-gris-2:  #6f7f98;
-  --d-gris-3:  #41547a;
-  --d-borde:   #243148;
-  --d-borde-2: #1c2840;
-  --d-verde:   #34d399;
-  --d-ambar:   #fbbf24;
-  --d-rojo:    #f87171;
+  --d-azul:    #5b8def;
+  --d-marino:  #e0e0e0;
+  --d-gris:    #b0b0b0;
+  --d-gris-2:  #8a8a8a;
+  --d-gris-3:  #4a4a4a;
+  --d-borde:   #2e2e2e;
+  --d-borde-2: #262626;
+  --d-verde:   #4cc38a;
+  --d-ambar:   #e5a54b;
+  --d-rojo:    #f07171;
 }
 
 /* Paneles, tarjetas y menús (antes #ffffff) */
@@ -114,8 +114,8 @@
 
 /* Chips de resumen (50 productos, stock bajo, agotados, por caducar) */
 :root[data-theme='dark'] .cat-resumen__chip:hover { border-color: var(--color-border-2); }
-:root[data-theme='dark'] .cat-resumen__chip--bajo    { background: #33250e; border-color: #5b3f12; color: #fbbf24; }
-:root[data-theme='dark'] .cat-resumen__chip--agotado { background: #3a1618; border-color: #5c2326; color: #f87171; }
+:root[data-theme='dark'] .cat-resumen__chip--bajo    { background: #2e2414; border-color: #5b3f12; color: #e5a54b; }
+:root[data-theme='dark'] .cat-resumen__chip--agotado { background: #331b1b; border-color: #5c2326; color: #f07171; }
 :root[data-theme='dark'] .cat-resumen__chip--caducar { background: #3a1620; border-color: #5c2333; color: #fb7185; }
 
 /* Buscador y filtro de estado */
@@ -160,11 +160,11 @@
 }
 
 /* Etiquetas de stock y caducidad */
-:root[data-theme='dark'] .cat-stock--ok      { background: #0f2d25; border-color: #14532d; color: #34d399; }
-:root[data-theme='dark'] .cat-stock--bajo    { background: #33250e; border-color: #5b3f12; color: #fbbf24; }
-:root[data-theme='dark'] .cat-stock--agotado { background: #3a1618; border-color: #5c2326; color: #f87171; }
-:root[data-theme='dark'] .cat-caduca { background: #33250e; color: #fbbf24; }
-:root[data-theme='dark'] .cat-caduca.is-urgente { background: #3a1618; color: #f87171; }
+:root[data-theme='dark'] .cat-stock--ok      { background: #15291f; border-color: #1f4d36; color: #4cc38a; }
+:root[data-theme='dark'] .cat-stock--bajo    { background: #2e2414; border-color: #5b3f12; color: #e5a54b; }
+:root[data-theme='dark'] .cat-stock--agotado { background: #331b1b; border-color: #5c2326; color: #f07171; }
+:root[data-theme='dark'] .cat-caduca { background: #2e2414; color: #e5a54b; }
+:root[data-theme='dark'] .cat-caduca.is-urgente { background: #331b1b; color: #f07171; }
 
 /* Acciones por fila y menú de tres puntos */
 :root[data-theme='dark'] .cat-icono-boton:hover { background: var(--color-surface-2); }

@@ -10,7 +10,8 @@ import './styles/components.css'
 // CAMBIO 1: estilos del tema oscuro y función que arranca el tema
 import './styles/tema-oscuro-pantallas.css'
 import './styles/tema-oscuro.css'
-import './styles/tema-oscuro.css'
+import './styles/tema-oscuro-ajustes.css'
+
 import { iniciarTema } from './services/tema'
 
 // CAMBIO 2: aplica el tema guardado (claro, oscuro o automático) antes de dibujar la app

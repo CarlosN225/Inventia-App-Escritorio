@@ -1,0 +1,878 @@
+/* ============================================================
+   MODO OSCURO — AJUSTES FINOS
+   Va ENCIMA de tema-oscuro-pantallas.css.
+   ============================================================ */
+
+html:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* ============================================================
+   1. LOGIN — quitar el brillo azul, fondo sobrio y neutro
+   ============================================================ */
+
+html:root[data-theme='dark'] .login-screen {
+  background: #0d0f12;
+}
+
+html:root[data-theme='dark'] .login-hero {
+  background:
+    radial-gradient(700px 500px at 0% 0%, rgba(34, 197, 184, 0.06), transparent 60%),
+    radial-gradient(700px 500px at 100% 100%, rgba(22, 104, 227, 0.05), transparent 60%),
+    #0d0f12;
+}
+
+html:root[data-theme='dark'] .login-hero::after {
+  background: linear-gradient(90deg, transparent 0%, #0d0f12 100%);
+}
+
+html:root[data-theme='dark'] .login-panel {
+  background: #0d0f12;
+}
+
+/* El botón "Iniciar sesión" en oscuro: color plano, sin gradiente chillón */
+html:root[data-theme='dark'] .login-submit {
+  background: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+html:root[data-theme='dark'] .login-submit:hover {
+  background: #2563eb;
+  filter: none;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
+}
+
+html:root[data-theme='dark'] .login-form__brand {
+  background: linear-gradient(135deg, #6ee7b7 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Los iconos de las features más suaves */
+html:root[data-theme='dark'] .login-hero__feature-icon {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #7dd3fc;
+}
+
+/* ============================================================
+   2. SIDEBAR — quitar brillo verde/cyan, fondo neutro
+   ============================================================ */
+
+html:root[data-theme='dark'] .sidebar {
+  background:
+    linear-gradient(180deg, #16181d 0%, #14161a 55%, #16181d 100%);
+  border-right: 1px solid #26282e;
+}
+
+/* El link activo, sin glow */
+html:root[data-theme='dark'] .sidebar__link.is-active {
+  background: #1e2126;
+  color: #7dd3fc;
+  box-shadow: none;
+}
+
+html:root[data-theme='dark'] .sidebar__link.is-active svg {
+  color: #7dd3fc;
+}
+
+html:root[data-theme='dark'] .sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* El botón "Contraer" más sobrio */
+html:root[data-theme='dark'] .sidebar__toggle {
+  background: #1a1d22;
+  border-color: #26282e;
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .sidebar__toggle:hover {
+  background: #1e2126;
+  border-color: #333640;
+  color: #e0e0e0;
+}
+
+/* ============================================================
+   3. DASHBOARD — suavizar el rojo de "Kinder Bueno" (fila error)
+   ============================================================ */
+
+html:root[data-theme='dark'] .dash-tabla__cantidad.is-resta,
+html:root[data-theme='dark'] .dash-tabla tbody tr:hover {
+  /* que no se intensifique tanto al hacer hover */
+  filter: none;
+}
+
+html:root[data-theme='dark'] .dash-tabla__cantidad.is-resta {
+  color: #f0a0a0;
+}
+
+/* Los chips de tipo */
+html:root[data-theme='dark'] .dash-tipo--merma {
+  background: rgba(240, 113, 113, 0.12);
+  border-color: rgba(240, 113, 113, 0.28);
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .dash-tipo--venta {
+  background: rgba(91, 141, 239, 0.12);
+  border-color: rgba(91, 141, 239, 0.28);
+  color: #90a8e8;
+}
+
+html:root[data-theme='dark'] .dash-tipo--compra {
+  background: rgba(76, 195, 138, 0.12);
+  border-color: rgba(76, 195, 138, 0.28);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .dash-tipo--correccion {
+  background: rgba(169, 155, 240, 0.12);
+  border-color: rgba(169, 155, 240, 0.28);
+  color: #b8acf5;
+}
+
+/* ============================================================
+   4. BOTONES PRIMARIOS — quitar gradiente, color plano y sobrio
+   ============================================================ */
+
+html:root[data-theme='dark'] .rv-confirmar,
+html:root[data-theme='dark'] .rv-confirmar:not(:disabled) {
+  background: #3b82f6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+}
+
+html:root[data-theme='dark'] .rv-confirmar:hover:not(:disabled) {
+  background: #2563eb;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+}
+
+html:root[data-theme='dark'] .rv-confirmar:disabled {
+  background: #2a3756;
+  color: #6b7280;
+  box-shadow: none;
+}
+
+/* Igual para otros botones primarios (por si los hay) */
+html:root[data-theme='dark'] .cat-boton-primario,
+html:root[data-theme='dark'] .ci-boton--primario,
+html:root[data-theme='dark'] .cf-boton--primario,
+html:root[data-theme='dark'] .ay-boton,
+html:root[data-theme='dark'] .ma-boton--primario,
+html:root[data-theme='dark'] .mp-boton--primario,
+html:root[data-theme='dark'] .rm-boton--primario {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+}
+
+html:root[data-theme='dark'] .cat-boton-primario:hover,
+html:root[data-theme='dark'] .ci-boton--primario:hover:not(:disabled),
+html:root[data-theme='dark'] .cf-boton--primario:hover:not(:disabled),
+html:root[data-theme='dark'] .ay-boton:hover,
+html:root[data-theme='dark'] .ma-boton--primario:hover,
+html:root[data-theme='dark'] .mp-boton--primario:hover:not(:disabled),
+html:root[data-theme='dark'] .rm-boton--primario:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+}
+
+/* ============================================================
+   5. TABLAS — bordes más suaves, sin líneas azules chillando
+   ============================================================ */
+
+html:root[data-theme='dark'] .hi .hi-tabla th,
+html:root[data-theme='dark'] .hi .hi-tabla td {
+  border-color: #23262d;
+}
+
+html:root[data-theme='dark'] .hi .hi-tabla tbody tr.hi-fila:hover {
+  background: #1c1f24;
+}
+
+html:root[data-theme='dark'] .hi .hi-tabla tbody tr.hi-fila.is-abierta {
+  background: #1c1f24;
+}
+
+/* Igual para todas las tablas */
+html:root[data-theme='dark'] .cat .cat-tabla th,
+html:root[data-theme='dark'] .cat .cat-tabla td,
+html:root[data-theme='dark'] .ci .ci-tabla th,
+html:root[data-theme='dark'] .ci .ci-tabla td,
+html:root[data-theme='dark'] .cf .cf-tabla th,
+html:root[data-theme='dark'] .cf .cf-tabla td,
+html:root[data-theme='dark'] .dash-tabla th,
+html:root[data-theme='dark'] .dash-tabla td {
+  border-color: #23262d;
+}
+
+html:root[data-theme='dark'] .cat .cat-tabla tbody tr:hover,
+html:root[data-theme='dark'] .ci .ci-tabla tbody tr:hover,
+html:root[data-theme='dark'] .cf .cf-tabla tbody tr:hover,
+html:root[data-theme='dark'] .dash-tabla tbody tr:hover {
+  background: #1c1f24;
+}
+
+/* ============================================================
+   6. ALERTAS — quitar la barra verde del cuadro de WhatsApp
+   ============================================================ */
+
+html:root[data-theme='dark'] .al-wa {
+  border: 1px solid #23262d;
+  background: #181a1f;
+  box-shadow: none;
+}
+
+html:root[data-theme='dark'] .al-wa__icono {
+  background: rgba(76, 195, 138, 0.12);
+  color: #4cc38a;
+}
+
+html:root[data-theme='dark'] .al-wa__estado {
+  border-left: 1px solid #23262d;
+}
+
+/* ============================================================
+   7. BORDES DEL SISTEMA — gris neutro, no azul
+   ============================================================ */
+
+html:root[data-theme='dark'] .ci-barra,
+html:root[data-theme='dark'] .cf-barra {
+  border-color: #23262d;
+}
+
+html:root[data-theme='dark'] .ci-panel,
+html:root[data-theme='dark'] .cf-panel,
+html:root[data-theme='dark'] .rv-panel,
+html:root[data-theme='dark'] .cat-panel,
+html:root[data-theme='dark'] .hi-panel,
+html:root[data-theme='dark'] .al-panel {
+  border-color: #23262d;
+}
+
+/* ============================================================
+   8. ERRORES EN ROJO — tonos más suaves, sin saturar
+   ============================================================ */
+
+html:root[data-theme='dark'] .rv-renglon.is-error {
+  border-color: rgba(248, 113, 113, 0.32);
+  background: rgba(248, 113, 113, 0.06);
+  box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.7);
+}
+
+html:root[data-theme='dark'] .rv-renglon__error,
+html:root[data-theme='dark'] .rv-espera {
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .rv-renglon.is-error .rv-cantidad input {
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .rv-renglon.is-error .rv-boton-chico {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: transparent;
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .rv-aviso-error {
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.06);
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .rv-aviso-error strong,
+html:root[data-theme='dark'] .rv-aviso-error svg {
+  color: #f0a0a0;
+}
+
+/* ============================================================
+   9. BUSCADORES con tinte azul muy suave (no chillón)
+   ============================================================ */
+
+html:root[data-theme='dark'] .hi-buscador input,
+html:root[data-theme='dark'] .cat-buscador input,
+html:root[data-theme='dark'] .rv-buscador input,
+html:root[data-theme='dark'] .ci-buscador input {
+  border: 1px solid #23262d;
+  background: #181a1f;
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .hi-buscador input::placeholder,
+html:root[data-theme='dark'] .cat-buscador input::placeholder,
+html:root[data-theme='dark'] .rv-buscador input::placeholder,
+html:root[data-theme='dark'] .ci-buscador input::placeholder {
+  color: #6b7280;
+}
+
+html:root[data-theme='dark'] .hi-buscador input:focus,
+html:root[data-theme='dark'] .cat-buscador input:focus,
+html:root[data-theme='dark'] .rv-buscador input:focus,
+html:root[data-theme='dark'] .ci-buscador input:focus {
+  border-color: #3b82f6;
+  background: #181a1f;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+
+html:root[data-theme='dark'] .hi-buscador__icono,
+html:root[data-theme='dark'] .cat-buscador__icono,
+html:root[data-theme='dark'] .rv-buscador__icono,
+html:root[data-theme='dark'] .ci-buscador__icono {
+  color: #6b7280;
+}
+
+/* ============================================================
+   10. VISTA PREVIA DE WHATSAPP — respetar los colores reales
+   ============================================================ */
+
+html:root[data-theme='dark'] .al-chat {
+  border: 1px solid #23262d;
+  background: #0a0f14;
+}
+
+html:root[data-theme='dark'] .al-chat__cabecera {
+  background: #1f2c33;
+}
+
+html:root[data-theme='dark'] .al-chat__avatar {
+  background: #00a884;
+  color: #ffffff;
+}
+
+html:root[data-theme='dark'] .al-chat__nombre { color: #e9edef; }
+html:root[data-theme='dark'] .al-chat__sub { color: #8696a0; }
+html:root[data-theme='dark'] .al-chat__fondo { background: #0a0f14; }
+html:root[data-theme='dark'] .al-chat__fecha {
+  background: #182229;
+  color: #8696a0;
+}
+
+html:root[data-theme='dark'] .al-burbuja {
+  background: #005c4b;
+  color: #e9edef;
+}
+
+html:root[data-theme='dark'] .al-burbuja strong { color: #ffffff; }
+html:root[data-theme='dark'] .al-burbuja li { color: #e9edef; }
+html:root[data-theme='dark'] .al-burbuja__mas { color: #a7d1c8; }
+html:root[data-theme='dark'] .al-burbuja__hora { color: #8fbfb5; }
+html:root[data-theme='dark'] .al-burbuja__hora svg { color: #53bdeb; }
+
+/* ============================================================
+   11. AVATAR del topbar — sin gradiente chillón
+   ============================================================ */
+
+html:root[data-theme='dark'] .topbar__avatar {
+  background: linear-gradient(135deg, #4b91e8, #5b8def);
+  box-shadow: none;
+}
+
+/* ============================================================
+   12. Autofill gris oscuro (evita el amarillo/azul de Chrome)
+   ============================================================ */
+
+html:root[data-theme='dark'] input:-webkit-autofill,
+html:root[data-theme='dark'] input:-webkit-autofill:hover,
+html:root[data-theme='dark'] input:-webkit-autofill:focus,
+html:root[data-theme='dark'] input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #181a1f inset !important;
+  -webkit-text-fill-color: #e0e0e0 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ============================================================
+   13. SCROLLBAR del sistema
+   ============================================================ */
+
+html:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #33363d;
+  border: 2px solid #16181d;
+}
+
+html:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: #454850;
+}
+
+/* ============================================================
+   14. TOPBAR — mismo tono sobrio que el sidebar
+   ============================================================ */
+
+/* Barra superior: fondo plano igual al sidebar */
+html:root[data-theme='dark'] .topbar {
+  background: #16181d;
+  border-bottom: 1px solid #23262d;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Título "Dulcería: Los Querubines" */
+html:root[data-theme='dark'] .topbar__title {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .topbar__subtitle,
+html:root[data-theme='dark'] .topbar__negocio {
+  color: #8b919a;
+}
+
+/* Icono del negocio (el cuadrito con el panecillo) */
+html:root[data-theme='dark'] .topbar__negocio-icono {
+  background: #1e2126;
+  border-color: #23262d;
+  color: #7dd3fc;
+}
+
+/* Chip de fecha */
+html:root[data-theme='dark'] .topbar__fecha {
+  background: #1a1d22;
+  border-color: #23262d;
+  color: #b0b0b0;
+}
+
+html:root[data-theme='dark'] .topbar__fecha svg {
+  color: #7dd3fc;
+}
+
+/* Chip de conexión ("En línea") */
+html:root[data-theme='dark'] .topbar__conexion,
+html:root[data-theme='dark'] .topbar__conexion.is-online {
+  background: #1a1d22;
+  border: 1px solid #23262d;
+  color: #4cc38a;
+  box-shadow: none;
+}
+
+html:root[data-theme='dark'] .topbar__conexion.is-offline {
+  background: #1a1d22;
+  border-color: rgba(240, 113, 113, 0.35);
+  color: #f0a0a0;
+}
+
+/* El botón de sincronizar (el círculo con las flechas) */
+html:root[data-theme='dark'] .topbar__sync {
+  background: #1a1d22;
+  border-color: #23262d;
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .topbar__sync:hover {
+  background: #1e2126;
+  border-color: #333640;
+  color: #e0e0e0;
+}
+
+/* Avatar de usuario — quitar el gradiente chillón */
+html:root[data-theme='dark'] .topbar__avatar {
+  background: #3b82f6;
+  box-shadow: none;
+}
+
+/* El botón del avatar (el que envuelve al círculo "AM") */
+html:root[data-theme='dark'] .topbar__avatar-btn {
+  background: transparent;
+  border-color: transparent;
+}
+
+html:root[data-theme='dark'] .topbar__avatar-btn:hover,
+html:root[data-theme='dark'] .topbar__avatar-btn.is-open {
+  background: #1e2126;
+  border-color: #23262d;
+}
+
+html:root[data-theme='dark'] .topbar__chevron {
+  color: #6b7280;
+}
+
+/* Menú del usuario — coherente con el topbar */
+html:root[data-theme='dark'] .user-menu {
+  background: #1a1d22;
+  border-color: #23262d;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+html:root[data-theme='dark'] .user-menu__header {
+  background: transparent;
+}
+
+html:root[data-theme='dark'] .user-menu__divider {
+  background: #23262d;
+}
+
+html:root[data-theme='dark'] .user-menu__item {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .user-menu__item:hover {
+  background: #23262d;
+  color: #7dd3fc;
+}
+
+html:root[data-theme='dark'] .user-menu__item--danger {
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .user-menu__item--danger:hover {
+  background: rgba(240, 113, 113, 0.1);
+  color: #f0a0a0;
+}
+
+/* Iconos del menú */
+html:root[data-theme='dark'] .user-menu svg {
+  color: currentColor;
+}
+
+/* ============================================================
+   15. DASHBOARD — tooltip del gráfico en oscuro
+   ============================================================ */
+
+/* La caja flotante que muestra el valor de la barra más alta */
+html:root[data-theme='dark'] .dash-chart__valor {
+  background: #2a2d33;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  border: 1px solid #3a3d44;
+}
+
+html:root[data-theme='dark'] .dash-chart__valor::after {
+  border-top-color: #2a2d33;
+}
+
+/* La rejilla del gráfico más sutil */
+html:root[data-theme='dark'] .dash-chart__linea {
+  border-top-color: #23262d;
+}
+
+/* Los números del eje */
+html:root[data-theme='dark'] .dash-chart__eje {
+  color: #6b7280;
+}
+
+/* Los días debajo de las barras */
+html:root[data-theme='dark'] .dash-chart__dia {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .dash-chart__dia.is-max {
+  color: #7dd3fc;
+}
+
+/* ============================================================
+   16. MI PERFIL — ajustes visuales en oscuro
+   ============================================================ */
+
+/* La tarjeta superior con degradado azul → ahora sobria */
+html:root[data-theme='dark'] .mp-tarjeta {
+  background: #181a1f;
+  border: 1px solid #23262d;
+}
+
+/* Avatar en la tarjeta — sin glow azul */
+html:root[data-theme='dark'] .mp-avatar {
+  background: #3b82f6;
+  border: 3px solid #181a1f;
+  box-shadow: none;
+}
+
+/* Rol "Propietario" — sin brillo */
+html:root[data-theme='dark'] .mp-rol--propietario,
+html:root[data-theme='dark'] .mp-rol--encargado {
+  background: #1e2126;
+  border-color: #2a2d33;
+  color: #b8acf5;
+}
+
+html:root[data-theme='dark'] .mp-rol--encargado {
+  color: #90a8e8;
+}
+
+/* Paneles — bordes más suaves */
+html:root[data-theme='dark'] .mp-panel {
+  border-color: #23262d;
+}
+
+/* Headers de tarjeta */
+html:root[data-theme='dark'] .mp-cabecera {
+  border-bottom-color: #23262d;
+}
+
+html:root[data-theme='dark'] .mp-cabecera__icono {
+  background: #1e2126;
+  color: #7dd3fc;
+}
+
+/* Inputs bloqueados (Correo, Rol) — se veían muy oscuros y con poca jerarquía */
+html:root[data-theme='dark'] .mp-input-grupo.is-bloqueado {
+  background: #1a1d22;
+  border-color: #23262d;
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .mp-input-grupo.is-bloqueado input {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .mp-input-grupo.is-bloqueado svg {
+  color: #6b7280;
+}
+
+/* El enlace "Se cambia en Configuración › Usuarios" */
+html:root[data-theme='dark'] .mp-enlace {
+  color: #7dd3fc;
+}
+
+/* La medidor de contraseña — barras más sutiles */
+html:root[data-theme='dark'] .mp-medidor__barras span {
+  background: #23262d;
+}
+
+/* Los checks "Al menos 8 caracteres", etc. */
+html:root[data-theme='dark'] .mp-reglas li {
+  color: #6b7280;
+}
+
+html:root[data-theme='dark'] .mp-reglas li.is-ok {
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .mp-reglas li.is-ok .mp-reglas__icono {
+  background: rgba(76, 195, 138, 0.15);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .mp-reglas__icono {
+  background: #23262d;
+}
+
+/* Botón "Cambiar contraseña" */
+html:root[data-theme='dark'] .mp-boton--primario {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+html:root[data-theme='dark'] .mp-boton--primario:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+/* Sección "Lo que puedes hacer" — los checks */
+html:root[data-theme='dark'] .mp-permisos li {
+  color: #b0b0b0;
+}
+
+html:root[data-theme='dark'] .mp-permisos li.is-no {
+  color: #6b7280;
+}
+
+html:root[data-theme='dark'] .mp-si {
+  background: rgba(76, 195, 138, 0.15);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .mp-no {
+  background: #23262d;
+  color: #6b7280;
+}
+
+/* Actividad reciente — chips de tipo y cantidades */
+html:root[data-theme='dark'] .mp-tipo--venta {
+  background: rgba(91, 141, 239, 0.12);
+  border-color: rgba(91, 141, 239, 0.28);
+  color: #90a8e8;
+}
+
+html:root[data-theme='dark'] .mp-tipo--compra {
+  background: rgba(76, 195, 138, 0.12);
+  border-color: rgba(76, 195, 138, 0.28);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .mp-tipo--merma {
+  background: rgba(240, 113, 113, 0.12);
+  border-color: rgba(240, 113, 113, 0.28);
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .mp-tipo--correccion {
+  background: rgba(169, 155, 240, 0.12);
+  border-color: rgba(169, 155, 240, 0.28);
+  color: #b8acf5;
+}
+
+html:root[data-theme='dark'] .mp-cantidad--entra {
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .mp-cantidad--sale {
+  color: #f0a0a0;
+}
+
+/* Los items de actividad reciente */
+html:root[data-theme='dark'] .mp-actividad li {
+  border-bottom-color: #23262d;
+}
+
+/* El enlace "Ver todo en Historial" */
+html:root[data-theme='dark'] .mp-ver-todo {
+  border-top-color: #23262d;
+}
+/* ============================================================
+   17. AYUDA — header, guías y teclas bien definidas en oscuro
+   ============================================================ */
+
+/* ---------- Header con fondo sobrio ---------- */
+html:root[data-theme='dark'] .ay-encabezado {
+  background: #181a1f;
+  border: 1px solid #23262d;
+}
+
+html:root[data-theme='dark'] .ay-titulo {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .ay-subtitulo {
+  color: #8b919a;
+}
+
+/* ---------- Los 6 cuadritos de "Guías rápidas" ---------- */
+
+html:root[data-theme='dark'] .ay-guia {
+  background: #181a1f;
+  border-color: #23262d;
+}
+
+html:root[data-theme='dark'] .ay-guia:hover {
+  border-color: #3a3d44;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+html:root[data-theme='dark'] .ay-guia__titulo {
+  color: #e0e0e0;
+}
+
+/* La descripción debajo del título: subir contraste */
+html:root[data-theme='dark'] .ay-guia__desc {
+  color: #b0b0b0;
+}
+
+html:root[data-theme='dark'] .ay-guia__icono {
+  background: #1e2126;
+  color: #7dd3fc;
+}
+
+/* Etiqueta "Solo propietario" */
+html:root[data-theme='dark'] .ay-propietario {
+  background: #1e2126;
+  border-color: #2a2d33;
+  color: #b8acf5;
+}
+
+/* ---------- Panel "Atajos de teclado" ---------- */
+
+html:root[data-theme='dark'] .ay-atajos li {
+  border-bottom-color: #23262d;
+}
+
+/* El texto de al lado de cada tecla */
+html:root[data-theme='dark'] .ay .ay-atajos .ay-atajos__texto,
+html:root[data-theme='dark'] .ay .ay-atajos li > *:not(.ay-teclas):not(kbd) {
+  color: #d0d0d0 !important;
+}
+
+/* Las teclas — diseño real de tecla física */
+html:root[data-theme='dark'] .ay-tecla,
+html:root[data-theme='dark'] .ay kbd.ay-tecla {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px !important;
+  height: 28px;
+  padding: 0 10px !important;
+  border: 1px solid #35383f !important;
+  border-radius: 7px !important;
+  background: linear-gradient(180deg, #2a2d34 0%, #1e2126 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 0 #15171b,
+    0 3px 6px rgba(0, 0, 0, 0.4) !important;
+  color: #f0f0f0 !important;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0.03em;
+  -webkit-text-fill-color: #f0f0f0 !important;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  vertical-align: middle;
+}
+
+/* Contenedor de las teclas (cuando hay dos, como ↑↓) */
+html:root[data-theme='dark'] .ay-teclas {
+  display: inline-flex;
+  gap: 5px;
+  min-width: 92px;
+}
+
+/* ---------- Panel "¿Necesitas más ayuda?" ---------- */
+
+html:root[data-theme='dark'] .ay-contacto__texto {
+  color: #b0b0b0;
+}
+
+html:root[data-theme='dark'] .ay-contacto__datos li {
+  color: #d0d0d0;
+}
+
+html:root[data-theme='dark'] .ay-contacto__datos strong {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .ay-contacto__datos svg {
+  color: #7dd3fc;
+}
+
+html:root[data-theme='dark'] .ay-version {
+  color: #6b7280;
+  border-top-color: #23262d;
+}
+
+/* ---------- Paneles generales de Ayuda ---------- */
+
+html:root[data-theme='dark'] .ay-panel {
+  border-color: #23262d;
+}
+
+html:root[data-theme='dark'] .ay-seccion__titulo {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .ay-seccion__icono {
+  background: #1e2126;
+  color: #7dd3fc;
+}
+
+/* ---------- FAQ ---------- */
+
+html:root[data-theme='dark'] .ay-faq li {
+  border-bottom-color: #23262d;
+}
+
+html:root[data-theme='dark'] .ay-faq__pregunta {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .ay-faq__pregunta:hover {
+  color: #7dd3fc;
+}
+
+html:root[data-theme='dark'] .ay-faq__chevron {
+  color: #6b7280;
+}
+
+html:root[data-theme='dark'] .ay-faq__respuesta {
+  color: #b0b0b0;
+}

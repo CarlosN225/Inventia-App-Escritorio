@@ -1018,3 +1018,14 @@
   justify-content: center;
   width: 100%;
 }
+/* La etiqueta de caducidad cabe completa en su columna */
+.cat-tabla th.cat-col-caducidad {
+  width: 156px;
+}
+
+.cat-tabla .cat-caduca {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

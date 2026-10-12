@@ -16,7 +16,7 @@ SALIDA = ESTILOS / "tema-oscuro-pantallas.css"
 
 # Archivos que NO se procesan (ya tienen su tema oscuro a mano o son globales)
 OMITIR = {
-    "tokens.css", "base.css", "layout.css", "topbar.css", "catalogo.css",
+    "tokens.css", "base.css", "layout.css", "topbar.css",
     "tema-oscuro.css", "tema-oscuro-pantallas.css", "ajustes-menu.css",
 }
 PREFIJO = ":root[data-theme='dark'] "
@@ -71,26 +71,26 @@ def familia(r, g, b):
         return "azul"
     return "morado"
 
-
-# Fondos claros -> fondos oscuros
+# Fondos claros -> fondos oscuros (tintes suaves sobre gris carbón)
 FONDO = {
-    "rojo": "#3a1618", "ambar": "#33250e", "verde": "#0f2d25",
-    "azul": "#14284d", "cian": "#12303f", "morado": "#241a42",
+    "rojo": "#331b1b", "ambar": "#2e2414", "verde": "#15291f",
+    "azul": "#1b2638", "cian": "#172a30", "morado": "#241e33",
 }
 BORDE = {
-    "rojo": "#5c2326", "ambar": "#5b3f12", "verde": "#14532d",
-    "azul": "#2a4a85", "cian": "#1f4a63", "morado": "#3b2f6b",
+    "rojo": "#5a2a2a", "ambar": "#57421f", "verde": "#1f4d36",
+    "azul": "#2c3f63", "cian": "#25495a", "morado": "#3d3358",
 }
-# Textos oscuros -> textos claros (los semánticos conservan su significado)
+# Textos oscuros -> textos claros (los semánticos conservan su significado, desaturados)
 TEXTO_FAMILIA = {
-    "rojo": "#f87171", "ambar": "#fbbf24", "verde": "#34d399",
-    "azul": "#5aa0ff", "cian": "#38bdf8", "morado": "#a78bfa",
+    "rojo": "#f07171", "ambar": "#e5a54b", "verde": "#4cc38a",
+    "azul": "#7aa5f5", "cian": "#5cc4e6", "morado": "#a99bf0",
 }
+
 TEXTO_EXACTO = {
     "#0b1220": "var(--color-text)", "#14181c": "var(--color-text)",
     "#0f172a": "var(--color-text)", "#111827": "var(--color-text)",
     "#1e293b": "var(--color-text)", "#1f2937": "var(--color-text)",
-    "#334155": "#b6c2d6", "#475569": "#b6c2d6", "#4b5563": "#b6c2d6",
+    "#334155": "#c8c8c8", "#475569": "#c8c8c8", "#4b5563": "#c8c8c8",
     "#64748b": "var(--color-text-muted)", "#6b7280": "var(--color-text-muted)",
     "#94a3b8": "var(--color-text-soft)", "#9ca3af": "var(--color-text-soft)",
     "#1668e3": "var(--color-brand)",
@@ -137,7 +137,7 @@ def color_texto(c, texto):
         return TEXTO_EXACTO[clave]
     fam = familia(r, g, b)
     if fam == "neutro" or (max(r, g, b) - min(r, g, b)) < 30:
-        return "var(--color-text)" if luz(r, g, b) < 0.3 else "#b6c2d6"
+        return "var(--color-text)" if luz(r, g, b) < 0.3 else "#c8c8c8"
     return TEXTO_FAMILIA[fam]
 
 
@@ -177,7 +177,7 @@ def mapear(valor, rol, nombre=""):
         elif rol == "sombra":
             nuevo = color_sombra(c, original)
         elif es_gris_claro and luz(*c[:3]) > 0.62:
-            nuevo = "#41547a"
+            nuevo = "#4a4a4a"
         else:  # auto (variables de paleta): según la luz del color
             if luz(*c[:3]) > 0.78:
                 nuevo = color_fondo(c)
