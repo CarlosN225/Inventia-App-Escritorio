@@ -922,3 +922,99 @@
 .cat-tarjeta__desc {
   font-style: italic;
 }
+
+/* ============================================================
+   LA TABLA SIEMPRE CABE (menú abierto o cerrado)
+   ============================================================ */
+
+.cat-panel--tabla {
+  overflow-x: auto;
+  container-type: inline-size;
+  container-name: tabla-catalogo;
+}
+
+.cat-tabla {
+  width: 100%;
+  min-width: 620px;
+  table-layout: fixed;
+}
+
+.cat-tabla th,
+.cat-tabla td {
+  box-sizing: border-box;
+}
+
+/* Anchos de las columnas chicas; "Producto" se queda con lo demás */
+.cat-tabla th.cat-col-num       { width: 56px; }
+.cat-tabla th.cat-col-categoria { width: 140px; }
+.cat-tabla th.cat-col-precio    { width: 92px; }
+.cat-tabla th.cat-col-costo     { width: 96px; white-space: normal; }
+.cat-tabla th.cat-col-margen    { width: 80px; }
+.cat-tabla th.cat-col-stock     { width: 140px; }
+.cat-tabla th.cat-col-caducidad { width: 132px; }
+.cat-tabla th.cat-col-acciones  { width: 96px; }
+
+/* Lo largo se corta con "…" */
+.cat-tabla .cat-producto { min-width: 0; }
+.cat-tabla .cat-producto > div { min-width: 0; }
+
+.cat-tabla .cat-producto__nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cat-tabla .cat-producto__marca { max-width: 100%; }
+
+.cat-tabla .cat-chip {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cat-tabla .cat-stock { white-space: nowrap; }
+
+.cat-sin-fecha {
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* ---------- Responsive según el espacio de la tabla ---------- */
+
+@container tabla-catalogo (max-width: 1000px) {
+  .cat-tabla th.cat-col-costo,
+  .cat-tabla td.cat-costo,
+  .cat-tabla th.cat-col-margen,
+  .cat-tabla td.cat-margen {
+    display: none; /* se ven al editar el producto */
+  }
+}
+
+@container tabla-catalogo (max-width: 780px) {
+  .cat-tabla th.cat-col-caducidad,
+  .cat-tabla td.cat-col-caducidad {
+    display: none; /* se ve en Alertas */
+  }
+
+  .cat-tabla th.cat-col-categoria { width: 112px; }
+}
+/* Ahora son hasta 3 botones en Acciones: ojito, lápiz y ⋮ */
+.cat-tabla th.cat-col-acciones {
+  width: 124px;
+}
+
+/* Tarjetas: "Ver ficha" y "Editar" lado a lado */
+.cat-tarjeta__botones {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+}
+
+.cat-tarjeta__botones .cat-boton-secundario {
+  justify-content: center;
+  width: 100%;
+}

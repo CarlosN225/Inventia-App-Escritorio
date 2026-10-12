@@ -53,6 +53,10 @@ function primerNombre(nombreCompleto) {
   return nombreCompleto?.trim().split(/\s+/)[0] ?? ''
 }
 
+function capitalizar(texto) {
+  return texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : ''
+}
+
 function etiquetaPromo(promo) {
   return promo.tipo === 'porcentaje' ? `-${promo.valor}%` : `-${moneda.format(promo.valor)}`
 }
@@ -770,7 +774,17 @@ export default function RegistrarVenta() {
                               Ajustar a {r.disponible}
                             </button>
                           )}
-
+                          {/* La caja o bolsa completa en un clic (el stock sigue en piezas) */}
+                          {r.producto.piezasEmpaque > 1 && (
+                            <button
+                              type="button"
+                              className="rv-boton-chico rv-mas-empaque"
+                              onClick={() => cambiarCantidad(r.id, r.cantidad + r.producto.piezasEmpaque)}
+                              title={`Agregar ${textoUnidad(r.producto.empaque ?? 'caja', 1)} completa (${r.producto.piezasEmpaque} ${textoUnidad(r.producto.unidad, r.producto.piezasEmpaque)})`}
+                            >
+                              + {capitalizar(textoUnidad(r.producto.empaque ?? 'caja', 1))} ({r.producto.piezasEmpaque})
+                            </button>
+                          )}
                           <div className="rv-cantidad">
                             <button
                               type="button"

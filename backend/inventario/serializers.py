@@ -15,6 +15,7 @@ class ProductoSerializer(serializers.ModelSerializer):
 
     categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
     promocion_vigente = serializers.SerializerMethodField()
+    actualizado_en = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Producto
@@ -42,6 +43,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "stock_maximo",
             "activo",
             "promocion_vigente",
+            "actualizado_en",
         ]
 
     def to_representation(self, instance):
@@ -57,7 +59,12 @@ class ProductoSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         # Al editar, el stock no se toca: solo cambia con compras, ventas, mermas o correcciones
         validated_data.pop("stock_actual", None)
+        validated_data["actualizado_en"] = timezone.now()
         return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        validated_data["actualizado_en"] = timezone.now()
+        return super().create(validated_data)
 
     def get_promocion_vigente(self, obj):
         return promocion_vigente(obj)
@@ -295,6 +302,33 @@ class PromocionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"valor": "El descuento debe ser menor al precio de venta."})
         if inicio and fin and fin < inicio:
             raise serializers.ValidationError({"fecha_fin": "La fecha de fin debe ser después del inicio."})
+
+        # Varias promociones sí, pero nunca dos activas en las mismas fechas
+        activa = datos.get("activa", getattr(actual, "activa", True))
+        if activa and producto and inicio and fin:
+            encimada = (
+                Promocion.objects.filter(
+                    producto=producto,
+                    activa=True,
+                    fecha_inicio__lte=fin,
+                    fecha_fin__gte=inicio,
+                )
+                .exclude(pk=getattr(actual, "pk", None))
+                .first()
+            )
+            if encimada:
+                valor_texto = (
+                    f"{encimada.valor.normalize():f}%"
+                    if encimada.tipo_promocion == Promocion.TIPO_PORCENTAJE
+                    else f"${encimada.valor}"
+                )
+                raise serializers.ValidationError({
+                    "fecha_inicio": (
+                        f"Ya hay una promoción activa en esas fechas: {valor_texto} "
+                        f"del {encimada.fecha_inicio:%d/%m} al {encimada.fecha_fin:%d/%m}. "
+                        "Cambia las fechas o pausa la otra."
+                    )
+                })
 
         return datos
 

@@ -127,7 +127,8 @@ class Producto(models.Model):
     stock_minimo = models.IntegerField()
     stock_maximo = models.IntegerField(null=True, blank=True)
     activo = models.BooleanField(default=True)
-
+    actualizado_en = models.DateTimeField(null=True, blank=True)  # alta o última edición desde el catálogo
+    
     class Meta:
         db_table = "Producto"
         verbose_name = "Producto"
