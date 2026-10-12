@@ -20,6 +20,7 @@ import {
   RotateCcw,
   AlertCircle,
   Receipt,
+  ShieldCheck,
 } from 'lucide-react'
 
 import { getUsuarioActual } from '../services/auth'
@@ -39,6 +40,9 @@ const TIPOS = {
   merma: { label: 'Merma', clase: 'merma', color: '#dc2626', icono: PackageMinus },
   correccion: { label: 'Corrección', clase: 'correccion', color: '#7c3aed', icono: ClipboardCheck },
 }
+
+// Filtro especial (no es un tipo de movimiento): ventas con algún precio cambiado
+const FILTRO_PRECIOS = 'precios'
 
 const MOTIVOS_MERMA = {
   caducado: 'Caducado',
@@ -122,6 +126,18 @@ function aFechaLocal(iso) {
   return new Date(a, m - 1, d)
 }
 
+// ¿Esta venta trae algún precio cambiado a mano?
+function tieneEditado(r) {
+  return r.esGrupo && r.tipo === 'salida' && (r.ticket?.detalles ?? []).some((d) => d.tipo_precio === 'editado')
+}
+
+// "Ajuste de precio · lo cambió Luis · autorizó Ana"
+function textoBitacora(d, vendedor) {
+  const partes = [d.motivo_precio || 'Sin motivo', `lo cambió ${primerNombre(vendedor)}`]
+  if (d.autorizado_por_nombre) partes.push(`autorizó ${primerNombre(d.autorizado_por_nombre)}`)
+  return partes.join(' · ')
+}
+
 /* ---------- Arma los renglones: un ticket por venta o compra; lo demás, uno por movimiento ---------- */
 
 function armarRenglones(movimientos, ventasPorId, comprasPorId) {
@@ -172,7 +188,8 @@ function textoBuscable(r) {
   if (r.esGrupo) {
     const nombres = r.movimientos.map((m) => m.productoNombreFinal).join(' ')
     const extra = r.tipo === 'entrada' ? `${r.ticket?.proveedor ?? ''} ${r.ticket?.nota ?? ''}` : ''
-    return normalizar(`${etiquetaTipo(r)} ${r.folio} ${nombres} ${extra}`)
+    const motivos = (r.ticket?.detalles ?? []).map((d) => d.motivo_precio ?? '').join(' ')
+    return normalizar(`${etiquetaTipo(r)} ${r.folio} ${nombres} ${extra} ${motivos}`)
   }
   return normalizar(`${r.productoNombreFinal} ${textoOrigen(r)} ${r.motivo}`)
 }
@@ -180,13 +197,36 @@ function textoBuscable(r) {
 /* ---------- Exportar a CSV (producto por producto, para Excel) ---------- */
 
 function exportarCSV(renglones) {
-  const encabezado = ['Fecha', 'Hora', 'Tipo', 'Folio', 'Producto', 'Cantidad', 'Unidad', 'Stock después', 'Usuario', 'Detalle']
+  const encabezado = [
+    'Fecha',
+    'Hora',
+    'Tipo',
+    'Folio',
+    'Producto',
+    'Cantidad',
+    'Unidad',
+    'Stock después',
+    'Usuario',
+    'Detalle',
+    'Precio unitario',
+    'Bitácora de precio',
+  ]
 
   const filas = renglones.flatMap((r) => {
     const movimientos = r.esGrupo ? r.movimientos : [r]
+    const esVenta = r.esGrupo && r.tipo === 'salida'
 
     return movimientos.map((m) => {
       const fecha = new Date(m.fecha)
+      const d = esVenta ? (r.ticket?.detalles ?? []).find((x) => x.producto === m.productoId) : null
+
+      let bitacora = ''
+      if (d?.tipo_precio === 'editado') {
+        bitacora = `De ${moneda.format(Number(d.precio_lista ?? 0))} a ${moneda.format(Number(d.precio_unitario))} · ${textoBitacora(d, r.usuarioNombre)}`
+      } else if (d && d.tipo_precio !== 'normal') {
+        bitacora = ETIQUETAS_PRECIO[d.tipo_precio]?.texto ?? ''
+      }
+
       return [
         formatoDia.format(fecha),
         formatoHora.format(fecha),
@@ -198,6 +238,8 @@ function exportarCSV(renglones) {
         m.stockResultante ?? '',
         m.usuarioNombre ?? '',
         r.esGrupo ? (r.tipo === 'entrada' ? r.ticket?.proveedor ?? '' : '') : textoOrigen(m),
+        d ? Number(d.precio_unitario).toFixed(2) : '',
+        bitacora,
       ]
     })
   })
@@ -259,17 +301,32 @@ function DetalleTicket({ r, unidades }) {
           </thead>
           <tbody>
             {t.detalles.map((d) => {
-              const etiqueta = esVenta ? ETIQUETAS_PRECIO[d.tipo_precio] : null
+              const precio = Number(esVenta ? d.precio_unitario : d.costo_unitario)
+              const lista = esVenta && d.precio_lista ? Number(d.precio_lista) : null
+              const cambio = lista !== null && Math.abs(lista - precio) >= 0.01
+              const editado = esVenta && d.tipo_precio === 'editado'
+              const autorizado = editado && d.autorizado_por_nombre
+              const etiqueta = esVenta && !autorizado ? ETIQUETAS_PRECIO[d.tipo_precio] : null
 
               return (
-                <tr key={d.id}>
-                  <td>{d.producto_nombre}</td>
+                <tr key={d.id} className={editado ? 'is-editado' : ''}>
+                  <td>
+                    {d.producto_nombre}
+                    {editado && <span className="hi-bitacora">{textoBitacora(d, r.usuarioNombre)}</span>}
+                  </td>
                   <td className="is-der">
                     {d.cantidad} {textoUnidad(unidad(d.producto), d.cantidad)}
                   </td>
                   <td>
                     <span className="hi-precio">
-                      <strong>{moneda.format(Number(esVenta ? d.precio_unitario : d.costo_unitario))}</strong>
+                      {cambio && <s className="hi-tachado">{moneda.format(lista)}</s>}
+                      <strong>{moneda.format(precio)}</strong>
+                      {autorizado && (
+                        <span className="hi-chip hi-chip--autorizado" title={d.motivo_precio}>
+                          <ShieldCheck size={11} aria-hidden="true" />
+                          Autorizó {primerNombre(d.autorizado_por_nombre)}
+                        </span>
+                      )}
                       {etiqueta && <span className={`hi-chip hi-chip--${etiqueta.clase}`}>{etiqueta.texto}</span>}
                     </span>
                   </td>
@@ -411,6 +468,7 @@ export default function Movimientos() {
   const [usuario, setUsuario] = useState('todos')
   const [pagina, setPagina] = useState(1)
   const [abiertos, setAbiertos] = useState(() => new Set()) // varios tickets abiertos a la vez
+
   async function cargar() {
     setCargando(true)
     setError(null)
@@ -478,10 +536,16 @@ export default function Movimientos() {
 
   const conteoPorTipo = sinFiltroDeTipo.reduce((conteo, r) => {
     conteo[r.tipo] = (conteo[r.tipo] || 0) + 1
+    if (tieneEditado(r)) conteo[FILTRO_PRECIOS] = (conteo[FILTRO_PRECIOS] || 0) + 1
     return conteo
   }, {})
 
-  const filtrados = tipo === 'todos' ? sinFiltroDeTipo : sinFiltroDeTipo.filter((r) => r.tipo === tipo)
+  const filtrados =
+    tipo === 'todos'
+      ? sinFiltroDeTipo
+      : tipo === FILTRO_PRECIOS
+      ? sinFiltroDeTipo.filter(tieneEditado)
+      : sinFiltroDeTipo.filter((r) => r.tipo === tipo)
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
@@ -500,7 +564,7 @@ export default function Movimientos() {
   const cambiarTipo = filtrar(setTipo)
   const cambiarUsuario = filtrar(setUsuario)
 
-     function irAPagina(n) {
+  function irAPagina(n) {
     setPagina(n)
   }
 
@@ -629,7 +693,19 @@ export default function Movimientos() {
               <span className="hi-tipo-filtro__conteo">{conteoPorTipo[id] || 0}</span>
             </button>
           ))}
-          
+
+          {/* La bitácora de precios: solo las ventas con algún precio cambiado */}
+          <button
+            type="button"
+            className={'hi-tipo-filtro hi-tipo-filtro--precios' + (tipo === FILTRO_PRECIOS ? ' is-activo' : '')}
+            onClick={() => cambiarTipo(FILTRO_PRECIOS)}
+            title="Ventas en las que se cambió el precio de algún producto"
+          >
+            <ShieldCheck size={13} aria-hidden="true" />
+            Precios editados
+            <span className="hi-tipo-filtro__conteo">{conteoPorTipo[FILTRO_PRECIOS] || 0}</span>
+          </button>
+
           {enPagina.length > 0 && (
             <button type="button" className="hi-expandir" onClick={alternarPagina}>
               <ChevronDown size={14} className={paginaAbierta ? 'is-girado' : ''} aria-hidden="true" />
@@ -658,7 +734,9 @@ export default function Movimientos() {
         ) : filtrados.length === 0 ? (
           <div className="hi-vacio">
             <SearchX size={26} aria-hidden="true" />
-            {rangoId === 'hoy' && !busqueda && tipo === 'todos'
+            {tipo === FILTRO_PRECIOS
+              ? 'No hay ventas con precios cambiados en este periodo.'
+              : rangoId === 'hoy' && !busqueda && tipo === 'todos'
               ? 'Hoy todavía no hay movimientos.'
               : 'No hay movimientos con esos filtros.'}
           </div>
@@ -704,7 +782,14 @@ export default function Movimientos() {
                           <Icono size={14} />
                         </span>
                         <span className="hi-grupo">
-                          <span className="hi-producto__nombre">{titulo}</span>
+                          <span className="hi-producto__nombre">
+                            {titulo}
+                            {tieneEditado(r) && (
+                              <span className="hi-escudo" title="Incluye precios cambiados con autorización">
+                                <ShieldCheck size={13} aria-label="Con precios autorizados" />
+                              </span>
+                            )}
+                          </span>
                           <span className="hi-grupo__sub">{resumenNombres(nombres)}</span>
                         </span>
                       </div>
@@ -723,9 +808,7 @@ export default function Movimientos() {
                       celdaStock = solo.stockResultante ?? '—'
                     } else {
                       celdaCantidad = (
-                        <span className="hi-cantidad hi-cantidad--neutra">
-                          {r.movimientos.length} productos
-                        </span>
+                        <span className="hi-cantidad hi-cantidad--neutra">{r.movimientos.length} productos</span>
                       )
                       celdaStock = '—'
                     }
@@ -761,7 +844,7 @@ export default function Movimientos() {
                       </>
                     )
                     celdaOrigen = (
-                       <span className="hi-origen" title={textoOrigen(r)}>
+                      <span className="hi-origen" title={textoOrigen(r)}>
                         <Icono size={13} aria-hidden="true" />
                         {textoOrigen(r)}
                       </span>
@@ -772,7 +855,7 @@ export default function Movimientos() {
                     <Fragment key={r.clave}>
                       <tr
                         className={'hi-fila' + (estaAbierto ? ' is-abierta' : '')}
-                        onClick={() => alternar(r.clave)}                        
+                        onClick={() => alternar(r.clave)}
                         aria-expanded={estaAbierto}
                       >
                         <td>
