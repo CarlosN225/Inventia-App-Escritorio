@@ -310,13 +310,14 @@ export default function Dashboard() {
   /* ---------- Ventas ---------- */
 
   // Cada venta con su ganancia: (precio de venta - costo actual) × cantidad
-  // TODO: usar el costo del día de la venta cuando DetalleVenta lo guarde
   const ventasConDatos = useMemo(
     () =>
       ventas.map((v) => {
         const detalles = v.detalles ?? []
         const ganancia = detalles.reduce((suma, d) => {
-          const costo = productosPorId.get(d.producto)?.costo ?? 0
+          // El costo de ESE día; si la venta es vieja y no lo tiene, el costo actual
+          const costo =
+            d.costo_unitario != null ? Number(d.costo_unitario) : productosPorId.get(d.producto)?.costo ?? 0
           return suma + (Number(d.precio_unitario) - costo) * d.cantidad
         }, 0)
 
@@ -600,12 +601,17 @@ export default function Dashboard() {
                       return (
                         <div className="dash-chart__columna" key={d.dia}>
                           <div className="dash-chart__pista">
-                            <div
+                             <div
                               className={clases}
                               style={{ height: `${(d.valor / escalaMax) * 100}%` }}
-                              title={`${d.dia}: ${moneda.format(d.valor)}`}
+                              aria-label={`${d.hoy ? 'Hoy' : d.dia}: ${moneda.format(d.valor)}`}
                             >
-                              {esMax && <span className="dash-chart__valor">{monedaCorta.format(d.valor)}</span>}
+                              {/* La burbujita: fija en el día más alto; en los demás, al pasar el mouse */}
+                              {d.valor > 0 && (
+                                <span className={'dash-chart__valor' + (esMax ? ' is-fijo' : '')}>
+                                  {esMax ? monedaCorta.format(d.valor) : moneda.format(d.valor)}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <span className={'dash-chart__dia' + (esMax ? ' is-max' : '')}>{d.hoy ? 'Hoy' : d.dia}</span>

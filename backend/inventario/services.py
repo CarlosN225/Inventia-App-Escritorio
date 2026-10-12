@@ -167,6 +167,7 @@ def registrar_venta(request, renglones):
             subtotal=subtotal,
             tipo_precio=r.get("tipo_precio", "normal"),
             precio_lista=producto.precio_venta,
+            costo_unitario=producto.ultimo_costo if producto.ultimo_costo else None,
             motivo_precio=motivo_precio,
             autorizado_por=autorizo,
         )
