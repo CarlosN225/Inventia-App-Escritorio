@@ -45,6 +45,7 @@ import {
 import {
   obtenerConfiguracion,
   guardarConfiguracion,
+  guardarPin,
 } from '../services/configuracion'
 
 import '../styles/configuracion.css'
@@ -104,6 +105,13 @@ const SECCIONES = [
     sub: 'Número y horario',
     icono: MessageCircle,
   },
+  {
+    id: 'seguridad',
+    titulo: 'Seguridad',
+    sub: 'PIN para autorizar precios',
+    icono: ShieldCheck,
+  },
+
 ]
 
 const PREFERENCIAS = [
@@ -437,6 +445,14 @@ export default function Configuracion() {
   const [guardando, setGuardando] =
     useState(false)
 
+
+  // PIN del propietario
+  const [pinConfigurado, setPinConfigurado] = useState(false)
+  const [pin, setPin] = useState({ actual: '', nuevo: '', confirmar: '' })
+  const [intentoPin, setIntentoPin] = useState(false)
+  const [erroresServidorPin, setErroresServidorPin] = useState({})
+  const [guardandoPin, setGuardandoPin] = useState(false)
+
   /* ============================================================
      GUARDAR PREFERENCIA DE INACTIVOS
      ============================================================ */
@@ -476,6 +492,7 @@ export default function Configuracion() {
         const reales = desdeBackend(config)
         setAjustes(reales)
         setGuardados(reales)
+        setPinConfigurado(!!config.seguridad?.pin_configurado)
       })
       .catch(() =>
         setAviso({
@@ -690,6 +707,65 @@ export default function Configuracion() {
     Object.values(
       ajustes.preferencias
     ).filter(Boolean).length
+
+  /* ============================================================
+     PIN DEL PROPIETARIO
+     ============================================================ */
+
+  const soloCuatro = (texto) => String(texto ?? '').replace(/\D/g, '').slice(0, 4)
+
+  const erroresPin = {}
+  if (pinConfigurado && pin.actual.length !== 4) erroresPin.actual = 'Escribe tu PIN actual'
+  if (pin.nuevo.length !== 4) erroresPin.nuevo = 'El PIN debe ser de 4 números'
+  else if (pinConfigurado && pin.nuevo === pin.actual) erroresPin.nuevo = 'Debe ser diferente al actual'
+  else if (/^(\d)\1{3}$/.test(pin.nuevo) || ['1234', '4321', '0123'].includes(pin.nuevo)) {
+    erroresPin.nuevo = 'Es muy fácil de adivinar; elige otro'
+  }
+  if (pin.confirmar !== pin.nuevo) erroresPin.confirmar = 'Los PIN no coinciden'
+
+  const errorPin = (campo) => erroresServidorPin[campo] ?? (intentoPin ? erroresPin[campo] : null)
+
+  function cambiarPin(campo, valor) {
+    setPin((p) => ({ ...p, [campo]: soloCuatro(valor) }))
+    setErroresServidorPin((e) => {
+      const copia = { ...e }
+      delete copia[campo]
+      return copia
+    })
+  }
+
+  async function guardarMiPin() {
+    setIntentoPin(true)
+    if (Object.keys(erroresPin).length > 0 || guardandoPin) return
+
+    setGuardandoPin(true)
+
+    try {
+      await guardarPin({ pinActual: pin.actual, pinNuevo: pin.nuevo })
+
+      notificar({
+        texto: pinConfigurado
+          ? 'Tu PIN se cambió. Úsalo para autorizar precios.'
+          : 'PIN guardado. Ya puedes autorizar cambios de precio.',
+      })
+
+      setPinConfigurado(true)
+      setPin({ actual: '', nuevo: '', confirmar: '' })
+      setIntentoPin(false)
+    } catch (error) {
+      const datos = error?.response?.data
+      if (datos?.pin_actual || datos?.pin_nuevo) {
+        setErroresServidorPin({
+          ...(datos.pin_actual && { actual: String(datos.pin_actual) }),
+          ...(datos.pin_nuevo && { nuevo: String(datos.pin_nuevo) }),
+        })
+      } else {
+        notificar({ tipo: 'error', texto: 'No se pudo guardar el PIN' })
+      }
+    } finally {
+      setGuardandoPin(false)
+    }
+  }
 
   /* ============================================================
      NUEVO USUARIO
@@ -1368,6 +1444,8 @@ export default function Configuracion() {
                 ? `${activas} de 5`
                 : s.id === 'usuarios'
                 ? usuarios.length
+                : s.id === 'seguridad' && !pinConfigurado
+                ? '!'
                 : null
 
             return (
@@ -2754,10 +2832,134 @@ export default function Configuracion() {
           )}
 
           {/* ====================================================
+              SEGURIDAD (PIN)
+              ==================================================== */}
+
+          {seccion === 'seguridad' && (
+            <section className="cf-panel cf-seccion">
+              <header className="cf-seccion__cabecera">
+                <div>
+                  <h2 className="cf-seccion__titulo">Seguridad</h2>
+                  <p className="cf-seccion__sub">Tu PIN para autorizar cambios de precio.</p>
+                </div>
+
+                <span className={'cf-pin-estado ' + (pinConfigurado ? 'is-listo' : 'is-falta')}>
+                  {pinConfigurado ? <ShieldCheck size={14} aria-hidden="true" /> : <AlertCircle size={14} aria-hidden="true" />}
+                  {pinConfigurado ? 'PIN configurado' : 'Sin PIN'}
+                </span>
+              </header>
+
+              <p className="cf-info">
+                <Info size={16} aria-hidden="true" />
+                <span>
+                  Cuando un encargado quiera vender un producto a <strong>otro precio</strong>, la venta te pedirá este PIN.
+                  Si no estás, el producto se vende a su precio normal. Cada cambio queda registrado en el Historial con{' '}
+                  <strong>quién lo pidió, quién lo autorizó y por qué</strong>.
+                </span>
+              </p>
+
+              <div className="cf-campos cf-campos--pin">
+                {pinConfigurado && (
+                  <div className="cf-campo">
+                    <label className="cf-etiqueta" htmlFor="cf-pin-actual">
+                      PIN actual <span className="cf-requerido">*</span>
+                    </label>
+                    <input
+                      id="cf-pin-actual"
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={4}
+                      className={'cf-input cf-input--pin' + (errorPin('actual') ? ' is-error' : '')}
+                      value={pin.actual}
+                      onChange={(e) => cambiarPin('actual', e.target.value)}
+                      placeholder="••••"
+                    />
+                    {errorPin('actual') && (
+                      <p className="cf-error">
+                        <AlertCircle size={13} aria-hidden="true" />
+                        {errorPin('actual')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="cf-campo">
+                  <label className="cf-etiqueta" htmlFor="cf-pin-nuevo">
+                    {pinConfigurado ? 'PIN nuevo' : 'Crea tu PIN'} <span className="cf-requerido">*</span>
+                  </label>
+                  <input
+                    id="cf-pin-nuevo"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    className={'cf-input cf-input--pin' + (errorPin('nuevo') ? ' is-error' : '')}
+                    value={pin.nuevo}
+                    onChange={(e) => cambiarPin('nuevo', e.target.value)}
+                    placeholder="••••"
+                  />
+                  {errorPin('nuevo') ? (
+                    <p className="cf-error">
+                      <AlertCircle size={13} aria-hidden="true" />
+                      {errorPin('nuevo')}
+                    </p>
+                  ) : (
+                    <p className="cf-ayuda">4 números que solo tú conozcas</p>
+                  )}
+                </div>
+
+                <div className="cf-campo">
+                  <label className="cf-etiqueta" htmlFor="cf-pin-confirmar">
+                    Confírmalo <span className="cf-requerido">*</span>
+                  </label>
+                  <input
+                    id="cf-pin-confirmar"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    className={'cf-input cf-input--pin' + (errorPin('confirmar') ? ' is-error' : '')}
+                    value={pin.confirmar}
+                    onChange={(e) => cambiarPin('confirmar', e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && guardarMiPin()}
+                    placeholder="••••"
+                  />
+                  {errorPin('confirmar') && (
+                    <p className="cf-error">
+                      <AlertCircle size={13} aria-hidden="true" />
+                      {errorPin('confirmar')}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="cf-pin-acciones">
+                <p className="cf-ayuda">
+                  <Lock size={13} aria-hidden="true" /> Se guarda cifrado: ni el sistema puede leerlo.
+                </p>
+                <button
+                  type="button"
+                  className="cf-boton cf-boton--primario"
+                  onClick={guardarMiPin}
+                  disabled={guardandoPin}
+                >
+                  {guardandoPin ? (
+                    <Loader2 size={15} className="cf-girando" aria-hidden="true" />
+                  ) : (
+                    <KeyRound size={15} aria-hidden="true" />
+                  )}
+                  {guardandoPin ? 'Guardando…' : pinConfigurado ? 'Cambiar PIN' : 'Guardar PIN'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* ====================================================
               BARRA DE GUARDAR
               ==================================================== */}
 
-          {seccion !== 'usuarios' && (
+          {seccion !== 'usuarios' && seccion !== 'seguridad' && (
             <footer className="cf-barra">
 
               {hayCambios ? (

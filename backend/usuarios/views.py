@@ -280,7 +280,8 @@ def restablecer_contrasena_view(request, usuario_id):
     """
     El propietario puede restablecer la contraseña de un encargado.
 
-    Se genera una contraseña temporal.
+    Se genera una contraseña temporal: al entrar con ella,
+    la app le pide al encargado crear la suya.
     """
 
     try:
@@ -309,8 +310,11 @@ def restablecer_contrasena_view(request, usuario_id):
         contrasena_temporal
     )
 
+    # NUEVO: es temporal; al entrar, la app le pedirá crear la suya
+    usuario.debe_cambiar_contrasena = True
+
     usuario.save(
-        update_fields=['contrasena_hash']
+        update_fields=['contrasena_hash', 'debe_cambiar_contrasena']
     )
 
     return Response({
@@ -362,6 +366,8 @@ def actualizar_mi_perfil_view(request):
 def cambiar_mi_contrasena_view(request):
     """
     El usuario puede cambiar su propia contraseña.
+    También es la que usa la ventanita de "Crea tu contraseña"
+    cuando entró con una temporal.
     """
 
     usuario = obtener_usuario_sesion(request)
@@ -406,18 +412,32 @@ def cambiar_mi_contrasena_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # NUEVO: la nueva no puede ser igual a la actual (sobre todo, a la temporal)
+    if nueva_contrasena == contrasena_actual:
+        return Response(
+            {
+                'error':
+                    'La nueva contraseña debe ser diferente a la actual'
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     usuario.contrasena_hash = make_password(
         nueva_contrasena
     )
 
+    # NUEVO: ya creó la suya, deja de ser temporal
+    usuario.debe_cambiar_contrasena = False
+
     usuario.save(
-        update_fields=['contrasena_hash']
+        update_fields=['contrasena_hash', 'debe_cambiar_contrasena']
     )
 
     return Response({
         'mensaje':
             'Contraseña actualizada correctamente'
     })
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -464,6 +484,7 @@ def crear_primer_propietario_view(request):
             {'error': 'El correo ya está registrado'},
             status=status.HTTP_400_BAD_REQUEST
         )
+
     if nombre_negocio:
         digitos = lambda t: ''.join(c for c in str(t or '') if c.isdigit())
         if len(digitos(negocio.get('telefono'))) != 10:
@@ -476,7 +497,7 @@ def crear_primer_propietario_view(request):
                 {'error': 'El WhatsApp es obligatorio (10 dígitos)'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
     # Todo o nada: si algo falla, no queda un dueño sin negocio
     with transaction.atomic():
         usuario = Usuario.objects.create(

@@ -842,3 +842,52 @@
     font-size: 21px;
   }
 }
+
+/* ============================================================
+   BITÁCORA DE PRECIOS (PIN del propietario)
+   ============================================================ */
+
+/* Quién autorizó el cambio de precio */
+.hi-chip--autorizado {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  cursor: help;
+}
+
+/* El motivo y quién lo cambió, debajo del nombre del producto */
+.hi-bitacora {
+  display: block;
+  margin-top: 2px;
+  color: #7c3aed;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* El renglón editado, con una rayita morada para que resalte */
+.hi .hi-detalle__tabla tr.is-editado td:first-child {
+  box-shadow: inset 3px 0 0 #a78bfa;
+}
+
+/* El escudito en la fila de la venta */
+.hi-escudo {
+  display: inline-grid;
+  place-items: center;
+  margin-left: 6px;
+  color: #7c3aed;
+  vertical-align: -2px;
+}
+
+/* El filtro de "Precios editados" */
+.hi-tipo-filtro--precios svg {
+  color: #7c3aed;
+}
+
+.hi-tipo-filtro--precios.is-activo {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+}

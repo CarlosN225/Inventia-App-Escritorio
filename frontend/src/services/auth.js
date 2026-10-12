@@ -170,3 +170,14 @@ export async function crearPrimerPropietario(datos) {
 
     return response.data;
 }
+
+
+/* Cambia la contraseña temporal por una propia (la pide la app al entrar) */
+export async function cambiarContrasenaTemporal(actual, nueva) {
+  const response = await axios.post(
+    `${API_URL}/usuarios/mi-contrasena/`,
+    { contrasena_actual: actual, nueva_contrasena: nueva },
+    { withCredentials: true }
+  )
+  return response.data
+}

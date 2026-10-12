@@ -51,5 +51,23 @@ export function leerAjustes(config) {
     diasAviso: config?.whatsapp?.dias_aviso_caducidad ?? 30,
     horaResumen: config?.whatsapp?.hora_resumen ?? '20:00',
     telefonoAlertas: config?.whatsapp?.telefono_alertas ?? '',
+    contactoAlertas: config?.whatsapp?.contacto_alertas ?? '',
+    pinConfigurado: !!config?.seguridad?.pin_configurado,
   }
+}
+
+
+/* El propietario crea o cambia su PIN de 4 números */
+export async function guardarPin({ pinActual, pinNuevo }) {
+  const response = await axios.post(
+    `${API_URL}/configuracion/pin/`,
+    { pin_actual: pinActual || '', pin_nuevo: pinNuevo },
+    CON_SESION
+  )
+
+  // Se vuelve a pedir la configuración, para que todas las pantallas sepan que ya hay PIN
+  await obtenerConfiguracion(true)
+  window.dispatchEvent(new Event(EVENTO_CONFIGURACION))
+
+  return response.data
 }

@@ -79,6 +79,60 @@ from django.utils import timezone
 
 from .models import Venta, DetalleVenta, Compra, DetalleCompra
 
+from .autorizaciones import leer_autorizacion
+from .serializers import promocion_vigente
+
+CENTAVO = Decimal("0.01")
+
+
+def _validar_precio(producto, renglon, usuario):
+    """Revisa que el precio cuadre con su tipo. Devuelve (motivo, quién autorizó)."""
+    precio = renglon["precio_unitario"]
+    tipo = renglon.get("tipo_precio", "normal")
+    lista = producto.precio_venta
+
+    if tipo == "normal":
+        if abs(precio - lista) > CENTAVO:
+            raise ValidationError({"renglones": f"El precio de {producto.nombre} no coincide con el de lista."})
+        return "", None
+
+    if tipo == "mayoreo":
+        aplica = (
+            producto.precio_mayoreo
+            and producto.cantidad_minima_mayoreo
+            and renglon["cantidad"] >= producto.cantidad_minima_mayoreo
+            and abs(precio - producto.precio_mayoreo) <= CENTAVO
+        )
+        if not aplica:
+            raise ValidationError({"renglones": f"El mayoreo de {producto.nombre} no aplica a esa cantidad."})
+        return "", None
+
+    if tipo == "promocion":
+        promo = promocion_vigente(producto)
+        if not promo:
+            raise ValidationError({"renglones": f"{producto.nombre} ya no tiene promoción vigente."})
+        valor = Decimal(promo["valor"])
+        esperado = (
+            (lista * (Decimal("100") - valor) / Decimal("100")).quantize(CENTAVO)
+            if promo["tipo"] == "porcentaje"
+            else max(Decimal("0"), lista - valor)
+        )
+        if abs(precio - esperado) > CENTAVO:
+            raise ValidationError({"renglones": f"El precio de promoción de {producto.nombre} no coincide."})
+        return "", None
+
+    # Precio editado: el propietario lo autoriza él mismo; el encargado necesita el sello del PIN
+    if usuario.rol == "propietario":
+        return (renglon.get("motivo_precio") or "").strip() or "Ajuste de precio", usuario
+
+    datos = leer_autorizacion(renglon.get("autorizacion"))
+    if not datos or datos.get("p") != producto.id or Decimal(datos.get("precio", "0")) != precio:
+        raise ValidationError({
+            "renglones": f"La autorización del precio de {producto.nombre} ya venció o no es válida.",
+            "producto_autorizacion": producto.id,
+        })
+
+    return datos.get("m", ""), Usuario.objects.get(pk=datos["a"])
 
 def _usuario_de_sesion(request):
     return Usuario.objects.get(pk=request.session["id_usuario"])
@@ -102,7 +156,7 @@ def registrar_venta(request, renglones):
             raise ValidationError({
                 "renglones": f"No hay suficiente {producto.nombre}. Disponible: {producto.stock_actual}."
             })
-
+        motivo_precio, autorizo = _validar_precio(producto, r, usuario)
         subtotal = r["precio_unitario"] * r["cantidad"]
 
         DetalleVenta.objects.create(
@@ -112,6 +166,9 @@ def registrar_venta(request, renglones):
             precio_unitario=r["precio_unitario"],
             subtotal=subtotal,
             tipo_precio=r.get("tipo_precio", "normal"),
+            precio_lista=producto.precio_venta,
+            motivo_precio=motivo_precio,
+            autorizado_por=autorizo,
         )
 
         producto.stock_actual -= r["cantidad"]

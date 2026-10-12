@@ -145,6 +145,9 @@ def _datos_configuracion(negocio):
             "hora_resumen": config.hora_resumen.strftime("%H:%M") if config.hora_resumen else "20:00",
             "dias_aviso_caducidad": config.dias_aviso_caducidad,
         },
+        "seguridad": {
+            "pin_configurado": bool(config.pin_hash),
+        },
     }
 
 
@@ -250,4 +253,86 @@ class PromocionViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return [EsUsuarioAutenticado()]
         return [EsPropietario()]
-    
+
+
+
+# ============================================================
+#  PIN DEL PROPIETARIO Y AUTORIZACIONES DE PRECIO
+# ============================================================
+from decimal import Decimal, InvalidOperation
+
+from django.contrib.auth.hashers import check_password, make_password
+
+from .autorizaciones import firmar_autorizacion, motivo_valido, pin_con_formato, verificar_pin
+
+def _negocio_y_configuracion():
+    negocio = Negocio.objects.select_related("usuario_admin").first()
+    if not negocio:
+        return None, None
+    config, _ = Configuracion.objects.get_or_create(negocio=negocio)
+    return negocio, config
+
+
+class PinView(APIView):
+    """El propietario crea o cambia su PIN de 4 números."""
+
+    permission_classes = [EsPropietario]
+
+    def post(self, request):
+        negocio, config = _negocio_y_configuracion()
+        if not config:
+            return Response({"error": "Todavía no hay un negocio configurado."}, status=status.HTTP_404_NOT_FOUND)
+
+        nuevo = str(request.data.get("pin_nuevo") or "")
+        actual = str(request.data.get("pin_actual") or "")
+
+        if not pin_con_formato(nuevo):
+            return Response({"pin_nuevo": "El PIN debe ser de 4 números."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Si ya tenía PIN, para cambiarlo hay que saber el actual
+        if config.pin_hash and not check_password(actual, config.pin_hash):
+            return Response({"pin_actual": "El PIN actual no es correcto."}, status=status.HTTP_400_BAD_REQUEST)
+
+        config.pin_hash = make_password(nuevo)
+        config.pin_intentos_fallidos = 0
+        config.pin_bloqueado_hasta = None
+        config.save(update_fields=["pin_hash", "pin_intentos_fallidos", "pin_bloqueado_hasta"])
+
+        return Response({"mensaje": "PIN guardado"})
+
+
+class AutorizarPrecioView(APIView):
+    """Se pide desde la venta: el propietario teclea su PIN y el backend firma la autorización."""
+
+    permission_classes = [EsUsuarioAutenticado]
+
+    def post(self, request):
+        negocio, config = _negocio_y_configuracion()
+        if not config:
+            return Response({"error": "Todavía no hay un negocio configurado."}, status=status.HTTP_404_NOT_FOUND)
+
+        producto = Producto.objects.filter(pk=request.data.get("producto"), activo=True).first()
+        if not producto:
+            return Response({"producto": "Ese producto no existe o está desactivado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            precio = Decimal(str(request.data.get("precio"))).quantize(Decimal("0.01"))
+            if precio <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({"precio": "Escribe un precio mayor a $0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        motivo = (request.data.get("motivo") or "").strip()
+        if not motivo_valido(motivo):
+            return Response({"motivo": "Elige el motivo del cambio (si es «Otro», escríbelo)."}, status=status.HTTP_400_BAD_REQUEST)
+       
+        correcto, mensaje, bloqueado = verificar_pin(config, str(request.data.get("pin") or ""))
+        if not correcto:
+            return Response({"pin": mensaje, "bloqueado": bloqueado}, status=status.HTTP_400_BAD_REQUEST)
+       
+        propietario = negocio.usuario_admin or Usuario.objects.filter(rol="propietario").first()
+
+        return Response({
+            "autorizacion": firmar_autorizacion(producto.id, precio, motivo, propietario.id),
+            "autorizado_por": propietario.nombre_completo,
+        })

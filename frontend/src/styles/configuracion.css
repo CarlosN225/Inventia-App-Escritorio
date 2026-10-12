@@ -1277,3 +1277,62 @@
 @keyframes cf-girar {
   to { transform: rotate(360deg); }
 }
+
+/* ============ SEGURIDAD (PIN) ============ */
+
+.cf-pin-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cf-pin-estado.is-listo {
+  border-color: #b8e6d1;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.cf-pin-estado.is-falta {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.cf-campos--pin {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+/* Los puntitos del PIN, grandes y separados, como en un cajero */
+.cf-input--pin {
+  font-size: 22px;
+  letter-spacing: 0.5em;
+  text-align: center;
+}
+
+.cf-input--pin::placeholder {
+  letter-spacing: 0.35em;
+}
+
+.cf-pin-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eef1f5;
+}
+
+.cf-pin-acciones .cf-ayuda {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}

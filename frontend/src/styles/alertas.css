@@ -892,3 +892,8 @@
   .al-wa__estado { padding-left: 0; border-left: none; }
   .al-wa__acciones { align-items: flex-start; }
 }
+
+/* Sin WhatsApp, las listas ocupan todo el ancho */
+.al-grid--sola {
+  grid-template-columns: minmax(0, 1fr);
+}

@@ -16,6 +16,8 @@ class Usuario(models.Model):
     telefono_whatsapp = models.CharField(max_length=20)
     rol = models.CharField(max_length=20, choices=ROL_CHOICES)
     activo = models.BooleanField(default=True)
+        # Si entró con una contraseña temporal (alta o restablecida), debe cambiarla al entrar
+    debe_cambiar_contrasena = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -16,6 +16,8 @@ import RegistrarMerma from './pages/RegistrarMerma.jsx'
 import CorreccionInventario from './pages/CorreccionInventario.jsx'
 import MiPerfil from './pages/MiPerfil.jsx'
 import Ayuda from './pages/Ayuda.jsx'
+import ContrasenaObligatoria from './components/ContrasenaObligatoria.jsx'
+
 
 export default function App() {
   return (
@@ -27,7 +29,15 @@ export default function App() {
 
         {/* Todo lo interno requiere sesión activa */}
         <Route element={<RutaProtegida />}>
-          <Route element={<Layout />}>
+          <Route
+            element={
+              <>
+                <Layout />
+                {/* Si entró con contraseña temporal, no deja usar la app hasta cambiarla */}
+                <ContrasenaObligatoria />
+              </>
+            }
+          >
             <Route path="/panel" element={<Dashboard />} />
             <Route path="/catalogo" element={<Catalogo />} />
             <Route path="/catalogo/nuevo" element={<ProductoForm />} />

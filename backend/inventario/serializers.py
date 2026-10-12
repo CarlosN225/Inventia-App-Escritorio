@@ -194,6 +194,9 @@ class RenglonVentaSerializer(serializers.Serializer):
     cantidad = serializers.IntegerField(min_value=1)
     precio_unitario = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0"))
     tipo_precio = serializers.ChoiceField(choices=TIPOS_PRECIO, default="normal")
+    autorizacion = serializers.CharField(required=False, allow_blank=True)
+    motivo_precio = serializers.CharField(required=False, allow_blank=True, max_length=120)
+
 
 
 class RegistrarVentaSerializer(serializers.Serializer):
@@ -218,11 +221,14 @@ class RegistrarCompraSerializer(serializers.Serializer):
 
 class DetalleVentaSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+    autorizado_por_nombre = serializers.CharField(source="autorizado_por.nombre_completo", read_only=True, default=None)
 
     class Meta:
         model = DetalleVenta
-        fields = ["id", "producto", "producto_nombre", "cantidad", "precio_unitario", "subtotal", "tipo_precio"]
-
+        fields = [
+            "id", "producto", "producto_nombre", "cantidad", "precio_unitario", "subtotal", "tipo_precio",
+            "precio_lista", "motivo_precio", "autorizado_por", "autorizado_por_nombre",
+        ]
 
 class VentaSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.nombre_completo", read_only=True)

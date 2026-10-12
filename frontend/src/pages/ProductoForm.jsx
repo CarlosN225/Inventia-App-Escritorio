@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAjustes } from '../hooks/useConfiguracion'
 import { notificar } from '../services/notificar'
+import { listarVentas } from '../services/ventas'
+import { textoUnidad } from '../utils/unidades'
 
 import {
   ChevronRight,
@@ -229,6 +231,7 @@ export default function ProductoForm() {
   const [categorias, setCategorias] = useState([])
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState(null) // null | 'no-encontrado' | mensaje
+  const [ventasMes, setVentasMes] = useState(null) // { piezas, ingreso } de este producto en el mes
 
   const [usuarioActual, setUsuarioActual] = useState(null)
   const [cargandoUsuario, setCargandoUsuario] = useState(true)
@@ -273,6 +276,33 @@ export default function ProductoForm() {
         ])
 
         if (sigueMontado) setPromociones(listaPromos)
+
+        // Las ventas del mes de este producto (para el Resumen); si fallan, solo no se muestran
+        if (!esNuevo) {
+          listarVentas()
+            .then((ventas) => {
+              const inicioMes = new Date()
+              inicioMes.setDate(1)
+              inicioMes.setHours(0, 0, 0, 0)
+
+              let piezas = 0
+              let ingreso = 0
+
+              ventas
+                .filter((v) => new Date(v.fecha_venta) >= inicioMes)
+                .forEach((v) =>
+                  (v.detalles ?? []).forEach((d) => {
+                    if (d.producto === Number(id)) {
+                      piezas += d.cantidad
+                      ingreso += Number(d.precio_unitario) * d.cantidad
+                    }
+                  })
+                )
+
+              if (sigueMontado) setVentasMes({ piezas, ingreso })
+            })
+            .catch(() => {})
+        }
 
         setCategorias(listaCategorias)
         setProducto(productoBackend)
@@ -391,6 +421,19 @@ export default function ProductoForm() {
       const datos = e.response?.data
       const primero = datos && typeof datos === 'object' ? Object.values(datos)[0] : null
       setErrorPromo(primero ? String([].concat(primero)[0]) : mensajeDeError(e))
+    }
+  }
+
+  // Enter agrega la promoción; Esc la cancela (sin cerrar ni mandar el formulario del producto)
+  function enterEnPromo(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      agregarPromo()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      setNuevaPromo(null)
+      setErrorPromo('')
     }
   }
 
@@ -1310,17 +1353,25 @@ export default function ProductoForm() {
                       {stockActual} {unidad.plural}
                     </dd>
                   </div>
-                  <div>
+                                   <div>
                     <dt>Vendidas este mes</dt>
-                    <dd>—</dd>
+                    <dd>
+                      {ventasMes
+                        ? `${ventasMes.piezas} ${textoUnidad(producto?.unidad ?? 'pieza', ventasMes.piezas)}`
+                        : '—'}
+                    </dd>
                   </div>
+
                   <div>
                     <dt>Ganancia estimada del mes</dt>
-                    <dd>—</dd>
+                    <dd>
+                      {ventasMes && producto?.costo
+                        ? moneda.format(ventasMes.ingreso - ventasMes.piezas * producto.costo)
+                        : '—'}
+                    </dd>
                   </div>
                 </dl>
-                {/* TODO: llenar con las ventas reales cuando se conecte Registrar venta */}
-                <Pendiente texto="Las ventas del mes aparecerán cuando se conecte Registrar venta." />
+   
               </>
             )}
           </section>
