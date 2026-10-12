@@ -294,6 +294,8 @@ export default function ProductoForm() {
 
               let piezas = 0
               let ingreso = 0
+              let costo = 0 // lo que costó lo vendido (con el costo de cada venta)
+              let sinCosto = 0 // piezas de ventas viejas sin costo guardado
 
               ventas
                 .filter((v) => new Date(v.fecha_venta) >= inicioMes)
@@ -303,11 +305,13 @@ export default function ProductoForm() {
                       piezas += d.cantidad
                       ingreso += Number(d.precio_unitario) * d.cantidad
                     }
+                    if (d.costo_unitario != null) costo += Number(d.costo_unitario) * d.cantidad
+                      else sinCosto += d.cantidad
                   })
                 )
 
-              if (sigueMontado) setVentasMes({ piezas, ingreso })
-            })
+              if (sigueMontado) setVentasMes({ piezas, ingreso, costo, sinCosto })
+              })
             .catch(() => {})
         }
 
@@ -1442,10 +1446,9 @@ export default function ProductoForm() {
                   </div>
 
                   <div>
-                    <dt>Ganancia estimada del mes</dt>
-                    <dd>
-                      {ventasMes && producto?.costo
-                        ? moneda.format(ventasMes.ingreso - ventasMes.piezas * producto.costo)
+                   <dd>
+                      {ventasMes && (ventasMes.sinCosto === 0 || producto?.costo)
+                        ? moneda.format(ventasMes.ingreso - ventasMes.costo - ventasMes.sinCosto * (producto?.costo ?? 0))
                         : '—'}
                     </dd>
                   </div>

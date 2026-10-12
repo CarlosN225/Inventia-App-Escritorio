@@ -216,6 +216,7 @@ class DetalleVenta(models.Model):
     tipo_precio = models.CharField(max_length=10, choices=TIPO_PRECIO_CHOICES, default="normal")
     # Bitácora de precios: cuánto costaba, por qué se cambió y quién lo autorizó
     precio_lista = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    costo_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # costo de ESE día
     motivo_precio = models.CharField(max_length=120, blank=True, default="")
     autorizado_por = models.ForeignKey(
         Usuario,

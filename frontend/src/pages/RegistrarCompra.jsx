@@ -279,6 +279,12 @@ export default function RegistrarCompra() {
             : 'baja'
           : null
 
+      // Costos sospechosos: casi siempre es el precio de la caja capturado como si fuera de la pieza (o al revés)
+      const costoMayorPrecio = costoValido && producto.precio > 0 && costo >= producto.precio
+      const costoMuyBajo = costoValido && costoAnterior !== null && costo < costoAnterior * 0.3
+      const costoSugerido = costoMayorPrecio && porEmpaque > 1 ? redondear(costo / porEmpaque) : null
+      const costoSospechoso = (costoMayorPrecio || costoMuyBajo) && !item.costoConfirmado
+
       const caducidadVencida = item.caducidad !== '' && diasHasta(item.caducidad) < 0
 
       const conversion =
@@ -298,12 +304,15 @@ export default function RegistrarCompra() {
         costoValido,
         costoAnterior,
         cambioCosto,
+        costoMayorPrecio,
+        costoMuyBajo,
+        costoSugerido,
+        costoSospechoso,
         subtotal: costoValido ? redondear(piezas * costo) : 0,
         stockActual: producto.stock,
         nuevoStock: producto.stock + piezas,
         caducidadVencida,
-        conError: !costoValido || caducidadVencida,
-      }
+        conError: !costoValido || caducidadVencida || costoSospechoso,      }
     })
 
   const totalPiezas = renglones.reduce((suma, r) => suma + r.piezas, 0)
@@ -319,9 +328,12 @@ export default function RegistrarCompra() {
     motivoBloqueo = 'escribe o elige el proveedor'
   } else if (renglonesConError.length > 0) {
     const r = renglonesConError[0]
-    motivoBloqueo = !r.costoValido
+      motivoBloqueo = !r.costoValido
       ? `falta el costo de ${r.producto.nombre}`
-      : `la caducidad de ${r.producto.nombre} ya pasó`
+      : r.costoSospechoso
+        ? `revisa el costo de ${r.producto.nombre}`
+        : `la caducidad de ${r.producto.nombre} ya pasó`
+    
   }
 
   /* ---------- Registrar y cancelar ---------- */
@@ -879,7 +891,7 @@ export default function RegistrarCompra() {
                             step="0.01"
                             inputMode="decimal"
                             value={r.costo}
-                            onChange={(e) => actualizar(r.id, { costo: e.target.value })}
+                            onChange={(e) => actualizar(r.id, { costo: e.target.value, costoConfirmado: false })}
                             aria-label={`Costo por ${textoUnidad(r.unidad, 1, true)} de ${r.producto.nombre}`}
                           />
                           <span className="rc-sufijo">/{textoUnidad(r.unidad, 1)}</span>
@@ -916,7 +928,7 @@ export default function RegistrarCompra() {
                         {' · '}Stock {r.stockActual} → <strong>{r.nuevoStock}</strong>
                       </p>
 
-                      {r.conError && (
+                                            {(!r.costoValido || r.caducidadVencida) && (
                         <p className="rv-renglon__error">
                           <AlertTriangle size={12} aria-hidden="true" />
                           {!r.costoValido
@@ -924,6 +936,56 @@ export default function RegistrarCompra() {
                             : 'Esa fecha de caducidad ya pasó'}
                         </p>
                       )}
+
+                      {/* Costo sospechoso: hay que corregirlo o confirmarlo */}
+                      {r.costoValido && r.costoSospechoso && (
+                        <div className="rc-alerta-costo" role="alert">
+                          <p>
+                            <AlertTriangle size={14} aria-hidden="true" />
+                            <span>
+                              {r.costoMayorPrecio ? (
+                                <>
+                                  Lo estás comprando <strong>más caro de lo que lo vendes</strong> (
+                                  {moneda.format(r.producto.precio)} por {textoUnidad(r.unidad, 1)}).
+                                  {r.costoSugerido !== null && (
+                                    <>
+                                      {' '}
+                                      ¿Capturaste el precio de la {textoUnidad(r.empaque, 1)}? Por {textoUnidad(r.unidad, 1)}{' '}
+                                      serían <strong>{moneda.format(r.costoSugerido)}</strong> ({moneda.format(r.costoNum)} ÷{' '}
+                                      {r.porEmpaque}).
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  Es <strong>mucho menos</strong> de lo que te costaba ({moneda.format(r.costoAnterior)} por{' '}
+                                  {textoUnidad(r.unidad, 1)}). ¿Está bien?
+                                </>
+                              )}
+                            </span>
+                          </p>
+
+                          <div className="rc-alerta-costo__botones">
+                            {r.costoSugerido !== null && (
+                              <button
+                                type="button"
+                                className="rc-alerta-costo__boton is-principal"
+                                onClick={() => actualizar(r.id, { costo: String(r.costoSugerido), costoConfirmado: false })}
+                              >
+                                Usar {moneda.format(r.costoSugerido)} por {textoUnidad(r.unidad, 1)}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="rc-alerta-costo__boton"
+                              onClick={() => actualizar(r.id, { costoConfirmado: true })}
+                            >
+                              Sí, el costo es correcto
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
                     </div>
                   </li>
                 ))}

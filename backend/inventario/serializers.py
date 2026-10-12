@@ -234,8 +234,17 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
         model = DetalleVenta
         fields = [
             "id", "producto", "producto_nombre", "cantidad", "precio_unitario", "subtotal", "tipo_precio",
-            "precio_lista", "motivo_precio", "autorizado_por", "autorizado_por_nombre",
+            "precio_lista", "costo_unitario", "motivo_precio", "autorizado_por", "autorizado_por_nombre",
         ]
+
+    def to_representation(self, instance):
+        datos = super().to_representation(instance)
+        # El costo solo lo ve el propietario
+        request = self.context.get("request")
+        if not request or request.session.get("rol") != "propietario":
+            datos.pop("costo_unitario", None)
+        return datos
+
 
 class VentaSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.nombre_completo", read_only=True)
@@ -247,8 +256,7 @@ class VentaSerializer(serializers.ModelSerializer):
 
     def get_detalles(self, obj):
         # Usa lo que ya se trajo con prefetch_related (sin consultar otra vez)
-        return DetalleVentaSerializer(obj.detalles.all(), many=True).data
- 
+        return DetalleVentaSerializer(obj.detalles.all(), many=True, context=self.context).data
 
 class DetalleCompraSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)

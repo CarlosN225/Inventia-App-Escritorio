@@ -1046,3 +1046,24 @@
 .dash-kpis:has(.dash-kpi:nth-child(3):last-child) {
   grid-template-columns: repeat(3, 1fr);
 }
+
+/* La burbujita del valor: fija en el día más alto, y al pasar el mouse en los demás */
+.dash-chart__valor {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.dash-chart__valor.is-fijo,
+.dash-chart__columna:hover .dash-chart__valor {
+  opacity: 1;
+}
+
+.dash-chart__columna:hover .dash-chart__valor:not(.is-fijo) {
+  z-index: 2;
+}
+
+/* Al pasar el mouse por un día con ganancia, la barra se ilumina un poquito */
+.dash-chart__columna:hover .dash-chart__barra {
+  filter: brightness(1.15);
+}
