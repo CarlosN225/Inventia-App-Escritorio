@@ -11,7 +11,8 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'correo',
             'telefono_whatsapp',
             'rol',
-            'activo'
+            'activo',
+            'debe_cambiar_contrasena',
         ]
 
 
@@ -45,7 +46,8 @@ class UsuarioRegistroSerializer(serializers.ModelSerializer):
         usuario = Usuario(
             **validated_data,
             rol='encargado',
-            activo=True
+            activo=True,
+            debe_cambiar_contrasena=True  # la que le da el dueño es temporal
         )
 
         usuario.contrasena_hash = make_password(contrasena)
