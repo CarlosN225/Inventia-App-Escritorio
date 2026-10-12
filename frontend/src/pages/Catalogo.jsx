@@ -23,19 +23,18 @@ import {
   Loader2,
   WifiOff,
   RotateCcw,
-  CheckCircle2,
-  AlertCircle,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { useAjustes } from '../hooks/useConfiguracion'
 import { getUsuarioActual } from '../services/auth'
 import { listarProductos, cambiarActivoProducto, mensajeDeError } from '../services/productos'
+import { notificar } from '../services/notificar'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/catalogo.css'
-import { notificar } from '../services/notificar.js'
 
 const POR_PAGINA = 15
-const DIAS_AVISO_CADUCIDAD = 30
+const DIAS_AVISO_CADUCIDAD = 30 // solo si la configuración todavía no carga
 const MARGEN_BAJO = 25
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
@@ -44,7 +43,7 @@ const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MX
 
 // Quita acentos y pasa a minúsculas para que "mazapan" encuentre "Mazapán"
 function normalizar(texto) {
-  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return (texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 function estadoStock(p) {
@@ -53,8 +52,8 @@ function estadoStock(p) {
   return 'ok'
 }
 
-function porCaducar(p) {
-  return p.diasCaducar !== null && p.diasCaducar <= DIAS_AVISO_CADUCIDAD
+function porCaducar(p, aviso = DIAS_AVISO_CADUCIDAD) {
+  return p.diasCaducar !== null && p.diasCaducar <= aviso
 }
 
 // null si no se puede calcular (por ejemplo, el encargado no recibe el costo)
@@ -95,7 +94,7 @@ function PastillaStock({ producto }) {
   )
 }
 
-function Caducidad({ producto }) {
+function Caducidad({ producto, aviso = DIAS_AVISO_CADUCIDAD }) {
   if (!producto.caducidad) {
     return <span className="cat-sin-fecha">Sin fecha de caducidad registrada</span>
   }
@@ -112,7 +111,7 @@ function Caducidad({ producto }) {
     )
   }
 
-  if (dias <= DIAS_AVISO_CADUCIDAD) {
+  if (dias <= aviso) {
     return (
       <span className={'cat-caduca' + (dias <= 7 ? ' is-urgente' : '')}>
         <CalendarClock size={13} aria-hidden="true" />
@@ -141,6 +140,11 @@ function FotoProducto({ producto, grande = false }) {
 export default function Catalogo() {
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Lo que el dueño prendió en Configuración
+  const ajustes = useAjustes()
+  const aviso = ajustes.diasAviso
+  const conCaducidad = ajustes.maneja_caducidad
 
   const [usuarioActual, setUsuarioActual] = useState(null)
   const [productos, setProductos] = useState([])
@@ -174,7 +178,8 @@ export default function Catalogo() {
       setCargando(false)
     }
   }
-  // Aviso que manda el formulario al guardar (ej. "Chocolate Carlos V se actualizó.")
+
+  // El formulario manda cuál producto resaltar al guardar
   useEffect(() => {
     const { resaltar } = location.state ?? {}
     if (!resaltar) return
@@ -185,8 +190,6 @@ export default function Catalogo() {
     navigate(location.pathname, { replace: true, state: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
- 
-
 
   useEffect(() => {
     getUsuarioActual()
@@ -196,6 +199,11 @@ export default function Catalogo() {
     cargarProductos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Si apagan la caducidad estando en ese filtro, regresa a "Todos"
+  useEffect(() => {
+    if (!conCaducidad && estado === 'caducar') setEstado('todos')
+  }, [conCaducidad, estado])
 
   useEffect(() => {
     if (menuAbierto === null) return
@@ -223,6 +231,7 @@ export default function Catalogo() {
 
   const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
   const desactivados = useMemo(() => productos.filter((p) => !p.activo), [productos])
+
   // Lleva a la página del producto recién guardado y le quita el resaltado a los 3 segundos
   useEffect(() => {
     if (resaltado === null || cargando) return
@@ -234,15 +243,14 @@ export default function Catalogo() {
     return () => clearTimeout(temporizador)
   }, [resaltado, cargando, activos])
 
-
   const resumen = useMemo(
     () => ({
       total: activos.length,
       bajo: activos.filter((p) => estadoStock(p) === 'bajo').length,
       agotado: activos.filter((p) => estadoStock(p) === 'agotado').length,
-      caducar: activos.filter(porCaducar).length,
+      caducar: activos.filter((p) => porCaducar(p, aviso)).length,
     }),
-    [activos]
+    [activos, aviso]
   )
 
   // Categorías que tienen productos, en el orden fijo de la lista de 16
@@ -265,14 +273,14 @@ export default function Catalogo() {
     const base = estado === 'desactivados' ? desactivados : activos
 
     return base.filter((p) => {
-      if (texto && !normalizar(`${p.nombre} ${p.marca}`).includes(texto)) return false
+      if (texto && !normalizar(`${p.nombre} ${p.marca} ${p.descripcion}`).includes(texto)) return false
       if (categoria !== 'Todas' && p.categoria !== categoria) return false
       if (estado === 'bajo' && estadoStock(p) !== 'bajo') return false
       if (estado === 'agotado' && estadoStock(p) !== 'agotado') return false
-      if (estado === 'caducar' && !porCaducar(p)) return false
+      if (estado === 'caducar' && !porCaducar(p, aviso)) return false
       return true
     })
-  }, [activos, desactivados, busqueda, categoria, estado])
+  }, [activos, desactivados, busqueda, categoria, estado, aviso])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
@@ -343,8 +351,16 @@ export default function Catalogo() {
       texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`,
       clase: 'cat-resumen__chip--agotado',
     },
-    { id: 'caducar', icono: CalendarClock, texto: `${resumen.caducar} por caducar`, clase: 'cat-resumen__chip--caducar' },
   ]
+
+  if (conCaducidad) {
+    chipsResumen.push({
+      id: 'caducar',
+      icono: CalendarClock,
+      texto: `${resumen.caducar} por caducar`,
+      clase: 'cat-resumen__chip--caducar',
+    })
+  }
 
   if (esPropietario && desactivados.length > 0) {
     chipsResumen.push({
@@ -394,8 +410,6 @@ export default function Catalogo() {
         )}
       </header>
 
-      
-
       {/* ============ FILTROS ============ */}
       <section className="cat-panel">
         <div className="cat-barra">
@@ -403,7 +417,7 @@ export default function Catalogo() {
             <Search size={16} className="cat-buscador__icono" aria-hidden="true" />
             <input
               type="text"
-              placeholder="Busca por nombre o marca..."
+              placeholder="Busca por nombre, marca o descripción..."
               value={busqueda}
               onChange={(e) => cambiarBusqueda(e.target.value)}
               aria-label="Buscar producto"
@@ -427,7 +441,7 @@ export default function Catalogo() {
               <option value="todos">Todos</option>
               <option value="bajo">Stock bajo</option>
               <option value="agotado">Agotados</option>
-              <option value="caducar">Por caducar</option>
+              {conCaducidad && <option value="caducar">Por caducar</option>}
               {esPropietario && <option value="desactivados">Desactivados</option>}
             </select>
           </label>
@@ -549,7 +563,7 @@ export default function Catalogo() {
                 {esPropietario && <th className="is-der">Último costo</th>}
                 {esPropietario && <th className="is-der">Margen</th>}
                 <th>Stock</th>
-                <th>Caducidad</th>
+                {conCaducidad && <th>Caducidad</th>}
                 <th className="is-der">Acciones</th>
               </tr>
             </thead>
@@ -560,7 +574,7 @@ export default function Catalogo() {
                 const abreArriba = visibles.length > 3 && indice >= visibles.length - 2
 
                 return (
-                 <tr
+                  <tr
                     key={p.id}
                     className={(p.activo ? '' : 'cat-fila-inactiva') + (p.id === resaltado ? ' cat-fila-resaltada' : '')}
                   >
@@ -570,7 +584,8 @@ export default function Catalogo() {
                         <FotoProducto producto={p} />
                         <div>
                           <p className="cat-producto__nombre">
-                            {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                            {p.nombre}
+                            {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                             {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
                           </p>
                           {(p.marca || p.descripcion) && (
@@ -578,7 +593,7 @@ export default function Catalogo() {
                               {[p.marca, p.descripcion].filter(Boolean).join(' · ')}
                             </p>
                           )}
-                         </div>
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -598,9 +613,11 @@ export default function Catalogo() {
                     <td>
                       <PastillaStock producto={p} />
                     </td>
-                    <td className="cat-col-caducidad">
-                      <Caducidad producto={p} />
-                    </td>
+                    {conCaducidad && (
+                      <td className="cat-col-caducidad">
+                        <Caducidad producto={p} aviso={aviso} />
+                      </td>
+                    )}
                     <td className="is-der">
                       <div className="cat-acciones" ref={menuAbierto === p.id ? menuRef : null}>
                         {esPropietario && p.activo && (
@@ -683,7 +700,10 @@ export default function Catalogo() {
                     <span className="cat-tarjeta__numero">No. {inicio + indice + 1}</span>
                   </div>
 
-                  <p className="cat-tarjeta__nombre">{p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}</p>
+                  <p className="cat-tarjeta__nombre">
+                    {p.nombre}
+                    {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                  </p>
                   <div className="cat-tarjeta__etiquetas">
                     <span className="cat-chip">{p.categoria}</span>
                     {p.marca && <span className="cat-tarjeta__marca-texto">{p.marca}</span>}
@@ -699,7 +719,7 @@ export default function Catalogo() {
 
                   <div className="cat-tarjeta__pie">
                     <PastillaStock producto={p} />
-                    {porCaducar(p) && <Caducidad producto={p} />}
+                    {conCaducidad && porCaducar(p, aviso) && <Caducidad producto={p} aviso={aviso} />}
                   </div>
 
                   {esPropietario &&

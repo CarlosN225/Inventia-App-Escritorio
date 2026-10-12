@@ -51,6 +51,7 @@ export function leerAjustes(config) {
     diasAviso: config?.whatsapp?.dias_aviso_caducidad ?? 30,
     horaResumen: config?.whatsapp?.hora_resumen ?? '20:00',
     telefonoAlertas: config?.whatsapp?.telefono_alertas ?? '',
+    contactoAlertas: config?.whatsapp?.contacto_alertas ?? '',
     pinConfigurado: !!config?.seguridad?.pin_configurado,
   }
 }
