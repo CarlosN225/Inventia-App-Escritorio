@@ -926,3 +926,411 @@ html:root[data-theme='dark'] .rc-alerta-costo__boton.is-principal {
   background: #e5a54b;
   color: #1e1e1e;
 }
+ /* ============================================================
+   20. ASISTENTE DE CONFIGURACIÓN INICIAL
+   ============================================================ */
+
+/* ---------- Contenedor principal ---------- */
+html:root[data-theme='dark'] .as {
+  background: #0d0f12;
+  color: #e0e0e0;
+}
+
+/* ---------- Marca ---------- */
+html:root[data-theme='dark'] .as-marca__nombre {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-marca__sub {
+  color: #5cc4e6;
+}
+
+html:root[data-theme='dark'] .as-demo {
+  border-color: rgba(229, 165, 75, 0.4);
+  background: rgba(229, 165, 75, 0.1);
+  color: #e5a54b;
+}
+
+/* ---------- Pasos (círculos 1-2-3-4) ---------- */
+html:root[data-theme='dark'] .as-paso + .as-paso::before {
+  background: #23262d;
+}
+
+html:root[data-theme='dark'] .as-paso__circulo {
+  border-color: #23262d;
+  background: #181a1f;
+  color: #6b7280;
+}
+
+html:root[data-theme='dark'] .as-paso--hecho .as-paso__circulo {
+  border-color: #181a1f;
+  background: #4cc38a;
+  color: #0d0f12;
+  box-shadow: 0 0 0 4px rgba(76, 195, 138, 0.14);
+}
+
+html:root[data-theme='dark'] .as-paso--actual .as-paso__circulo {
+  border-color: #181a1f;
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.16);
+}
+
+html:root[data-theme='dark'] .as-paso__nombre {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-paso--hecho .as-paso__nombre {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-paso--actual .as-paso__nombre {
+  color: #7dd3fc;
+}
+
+/* ---------- Tarjeta principal ---------- */
+html:root[data-theme='dark'] .as-tarjeta {
+  border-color: #23262d;
+  background: #181a1f;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+}
+
+html:root[data-theme='dark'] .as-seccion__cabecera {
+  border-bottom-color: #23262d;
+}
+
+html:root[data-theme='dark'] .as-titulo {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-subtitulo {
+  color: #8b919a;
+}
+
+/* ---------- Insignias ---------- */
+html:root[data-theme='dark'] .as-insignia {
+  border-color: rgba(76, 195, 138, 0.28);
+  background: rgba(76, 195, 138, 0.1);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .as-insignia--morada {
+  border-color: rgba(169, 155, 240, 0.28);
+  background: rgba(169, 155, 240, 0.1);
+  color: #b8acf5;
+}
+
+/* ---------- Aviso de error ---------- */
+html:root[data-theme='dark'] .as-aviso {
+  border-color: rgba(240, 113, 113, 0.3);
+  background: rgba(240, 113, 113, 0.08);
+  color: #f0a0a0;
+}
+
+/* ---------- Campos (inputs) ---------- */
+html:root[data-theme='dark'] .as-etiqueta {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-requerido {
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .as-input {
+  border-color: #23262d;
+  background: #12141a;
+  color: #6b7280;
+}
+
+html:root[data-theme='dark'] .as-input:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+  color: #7dd3fc;
+}
+
+html:root[data-theme='dark'] .as-input.is-error {
+  border-color: #f0a0a0;
+}
+
+/* El input de adentro NO dibuja caja propia */
+html:root[data-theme='dark'] .as-input input,
+html:root[data-theme='dark'] .as-input input:focus,
+html:root[data-theme='dark'] .as-input input:focus-visible {
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-input input::placeholder {
+  color: #6b7280;
+}
+
+/* El ojo de la contraseña */
+html:root[data-theme='dark'] .as-ojo {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-ojo:hover {
+  background: #23262d;
+  color: #e0e0e0;
+}
+
+/* Ayuda y errores */
+html:root[data-theme='dark'] .as-ayuda {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-error {
+  color: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .as-enlace {
+  color: #7dd3fc;
+}
+
+/* ---------- Medidor de contraseña ---------- */
+
+/* Fondo base de todas las barras */
+html:root[data-theme='dark'] .as-medidor__barras span {
+  background: #23262d;
+}
+
+/* Colores según la fuerza */
+html:root[data-theme='dark'] .as-medidor--1 .as-medidor__barras span:nth-child(-n + 1) {
+  background: #f0a0a0;
+}
+
+html:root[data-theme='dark'] .as-medidor--2 .as-medidor__barras span:nth-child(-n + 2) {
+  background: #e5a54b;
+}
+
+html:root[data-theme='dark'] .as-medidor--3 .as-medidor__barras span:nth-child(-n + 3) {
+  background: #5cc4e6;
+}
+
+html:root[data-theme='dark'] .as-medidor--4 .as-medidor__barras span:nth-child(-n + 4) {
+  background: #4cc38a;
+}
+
+/* Texto "Débil / Regular / Buena / Segura" según el nivel */
+html:root[data-theme='dark'] .as-medidor__texto {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-medidor--1 .as-medidor__texto { color: #f0a0a0; }
+html:root[data-theme='dark'] .as-medidor--2 .as-medidor__texto { color: #e5a54b; }
+html:root[data-theme='dark'] .as-medidor--3 .as-medidor__texto { color: #5cc4e6; }
+html:root[data-theme='dark'] .as-medidor--4 .as-medidor__texto { color: #4cc38a; }
+
+/* Reglas de contraseña (Al menos 8 caracteres, etc.) */
+html:root[data-theme='dark'] .as-reglas {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-reglas li.is-ok {
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .as-reglas__icono {
+  border-color: #35383f;
+}
+
+html:root[data-theme='dark'] .as-reglas li.is-ok .as-reglas__icono {
+  border-color: #4cc38a;
+  background: #4cc38a;
+  color: #0d0f12;
+}
+
+/* ---------- Preguntas (paso 3) ---------- */
+html:root[data-theme='dark'] .as-pregunta {
+  border-color: #23262d;
+  background: #12141a;
+}
+
+html:root[data-theme='dark'] .as-pregunta.is-error {
+  border-color: rgba(240, 113, 113, 0.3);
+  background: rgba(240, 113, 113, 0.05);
+}
+
+html:root[data-theme='dark'] .as-pregunta__icono {
+  background: rgba(34, 197, 184, 0.12);
+  color: #5cc4e6;
+}
+
+html:root[data-theme='dark'] .as-pregunta__icono.is-whatsapp {
+  background: rgba(76, 195, 138, 0.12);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .as-pregunta__titulo {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-pregunta__ejemplo {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-recomendado {
+  border-color: rgba(76, 195, 138, 0.28);
+  background: rgba(76, 195, 138, 0.1);
+  color: #7dd3a0;
+}
+
+/* Botones Sí/No */
+html:root[data-theme='dark'] .as-sino button {
+  border-color: #23262d;
+  background: #181a1f;
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-sino button:hover {
+  border-color: #35383f;
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-sino button.is-activo {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  color: #7dd3fc;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+}
+
+/* ---------- ¡Listo! (paso 4) ---------- */
+html:root[data-theme='dark'] .as-listo__dulce {
+  border-color: #23262d;
+  background: #181a1f;
+  color: #7dd3fc;
+  box-shadow:
+    0 0 0 10px rgba(34, 197, 184, 0.08),
+    0 14px 30px rgba(0, 0, 0, 0.4);
+}
+
+html:root[data-theme='dark'] .as-listo__check {
+  border-color: #181a1f;
+  background: #4cc38a;
+  color: #0d0f12;
+}
+
+html:root[data-theme='dark'] .as-listo__titulo {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-listo__texto {
+  color: #8b919a;
+}
+
+/* Resumen final */
+html:root[data-theme='dark'] .as-resumen {
+  border-color: #23262d;
+  background: #12141a;
+}
+
+html:root[data-theme='dark'] .as-resumen__cabecera {
+  border-bottom-color: #23262d;
+}
+
+html:root[data-theme='dark'] .as-resumen__icono {
+  background: rgba(34, 197, 184, 0.12);
+  color: #5cc4e6;
+}
+
+html:root[data-theme='dark'] .as-resumen__etiqueta {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-resumen__negocio {
+  color: #e0e0e0;
+}
+
+/* Chips del resumen */
+html:root[data-theme='dark'] .as-chip--verde {
+  border-color: rgba(76, 195, 138, 0.28);
+  background: rgba(76, 195, 138, 0.1);
+  color: #7dd3a0;
+}
+
+html:root[data-theme='dark'] .as-chip--gris {
+  border-color: #23262d;
+  background: #1e2126;
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-chip--morado {
+  border-color: rgba(169, 155, 240, 0.28);
+  background: rgba(169, 155, 240, 0.1);
+  color: #b8acf5;
+}
+
+/* Opciones finales (Agregar productos / Lo hago después) */
+html:root[data-theme='dark'] .as-opcion {
+  border-color: #23262d;
+  background: #12141a;
+}
+
+html:root[data-theme='dark'] .as-opcion--recomendada {
+  border-color: #22c5b8;
+  background: #181a1f;
+  box-shadow: 0 10px 28px rgba(34, 197, 184, 0.12);
+}
+
+html:root[data-theme='dark'] .as-opcion__etiqueta {
+  background: #22c5b8;
+  color: #0d0f12;
+}
+
+html:root[data-theme='dark'] .as-opcion__icono {
+  background: rgba(34, 197, 184, 0.12);
+  color: #5cc4e6;
+}
+
+html:root[data-theme='dark'] .as-opcion__icono--gris {
+  background: #1e2126;
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-opcion__titulo {
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-opcion__texto {
+  color: #8b919a;
+}
+
+html:root[data-theme='dark'] .as-recuerda {
+  border-color: #23262d;
+  background: #181a1f;
+  color: #8b919a;
+}
+
+/* ---------- Botones ---------- */
+html:root[data-theme='dark'] .as-boton--primario {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.22);
+}
+
+html:root[data-theme='dark'] .as-boton--primario:not(:disabled):hover {
+  background: #2563eb;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+}
+
+html:root[data-theme='dark'] .as-boton--secundario {
+  border-color: #23262d;
+  background: #181a1f;
+  color: #e0e0e0;
+}
+
+html:root[data-theme='dark'] .as-boton--secundario:not(:disabled):hover {
+  background: #1e2126;
+  border-color: #35383f;
+}
+
+html:root[data-theme='dark'] .as-acciones {
+  border-top-color: #23262d;
+}
+
+html:root[data-theme='dark'] .as-pie {
+  color: #6b7280;
+}

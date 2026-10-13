@@ -386,7 +386,7 @@ export default function AsistenteInicial() {
                     id="as-negocio"
                     autoFocus
                     maxLength={120}
-                    placeholder="Ej. Dulcería Los Querubines"
+                    placeholder="Ej. Dulcería La Esperanza"
                     value={negocio.nombre}
                     onChange={(e) => cambiar('negocio', 'nombre', e.target.value)}
                   />
@@ -470,7 +470,7 @@ export default function AsistenteInicial() {
                     id="as-correo"
                     type="email"
                     autoComplete="email"
-                    placeholder="Ej. ana@querubines.com"
+                    placeholder="Ej. nombre@micorreo.com"
                     value={propietario.correo}
                     onChange={(e) => cambiar('propietario', 'correo', e.target.value)}
                   />

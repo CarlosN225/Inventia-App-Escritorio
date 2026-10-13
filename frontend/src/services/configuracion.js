@@ -31,7 +31,8 @@ export async function guardarConfiguracion(cambios) {
 
 // "Dulcería Los Querubines" -> "Los Querubines" (la barra ya dice "Dulcería:")
 export function nombreCorto(nombre) {
-  return (nombre ?? '').replace(/^dulcer[ií]a\s+/i, '').trim()
+  const texto = (nombre ?? '').trim()
+  return texto.replace(/^dulcer[ií]a\s+/i, '') || texto
 }
 
 // Si todavía no carga (o falla), la app se comporta como recién configurada

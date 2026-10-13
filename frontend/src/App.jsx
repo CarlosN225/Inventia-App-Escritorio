@@ -17,16 +17,30 @@ import CorreccionInventario from './pages/CorreccionInventario.jsx'
 import MiPerfil from './pages/MiPerfil.jsx'
 import Ayuda from './pages/Ayuda.jsx'
 import ContrasenaObligatoria from './components/ContrasenaObligatoria.jsx'
-
+import BotonTema from './components/BotonTema.jsx'
 
 export default function App() {
   return (
     <>
       <Routes>
-        {/* Sin sidebar y sin protección: la entrada (login o asistente) y el asistente de la primera vez */}
-        <Route path="/" element={<PuertaDeEntrada />} />
-        <Route path="/bienvenida" element={<AsistenteInicial />} />
-
+                <Route
+          path="/"
+          element={
+            <>
+              <PuertaDeEntrada />
+              <BotonTema />
+            </>
+          }
+        />
+        <Route
+          path="/bienvenida"
+          element={
+            <>
+              <AsistenteInicial />
+              <BotonTema />
+            </>
+          }
+        />
         {/* Todo lo interno requiere sesión activa */}
         <Route element={<RutaProtegida />}>
           <Route
