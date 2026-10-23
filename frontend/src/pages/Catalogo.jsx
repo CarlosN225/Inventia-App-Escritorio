@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   Plus,
@@ -15,26 +15,38 @@ import {
   ChevronRight,
   Candy,
   X,
+  Check,
   History,
   EyeOff,
+  Eye,
+  FileText,
   SearchX,
   PackageOpen,
+  Loader2,
+  WifiOff,
+  RotateCcw,
 } from 'lucide-react'
 
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import FichaProducto from '../components/FichaProducto.jsx'
+import { useAjustes } from '../hooks/useConfiguracion'
+import { getUsuarioActual } from '../services/auth'
+import { listarProductos, cambiarActivoProducto, mensajeDeError } from '../services/productos'
+import { listarVentas } from '../services/ventas'
+import { notificar } from '../services/notificar'
+import { textoUnidad } from '../utils/unidades'
 import '../styles/catalogo.css'
 
-/* ============================================================
-   ESTADO INICIAL — Todo vacío hasta conectar el backend
-   ------------------------------------------------------------
-   PRODUCTOS:  catálogo del negocio
-   CATEGORIAS: categorías disponibles (o se calculan de PRODUCTOS)
-   ============================================================ */
-const PRODUCTOS = []
-const CATEGORIAS = []
-
 const POR_PAGINA = 15
-const DIAS_AVISO_CADUCIDAD = 30
+const DIAS_AVISO_CADUCIDAD = 30 // solo si la configuración todavía no carga
 const MARGEN_BAJO = 25
+
+const ORDENES = [
+  { id: 'nombre', label: 'Nombre (A–Z)' },
+  { id: 'nombre-desc', label: 'Nombre (Z–A)' },
+  { id: 'vendidos', label: 'Más vendidos' },
+  { id: 'recientes', label: 'Recientes' },
+]
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 
@@ -42,7 +54,7 @@ const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MX
 
 // Quita acentos y pasa a minúsculas para que "mazapan" encuentre "Mazapán"
 function normalizar(texto) {
-  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return (texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 function estadoStock(p) {
@@ -51,22 +63,39 @@ function estadoStock(p) {
   return 'ok'
 }
 
-function porCaducar(p) {
-  return p.diasCaducar !== null && p.diasCaducar <= DIAS_AVISO_CADUCIDAD
+function porCaducar(p, aviso = DIAS_AVISO_CADUCIDAD) {
+  return p.diasCaducar !== null && p.diasCaducar <= aviso
 }
 
+// null si no se puede calcular (por ejemplo, el encargado no recibe el costo)
 function margen(p) {
+  if (p.costo === null || !p.precio) return null
   return Math.round(((p.precio - p.costo) / p.precio) * 100)
+}
+
+// Números de página con puntos suspensivos: 1 … 4 5 6 … 20
+function paginasVisibles(total, actual) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+  const paginas = [1]
+  const desde = Math.max(2, actual - 1)
+  const hasta = Math.min(total - 1, actual + 1)
+
+  if (desde > 2) paginas.push('…')
+  for (let n = desde; n <= hasta; n++) paginas.push(n)
+  if (hasta < total - 1) paginas.push('…')
+
+  paginas.push(total)
+  return paginas
 }
 
 /* ============ Componentes auxiliares ============ */
 
 function PastillaStock({ producto }) {
   const estado = estadoStock(producto)
+  const unidad = textoUnidad(producto.unidad, producto.stock)
   const texto =
-    estado === 'agotado'
-      ? '0 · Agotado'
-      : `${producto.stock} pzas${estado === 'bajo' ? ' · Bajo' : ''}`
+    estado === 'agotado' ? '0 · Agotado' : `${producto.stock} ${unidad}${estado === 'bajo' ? ' · Bajo' : ''}`
 
   return (
     <span className={`cat-stock cat-stock--${estado}`}>
@@ -76,17 +105,32 @@ function PastillaStock({ producto }) {
   )
 }
 
-function Caducidad({ producto }) {
+function Caducidad({ producto, aviso = DIAS_AVISO_CADUCIDAD }) {
   if (!producto.caducidad) {
-    return <span className="cat-sin-fecha">Sin fecha de caducidad registrada</span>
+    return (
+      <span className="cat-sin-fecha" title="Sin fecha de caducidad registrada">
+        Sin fecha
+      </span>
+    )
   }
 
-  if (porCaducar(producto)) {
-    const urgente = producto.diasCaducar <= 7
+  const dias = producto.diasCaducar
+
+  if (dias < 0) {
+    const pasaron = Math.abs(dias)
     return (
-      <span className={'cat-caduca' + (urgente ? ' is-urgente' : '')}>
+      <span className="cat-caduca is-urgente">
         <CalendarClock size={13} aria-hidden="true" />
-        Caduca en {producto.diasCaducar} días
+        Caducó hace {pasaron} {pasaron === 1 ? 'día' : 'días'}
+      </span>
+    )
+  }
+
+  if (dias <= aviso) {
+    return (
+      <span className={'cat-caduca' + (dias <= 7 ? ' is-urgente' : '')}>
+        <CalendarClock size={13} aria-hidden="true" />
+        {dias === 0 ? 'Caduca hoy' : `Caduca en ${dias} ${dias === 1 ? 'día' : 'días'}`}
       </span>
     )
   }
@@ -94,19 +138,108 @@ function Caducidad({ producto }) {
   return <span>{producto.caducidad}</span>
 }
 
+function FotoProducto({ producto, grande = false }) {
+  return (
+    <span className={'cat-placeholder' + (grande ? ' cat-placeholder--grande' : '')} aria-hidden="true">
+      {producto.imagen ? (
+        <img src={producto.imagen} alt="" className="cat-foto" />
+      ) : (
+        <Candy size={grande ? 22 : 16} />
+      )}
+    </span>
+  )
+}
+
 /* ============ Componente principal ============ */
 
 export default function Catalogo() {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Lo que el dueño prendió en Configuración
+  const ajustes = useAjustes()
+  const aviso = ajustes.diasAviso
+  const conCaducidad = ajustes.maneja_caducidad
+  const conMayoreo = ajustes.vende_mayoreo
+  const conPromos = ajustes.maneja_promociones
+  const conCodigo = ajustes.usa_codigo_barras
+
+  const [usuarioActual, setUsuarioActual] = useState(null)
+  const [productos, setProductos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState(null)
+  const [aCambiar, setACambiar] = useState(null) // producto que se va a desactivar o reactivar
+  const [resaltado, setResaltado] = useState(null) // id del producto recién guardado
+  const [fichaDe, setFichaDe] = useState(null) // el producto que se está viendo en la ficha
 
   const [busqueda, setBusqueda] = useState('')
-  const [categoria, setCategoria] = useState('Todas')
+  const [elegidas, setElegidas] = useState(() => new Set()) // categorías elegidas; vacío = todas
   const [estado, setEstado] = useState('todos')
+  const [orden, setOrden] = useState('nombre')
+  const [vendidos, setVendidos] = useState(() => new Map()) // id -> piezas vendidas en 30 días
+
   const [vista, setVista] = useState('tabla')
   const [pagina, setPagina] = useState(1)
   const [menuAbierto, setMenuAbierto] = useState(null)
 
   const menuRef = useRef(null)
+
+  const esPropietario = usuarioActual?.rol === 'propietario'
+
+  /* ============ Cargar del backend ============ */
+
+  async function cargarProductos() {
+    setCargando(true)
+    setError(null)
+
+    try {
+      setProductos(await listarProductos())
+    } catch (e) {
+      setError(mensajeDeError(e))
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  // El formulario manda cuál producto resaltar al guardar
+  useEffect(() => {
+    const { resaltar } = location.state ?? {}
+    if (!resaltar) return
+
+    setResaltado(resaltar)
+
+    // Lo borra para que no vuelva a salir si recargas la página
+    navigate(location.pathname, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    getUsuarioActual()
+      .then(setUsuarioActual)
+      .catch(() => setUsuarioActual(null))
+
+    cargarProductos()
+
+    // Para "Más vendidos" y la ficha: piezas de los últimos 30 días (si falla, simplemente no se muestran)
+    listarVentas()
+      .then((ventas) => {
+        const desde = Date.now() - 30 * 24 * 60 * 60 * 1000
+        const piezas = new Map()
+        ventas
+          .filter((v) => new Date(v.fecha_venta).getTime() >= desde)
+          .forEach((v) =>
+            (v.detalles ?? []).forEach((d) => piezas.set(d.producto, (piezas.get(d.producto) || 0) + d.cantidad))
+          )
+        setVendidos(piezas)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Si apagan la caducidad estando en ese filtro, regresa a "Todos"
+  useEffect(() => {
+    if (!conCaducidad && estado === 'caducar') setEstado('todos')
+  }, [conCaducidad, estado])
 
   useEffect(() => {
     if (menuAbierto === null) return
@@ -132,45 +265,80 @@ export default function Catalogo() {
 
   /* ============ Cómputos ============ */
 
+  const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
+  const desactivados = useMemo(() => productos.filter((p) => !p.activo), [productos])
+
   const resumen = useMemo(
     () => ({
-      total: PRODUCTOS.length,
-      bajo: PRODUCTOS.filter((p) => estadoStock(p) === 'bajo').length,
-      agotado: PRODUCTOS.filter((p) => estadoStock(p) === 'agotado').length,
-      caducar: PRODUCTOS.filter(porCaducar).length,
+      total: activos.length,
+      bajo: activos.filter((p) => estadoStock(p) === 'bajo').length,
+      agotado: activos.filter((p) => estadoStock(p) === 'agotado').length,
+      caducar: activos.filter((p) => porCaducar(p, aviso)).length,
     }),
-    []
+    [activos, aviso]
   )
+
+  // Categorías que tienen productos, en el orden fijo de la lista de 16
+  const categorias = useMemo(() => {
+    const porNombre = new Map()
+    activos.forEach((p) => porNombre.set(p.categoria, p.categoriaId))
+    return [...porNombre.entries()].sort((a, b) => a[1] - b[1]).map(([nombre]) => nombre)
+  }, [activos])
 
   const conteoCategorias = useMemo(() => {
     const conteo = {}
-    PRODUCTOS.forEach((p) => {
+    activos.forEach((p) => {
       conteo[p.categoria] = (conteo[p.categoria] || 0) + 1
     })
     return conteo
-  }, [])
+  }, [activos])
 
   const filtrados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
+    const base = estado === 'desactivados' ? desactivados : activos
+    const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
 
-    return PRODUCTOS.filter((p) => {
-      if (texto && !normalizar(`${p.nombre} ${p.marca}`).includes(texto)) return false
-      if (categoria !== 'Todas' && p.categoria !== categoria) return false
+    const lista = base.filter((p) => {
+      if (texto && !normalizar(`${p.nombre} ${p.marca} ${p.descripcion}`).includes(texto)) return false
+      if (elegidas.size > 0 && !elegidas.has(p.categoria)) return false
       if (estado === 'bajo' && estadoStock(p) !== 'bajo') return false
       if (estado === 'agotado' && estadoStock(p) !== 'agotado') return false
-      if (estado === 'caducar' && !porCaducar(p)) return false
+      if (estado === 'caducar' && !porCaducar(p, aviso)) return false
       return true
     })
-  }, [busqueda, categoria, estado])
+
+    return [...lista].sort((a, b) => {
+      if (orden === 'nombre-desc') return porNombre(b, a)
+      if (orden === 'vendidos') return (vendidos.get(b.id) || 0) - (vendidos.get(a.id) || 0) || porNombre(a, b)
+      if (orden === 'recientes') {
+        // Con fecha primero (la más nueva arriba); los que no tienen, del más nuevo al más viejo
+        const fa = a.actualizadoEn ? new Date(a.actualizadoEn).getTime() : 0
+        const fb = b.actualizadoEn ? new Date(b.actualizadoEn).getTime() : 0
+        return fb - fa || b.id - a.id
+      }
+      return porNombre(a, b)
+    })
+  }, [activos, desactivados, busqueda, elegidas, estado, aviso, orden, vendidos])
+  
+  // Lleva a la página del producto recién guardado y le quita el resaltado a los 3 segundos
+  useEffect(() => {
+    if (resaltado === null || cargando) return
+
+    const indice = filtrados.findIndex((p) => p.id === resaltado)
+    if (indice >= 0) setPagina(Math.floor(indice / POR_PAGINA) + 1)
+
+    const temporizador = setTimeout(() => setResaltado(null), 3000)
+    return () => clearTimeout(temporizador)
+  }, [resaltado, cargando, filtrados])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
   const inicio = (paginaActual - 1) * POR_PAGINA
   const visibles = filtrados.slice(inicio, inicio + POR_PAGINA)
-  const hayFiltros = busqueda !== '' || categoria !== 'Todas' || estado !== 'todos'
-
-  const sinProductos = PRODUCTOS.length === 0
-  const sinResultados = filtrados.length === 0 && !sinProductos
+  const hayFiltros = busqueda !== '' || elegidas.size > 0 || estado !== 'todos'
+  
+  const sinProductos = !cargando && !error && productos.length === 0
+  const sinResultados = !cargando && !error && !sinProductos && filtrados.length === 0
 
   /* ============ Acciones ============ */
 
@@ -179,8 +347,14 @@ export default function Catalogo() {
     setPagina(1)
   }
 
-  function cambiarCategoria(valor) {
-    setCategoria(valor)
+   // Prende o apaga una categoría; "Todas" limpia la selección
+  function alternarCategoria(nombre) {
+    setElegidas((actual) => {
+      if (nombre === 'Todas') return new Set()
+      const copia = new Set(actual)
+      copia.has(nombre) ? copia.delete(nombre) : copia.add(nombre)
+      return copia
+    })
     setPagina(1)
   }
 
@@ -191,7 +365,7 @@ export default function Catalogo() {
 
   function limpiarFiltros() {
     setBusqueda('')
-    setCategoria('Todas')
+    setElegidas(new Set())    
     setEstado('todos')
     setPagina(1)
   }
@@ -200,12 +374,62 @@ export default function Catalogo() {
     navigate(`/catalogo/${id}/editar`)
   }
 
+  function verFicha(producto) {
+    setMenuAbierto(null)
+    setFichaDe(producto)
+  }
+
+  function pedirCambioActivo(producto) {
+    setMenuAbierto(null)
+    setACambiar(producto)
+  }
+
+  async function confirmarCambioActivo() {
+    const producto = aCambiar
+    setACambiar(null)
+
+    try {
+      const actualizado = await cambiarActivoProducto(producto.id, !producto.activo)
+      setProductos((lista) => lista.map((p) => (p.id === actualizado.id ? actualizado : p)))
+      notificar({
+        tipo: 'ok',
+        texto: actualizado.activo
+          ? `${actualizado.nombre} se reactivó y vuelve a aparecer en ventas.`
+          : `${actualizado.nombre} se desactivó. Su historial se conserva.`,
+      })
+    } catch (e) {
+      notificar({ tipo: 'error', texto: mensajeDeError(e) })
+    }
+  }
+
   const chipsResumen = [
-    { id: 'todos',   icono: Package,       texto: `${resumen.total} productos`, clase: '' },
-    { id: 'bajo',    icono: AlertTriangle, texto: `${resumen.bajo} stock bajo`, clase: 'cat-resumen__chip--bajo' },
-    { id: 'agotado', icono: XCircle,       texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`, clase: 'cat-resumen__chip--agotado' },
-    { id: 'caducar', icono: CalendarClock, texto: `${resumen.caducar} por caducar`, clase: 'cat-resumen__chip--caducar' },
+    { id: 'todos', icono: Package, texto: `${resumen.total} productos`, clase: '' },
+    { id: 'bajo', icono: AlertTriangle, texto: `${resumen.bajo} stock bajo`, clase: 'cat-resumen__chip--bajo' },
+    {
+      id: 'agotado',
+      icono: XCircle,
+      texto: `${resumen.agotado} agotado${resumen.agotado === 1 ? '' : 's'}`,
+      clase: 'cat-resumen__chip--agotado',
+    },
   ]
+
+  if (conCaducidad) {
+    chipsResumen.push({
+      id: 'caducar',
+      icono: CalendarClock,
+      texto: `${resumen.caducar} por caducar`,
+      clase: 'cat-resumen__chip--caducar',
+    })
+  }
+
+  if (esPropietario && desactivados.length > 0) {
+    chipsResumen.push({
+      id: 'desactivados',
+      icono: EyeOff,
+      texto: `${desactivados.length} desactivado${desactivados.length === 1 ? '' : 's'}`,
+      clase: 'cat-resumen__chip--desactivado',
+    })
+  }
 
   return (
     <div className="cat">
@@ -214,32 +438,32 @@ export default function Catalogo() {
         <div>
           <h1 className="cat-encabezado__titulo">Catálogo</h1>
           <p className="cat-encabezado__subtitulo">
-            {sinProductos
-              ? 'Aún no tienes productos registrados'
-              : `Todos los productos de tu negocio`}
+            {cargando
+              ? 'Cargando tus productos…'
+              : sinProductos
+                ? 'Aún no tienes productos registrados'
+                : 'Todos los productos de tu negocio'}
           </p>
 
-          <div className="cat-resumen">
-            {chipsResumen.map(({ id, icono: Icono, texto, clase }) => (
-              <button
-                key={id}
-                type="button"
-                className={`cat-resumen__chip ${clase}` + (estado === id ? ' is-activo' : '')}
-                onClick={() => cambiarEstado(id)}
-              >
-                <Icono size={14} aria-hidden="true" />
-                {texto}
-              </button>
-            ))}
-          </div>
+          {!cargando && !error && (
+            <div className="cat-resumen">
+              {chipsResumen.map(({ id, icono: Icono, texto, clase }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`cat-resumen__chip ${clase}` + (estado === id ? ' is-activo' : '')}
+                  onClick={() => cambiarEstado(id)}
+                >
+                  <Icono size={14} aria-hidden="true" />
+                  {texto}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {!sinProductos && (
-          <button
-            type="button"
-            className="cat-boton-primario"
-            onClick={() => navigate('/catalogo/nuevo')}
-          >
+        {!sinProductos && !cargando && !error && esPropietario && (
+          <button type="button" className="cat-boton-primario" onClick={() => navigate('/catalogo/nuevo')}>
             <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
             Nuevo producto
           </button>
@@ -253,10 +477,11 @@ export default function Catalogo() {
             <Search size={16} className="cat-buscador__icono" aria-hidden="true" />
             <input
               type="text"
-              placeholder="Busca por nombre o marca..."
+              placeholder="Busca por nombre, marca o descripción..."
               value={busqueda}
               onChange={(e) => cambiarBusqueda(e.target.value)}
               aria-label="Buscar producto"
+              disabled={cargando || !!error}
             />
             {busqueda && (
               <button
@@ -272,11 +497,30 @@ export default function Catalogo() {
 
           <label className="cat-estado">
             <span className="cat-estado__etiqueta">Estado</span>
-            <select value={estado} onChange={(e) => cambiarEstado(e.target.value)}>
+            <select value={estado} onChange={(e) => cambiarEstado(e.target.value)} disabled={cargando || !!error}>
               <option value="todos">Todos</option>
               <option value="bajo">Stock bajo</option>
               <option value="agotado">Agotados</option>
-              <option value="caducar">Por caducar</option>
+              {conCaducidad && <option value="caducar">Por caducar</option>}
+              {esPropietario && <option value="desactivados">Desactivados</option>}
+            </select>
+          </label>
+
+          <label className="cat-estado">
+            <span className="cat-estado__etiqueta">Ordenar</span>
+            <select
+              value={orden}
+              onChange={(e) => {
+                setOrden(e.target.value)
+                setPagina(1)
+              }}
+              disabled={cargando || !!error}
+            >
+              {ORDENES.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -304,52 +548,89 @@ export default function Catalogo() {
           </div>
         </div>
 
-        {CATEGORIAS.length > 0 && (
-          <div className="cat-categorias">
+                {categorias.length > 0 && estado !== 'desactivados' && (
+          <div className="cat-categorias" role="group" aria-label="Filtrar por categorías">
             <button
               type="button"
-              className={'cat-categoria' + (categoria === 'Todas' ? ' is-activa' : '')}
-              onClick={() => cambiarCategoria('Todas')}
+              aria-pressed={elegidas.size === 0}
+              className={'cat-categoria' + (elegidas.size === 0 ? ' is-activa' : '')}
+              onClick={() => alternarCategoria('Todas')}
             >
-              Todas<span className="cat-categoria__conteo">({PRODUCTOS.length})</span>
+              Todas<span className="cat-categoria__conteo">({activos.length})</span>
             </button>
 
-            {CATEGORIAS.filter((c) => conteoCategorias[c]).map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={'cat-categoria' + (categoria === c ? ' is-activa' : '')}
-                onClick={() => cambiarCategoria(c)}
-              >
-                {c}
-                <span className="cat-categoria__conteo">({conteoCategorias[c] || 0})</span>
-              </button>
-            ))}
+            {categorias.map((c) => {
+              const prendida = elegidas.has(c)
+
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={prendida}
+                  className={'cat-categoria' + (prendida ? ' is-activa' : '')}
+                  onClick={() => alternarCategoria(c)}
+                >
+                  {prendida && <Check size={13} strokeWidth={3} aria-hidden="true" />}
+                  {c}
+                  <span className="cat-categoria__conteo">({conteoCategorias[c] || 0})</span>
+                </button>
+              )
+            })}
+
+            {elegidas.size > 0 && (
+              <span className="cat-categorias__elegidas">
+                {elegidas.size} {elegidas.size === 1 ? 'categoría elegida' : 'categorías elegidas'} ·{' '}
+                <button type="button" onClick={() => alternarCategoria('Todas')}>
+                  Quitar
+                </button>
+              </span>
+            )}
           </div>
         )}
+        
       </section>
 
       {/* ============ RESULTADOS ============ */}
       <section className="cat-panel cat-panel--tabla">
-
-        {/* --- Sin productos registrados --- */}
-        {sinProductos ? (
+        {cargando ? (
+          /* --- Cargando --- */
+          <div className="cat-vacio-estado">
+            <span className="cat-vacio-estado__icono" aria-hidden="true">
+              <Loader2 size={22} className="cat-girando" />
+            </span>
+            <p className="cat-vacio-estado__titulo">Cargando productos…</p>
+          </div>
+        ) : error ? (
+          /* --- No se pudo cargar --- */
+          <div className="cat-vacio-estado">
+            <span className="cat-vacio-estado__icono cat-vacio-estado__icono--error" aria-hidden="true">
+              <WifiOff size={22} />
+            </span>
+            <p className="cat-vacio-estado__titulo">No pudimos cargar tus productos</p>
+            <p className="cat-vacio-estado__texto">{error}</p>
+            <button type="button" className="cat-boton-secundario" onClick={cargarProductos}>
+              <RotateCcw size={14} aria-hidden="true" />
+              Reintentar
+            </button>
+          </div>
+        ) : sinProductos ? (
+          /* --- Sin productos registrados --- */
           <div className="cat-vacio-estado">
             <span className="cat-vacio-estado__icono" aria-hidden="true">
               <PackageOpen size={22} />
             </span>
             <p className="cat-vacio-estado__titulo">Aún no tienes productos</p>
             <p className="cat-vacio-estado__texto">
-              Agrega tu primer producto para empezar a controlar tu inventario.
+              {esPropietario
+                ? 'Agrega tu primer producto para empezar a controlar tu inventario.'
+                : 'Pídele al propietario que agregue los productos del negocio.'}
             </p>
-            <button
-              type="button"
-              className="cat-boton-primario"
-              onClick={() => navigate('/catalogo/nuevo')}
-            >
-              <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
-              Nuevo producto
-            </button>
+            {esPropietario && (
+              <button type="button" className="cat-boton-primario" onClick={() => navigate('/catalogo/nuevo')}>
+                <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+                Nuevo producto
+              </button>
+            )}
           </div>
         ) : sinResultados ? (
           /* --- Sin resultados por filtros --- */
@@ -371,14 +652,14 @@ export default function Catalogo() {
             <thead>
               <tr>
                 <th className="cat-col-num">No.</th>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th className="is-der">Precio</th>
-                <th className="is-der">Último costo</th>
-                <th className="is-der">Margen</th>
-                <th>Stock</th>
-                <th>Caducidad</th>
-                <th className="is-der">Acciones</th>
+                <th className="cat-col-producto">Producto</th>
+                <th className="cat-col-categoria">Categoría</th>
+                <th className="is-der cat-col-precio">Precio</th>
+                {esPropietario && <th className="is-der cat-col-costo">Último costo</th>}
+                {esPropietario && <th className="is-der cat-col-margen">Margen</th>}
+                <th className="cat-col-stock">Stock</th>
+                {conCaducidad && <th className="cat-col-caducidad">Caducidad</th>}
+                <th className="is-der cat-col-acciones">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -388,16 +669,31 @@ export default function Catalogo() {
                 const abreArriba = visibles.length > 3 && indice >= visibles.length - 2
 
                 return (
-                  <tr key={p.id}>
+                  <tr
+                    key={p.id}
+                    className={(p.activo ? '' : 'cat-fila-inactiva') + (p.id === resaltado ? ' cat-fila-resaltada' : '')}
+                  >
                     <td className="cat-col-num">{numero}</td>
                     <td className="cat-col-producto">
                       <div className="cat-producto">
-                        <span className="cat-placeholder" aria-hidden="true">
-                          <Candy size={16} />
-                        </span>
+                        <FotoProducto producto={p} />
                         <div>
-                          <p className="cat-producto__nombre">{p.nombre}</p>
-                          <p className="cat-producto__marca">{p.marca}</p>
+                          <p className="cat-producto__nombre">
+                            {p.nombre}
+                            {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                            {!p.activo && <span className="cat-chip-inactivo">Desactivado</span>}
+                          </p>
+                          {(p.marca || p.descripcion || orden === 'vendidos') && (
+                            <p className="cat-producto__marca" title={p.descripcion || undefined}>
+                              {[
+                                orden === 'vendidos' && `${vendidos.get(p.id) || 0} vendidas en 30 días`,
+                                p.marca,
+                                p.descripcion,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -405,25 +701,49 @@ export default function Catalogo() {
                       <span className="cat-chip">{p.categoria}</span>
                     </td>
                     <td className="is-der cat-precio">{moneda.format(p.precio)}</td>
-                    <td className="is-der cat-costo">{moneda.format(p.costo)}</td>
-                    <td className={'is-der cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}%</td>
+                    {esPropietario && (
+                      <td className="is-der cat-costo">
+                        {p.costo !== null ? moneda.format(p.costo) : <span className="cat-sin-dato">—</span>}
+                      </td>
+                    )}
+                    {esPropietario && (
+                      <td className={'is-der cat-margen' + (m !== null && m < MARGEN_BAJO ? ' is-bajo' : '')}>
+                        {m !== null ? `${m}%` : <span className="cat-sin-dato">—</span>}
+                      </td>
+                    )}
                     <td>
                       <PastillaStock producto={p} />
                     </td>
-                    <td className="cat-col-caducidad">
-                      <Caducidad producto={p} />
-                    </td>
+                    {conCaducidad && (
+                      <td className="cat-col-caducidad">
+                        <Caducidad producto={p} aviso={aviso} />
+                      </td>
+                    )}
                     <td className="is-der">
                       <div className="cat-acciones" ref={menuAbierto === p.id ? menuRef : null}>
+                        {/* Ver ficha: lo ven todos */}
                         <button
                           type="button"
                           className="cat-icono-boton"
-                          title="Editar"
-                          aria-label={`Editar ${p.nombre}`}
-                          onClick={() => irAEditar(p.id)}
+                          title="Ver ficha"
+                          aria-label={`Ver ficha de ${p.nombre}`}
+                          onClick={() => verFicha(p)}
                         >
-                          <Pencil size={16} />
+                          <Eye size={16} />
                         </button>
+
+                        {esPropietario && p.activo && (
+                          <button
+                            type="button"
+                            className="cat-icono-boton"
+                            title="Editar"
+                            aria-label={`Editar ${p.nombre}`}
+                            onClick={() => irAEditar(p.id)}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           className="cat-icono-boton"
@@ -437,24 +757,37 @@ export default function Catalogo() {
 
                         {menuAbierto === p.id && (
                           <div className={'cat-menu' + (abreArriba ? ' cat-menu--arriba' : '')} role="menu">
-                            <button type="button" role="menuitem" onClick={() => irAEditar(p.id)}>
-                              <Pencil size={14} aria-hidden="true" />
-                              Editar producto
+                            <button type="button" role="menuitem" onClick={() => verFicha(p)}>
+                              <FileText size={14} aria-hidden="true" />
+                              Ver ficha
                             </button>
+                            {esPropietario && p.activo && (
+                              <button type="button" role="menuitem" onClick={() => irAEditar(p.id)}>
+                                <Pencil size={14} aria-hidden="true" />
+                                Editar producto
+                              </button>
+                            )}
                             <button type="button" role="menuitem" onClick={() => navigate('/movimientos')}>
                               <History size={14} aria-hidden="true" />
                               Ver movimientos
                             </button>
-                            {/* TODO: conectar con el backend (desactivar, no borrar) */}
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="is-peligro"
-                              onClick={() => setMenuAbierto(null)}
-                            >
-                              <EyeOff size={14} aria-hidden="true" />
-                              Desactivar
-                            </button>
+                            {esPropietario &&
+                              (p.activo ? (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="is-peligro"
+                                  onClick={() => pedirCambioActivo(p)}
+                                >
+                                  <EyeOff size={14} aria-hidden="true" />
+                                  Desactivar
+                                </button>
+                              ) : (
+                                <button type="button" role="menuitem" onClick={() => pedirCambioActivo(p)}>
+                                  <Eye size={14} aria-hidden="true" />
+                                  Reactivar
+                                </button>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -471,33 +804,60 @@ export default function Catalogo() {
               const m = margen(p)
 
               return (
-                <article className="cat-tarjeta" key={p.id}>
+                <article
+                  className={
+                    'cat-tarjeta' +
+                    (p.activo ? '' : ' cat-tarjeta--inactiva') +
+                    (p.id === resaltado ? ' cat-tarjeta--resaltada' : '')
+                  }
+                  key={p.id}
+                >
                   <div className="cat-tarjeta__arriba">
-                    <span className="cat-placeholder cat-placeholder--grande" aria-hidden="true">
-                      <Candy size={22} />
-                    </span>
+                    <FotoProducto producto={p} grande />
                     <span className="cat-tarjeta__numero">No. {inicio + indice + 1}</span>
                   </div>
 
-                  <p className="cat-tarjeta__nombre">{p.nombre}</p>
-                  <p className="cat-tarjeta__marca">
-                    {p.marca} · {p.categoria}
+                  <p className="cat-tarjeta__nombre">
+                    {p.nombre}
+                    {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                   </p>
+                  <div className="cat-tarjeta__etiquetas">
+                    <span className="cat-chip">{p.categoria}</span>
+                    {p.marca && <span className="cat-tarjeta__marca-texto">{p.marca}</span>}
+                  </div>
+                  {p.descripcion && <p className="cat-tarjeta__desc">{p.descripcion}</p>}
 
                   <div className="cat-tarjeta__precio">
                     <span className="cat-precio">{moneda.format(p.precio)}</span>
-                    <span className={'cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}% margen</span>
+                    {esPropietario && m !== null && (
+                      <span className={'cat-margen' + (m < MARGEN_BAJO ? ' is-bajo' : '')}>{m}% margen</span>
+                    )}
                   </div>
 
                   <div className="cat-tarjeta__pie">
                     <PastillaStock producto={p} />
-                    {porCaducar(p) && <Caducidad producto={p} />}
+                    {conCaducidad && porCaducar(p, aviso) && <Caducidad producto={p} aviso={aviso} />}
                   </div>
 
-                  <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
-                    <Pencil size={14} aria-hidden="true" />
-                    Editar
-                  </button>
+                  <div className="cat-tarjeta__botones">
+                    <button type="button" className="cat-boton-secundario" onClick={() => verFicha(p)}>
+                      <Eye size={14} aria-hidden="true" />
+                      Ver ficha
+                    </button>
+
+                    {esPropietario &&
+                      (p.activo ? (
+                        <button type="button" className="cat-boton-secundario" onClick={() => irAEditar(p.id)}>
+                          <Pencil size={14} aria-hidden="true" />
+                          Editar
+                        </button>
+                      ) : (
+                        <button type="button" className="cat-boton-secundario" onClick={() => pedirCambioActivo(p)}>
+                          <Eye size={14} aria-hidden="true" />
+                          Reactivar
+                        </button>
+                      ))}
+                  </div>
                 </article>
               )
             })}
@@ -505,47 +865,93 @@ export default function Catalogo() {
         )}
 
         {/* ============ PAGINACIÓN ============ */}
-        {!sinProductos && !sinResultados && (
+        {!cargando && !error && !sinProductos && !sinResultados && (
           <footer className="cat-paginacion">
             <span>
-              Mostrando <strong>{inicio + 1}–{Math.min(inicio + POR_PAGINA, filtrados.length)}</strong> de{' '}
-              <strong>{filtrados.length}</strong> productos
+              Mostrando{' '}
+              <strong>
+                {inicio + 1}–{Math.min(inicio + POR_PAGINA, filtrados.length)}
+              </strong>{' '}
+              de <strong>{filtrados.length}</strong> productos
             </span>
 
-            <div className="cat-paginacion__botones">
-              <button
-                type="button"
-                disabled={paginaActual === 1}
-                onClick={() => setPagina(paginaActual - 1)}
-              >
-                <ChevronLeft size={15} aria-hidden="true" />
-                Anterior
-              </button>
-
-              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={'cat-pagina' + (n === paginaActual ? ' is-activa' : '')}
-                  onClick={() => setPagina(n)}
-                  aria-current={n === paginaActual ? 'page' : undefined}
-                >
-                  {n}
+            {totalPaginas > 1 && (
+              <div className="cat-paginacion__botones">
+                <button type="button" disabled={paginaActual === 1} onClick={() => setPagina(paginaActual - 1)}>
+                  <ChevronLeft size={15} aria-hidden="true" />
+                  Anterior
                 </button>
-              ))}
 
-              <button
-                type="button"
-                disabled={paginaActual === totalPaginas}
-                onClick={() => setPagina(paginaActual + 1)}
-              >
-                Siguiente
-                <ChevronRight size={15} aria-hidden="true" />
-              </button>
-            </div>
+                {paginasVisibles(totalPaginas, paginaActual).map((n, i) =>
+                  n === '…' ? (
+                    <span key={`puntos-${i}`} className="cat-paginacion__puntos">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      type="button"
+                      className={'cat-pagina' + (n === paginaActual ? ' is-activa' : '')}
+                      onClick={() => setPagina(n)}
+                      aria-current={n === paginaActual ? 'page' : undefined}
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+
+                <button
+                  type="button"
+                  disabled={paginaActual === totalPaginas}
+                  onClick={() => setPagina(paginaActual + 1)}
+                >
+                  Siguiente
+                  <ChevronRight size={15} aria-hidden="true" />
+                </button>
+              </div>
+            )}
           </footer>
         )}
       </section>
+
+      {/* ============ FICHA DEL PRODUCTO ============ */}
+      {fichaDe && (
+        <FichaProducto
+          producto={fichaDe}
+          esPropietario={esPropietario}
+          conCaducidad={conCaducidad}
+          conMayoreo={conMayoreo}
+          conPromos={conPromos}
+          conCodigo={conCodigo}
+          aviso={aviso}
+          vendidas30={vendidos.get(fichaDe.id) || 0}
+          onCerrar={() => setFichaDe(null)}
+          onEditar={() => irAEditar(fichaDe.id)}
+          onVerMovimientos={() => navigate('/movimientos')}
+          onComprar={() =>
+            navigate('/registrar-compra', {
+              state: { agregar: { id: fichaDe.id, piezas: fichaDe.piezasEmpaque || 1 } },
+            })
+          }
+        />
+      )}
+
+      <ConfirmDialog
+        open={aCambiar !== null}
+        title={aCambiar?.activo ? '¿Desactivar el producto?' : '¿Reactivar el producto?'}
+        message={
+          aCambiar
+            ? aCambiar.activo
+              ? `${aCambiar.nombre} ya no aparecerá en ventas ni en el catálogo. Su historial se conserva y lo puedes reactivar cuando quieras.`
+              : `${aCambiar.nombre} vuelve a aparecer en el catálogo y en ventas.`
+            : ''
+        }
+        confirmText={aCambiar?.activo ? 'Sí, desactivar' : 'Sí, reactivar'}
+        cancelText="Cancelar"
+        tone={aCambiar?.activo ? 'danger' : 'default'}
+        onConfirm={confirmarCambioActivo}
+        onCancel={() => setACambiar(null)}
+      />
     </div>
   )
 }

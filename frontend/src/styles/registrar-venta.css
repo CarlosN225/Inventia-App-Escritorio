@@ -1029,9 +1029,47 @@
   max-width: 340px;
 }
 
+/* ============ CONECTADO AL BACKEND ============ */
+
+.rv-girando {
+  animation: rv-girar 0.9s linear infinite;
+}
+
+@keyframes rv-girar {
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 1100px) {
   .rv { grid-template-columns: minmax(0, 1fr); }
   .rv-ticket { position: static; max-height: none; }
   .rv-izquierda { max-height: none; }
   .rv-rapidos { max-height: 380px; }
+}
+
+/* Precio cambiado con autorización: quién lo autorizó (el motivo sale al pasar el mouse) */
+.rv-chip--autorizado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  cursor: help;
+}
+
+.rv-rapido__gramaje {
+  align-self: flex-start;
+  margin: 2px 0 0;
+}
+/* "+ Bolsa (25)": agrega el empaque completo */
+.rv-mas-empaque {
+  border-color: #c9e4f8;
+  background: #eef6fd;
+  color: #0369a1;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rv-mas-empaque:hover {
+  border-color: #0369a1;
 }

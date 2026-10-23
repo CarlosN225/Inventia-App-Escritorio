@@ -1,0 +1,340 @@
+/* ============================================================
+   MODAL DE ATENCIÓN AL ENTRAR — estilo neutro, solo el botón en azul
+   ============================================================ */
+
+.ma {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(11, 18, 32, 0.5);
+  backdrop-filter: blur(4px);
+  animation: ma-fondo 0.2s ease-out;
+}
+
+.ma-caja {
+  position: relative;
+  width: min(880px, 100%);
+  overflow: hidden;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e6eaf0;
+  box-shadow: 0 30px 70px rgba(11, 18, 32, 0.28);
+  animation: ma-entrar 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+/* ---------- Cerrar ---------- */
+
+.ma-cerrar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ma-cerrar:hover {
+  background: #f1f4f9;
+  color: #0b1220;
+}
+
+/* ---------- Encabezado neutro ---------- */
+
+.ma-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 24px 20px;
+  border-bottom: 1px solid #eef1f5;
+  background: #ffffff;
+}
+
+/* Campana gris neutra, sin azul */
+.ma-campana {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #f1f4f9;
+  border: 1px solid #e6eaf0;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.ma-cabecera__texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.ma-fecha {
+  margin: 0;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ma-titulo {
+  margin: 2px 0 3px;
+  color: #0b1220;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.ma-sub {
+  margin: 0;
+  color: #64748b;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.ma-sub strong {
+  color: #0b1220;
+}
+
+/* ---------- Tarjetas de grupo ---------- */
+
+.ma-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 20px 24px 8px;
+  list-style: none;
+}
+
+.ma-lista--1 { grid-template-columns: minmax(0, 440px); justify-content: center; }
+.ma-lista--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.ma-lista li {
+  opacity: 0;
+  animation: ma-aparecer 0.35s ease-out forwards;
+}
+
+.ma-fila {
+  --tono: #dc2626;
+  --fondo: #fef2f2;
+  --borde: #f7c9c9;
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #eef1f5;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0b1220;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease,
+              background 140ms ease;
+  height: 100%;
+}
+
+.ma-fila:hover {
+  background: var(--fondo);
+  border-color: var(--borde);
+  box-shadow: 0 8px 20px rgba(11, 18, 32, 0.06);
+  transform: translateY(-2px);
+}
+
+.ma-fila--rojo  { --tono: #dc2626; --fondo: #fef2f2; --borde: #f7c9c9; }
+.ma-fila--ambar { --tono: #d97706; --fondo: #fffbeb; --borde: #fde68a; }
+.ma-fila--rosa  { --tono: #e11d48; --fondo: #fff1f2; --borde: #fecdd3; }
+
+.ma-fila__icono {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--fondo);
+  color: var(--tono);
+  flex-shrink: 0;
+  transition: background 140ms ease;
+}
+
+.ma-fila:hover .ma-fila__icono {
+  background: #ffffff;
+}
+
+.ma-fila__textos {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ma-fila__titulo {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #0b1220;
+}
+
+.ma-fila__titulo strong {
+  margin-right: 3px;
+  color: var(--tono);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ma-fila__nombres {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ma-fila__flecha {
+  flex-shrink: 0;
+  color: #cbd5e1;
+  transition: transform 140ms ease, color 140ms ease;
+}
+
+.ma-fila:hover .ma-fila__flecha {
+  color: var(--tono);
+  transform: translateX(3px);
+}
+
+/* ---------- Botones al pie ---------- */
+
+.ma-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 24px 22px;
+  border-top: 1px solid #eef1f5;
+  background: #f8fafc;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+.ma-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0b1220;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease,
+              border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.ma-boton:hover {
+  background: #f1f4f9;
+  border-color: #c9d8ed;
+  color: #1668e3;
+}
+
+.ma-boton:active {
+  transform: translateY(1px);
+}
+
+/* ⭐ El único azul del modal */
+.ma-boton--primario {
+  border-color: #1668e3;
+  background: #1668e3;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(22, 104, 227, 0.24);
+}
+
+.ma-boton--primario:hover {
+  background: #1257c2;
+  border-color: #1257c2;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(22, 104, 227, 0.32);
+}
+
+.ma-boton--primario:active {
+  transform: translateY(1px);
+}
+
+/* Botón fantasma "Revisar después" */
+.ma-boton--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: #64748b;
+}
+
+.ma-boton--ghost:hover {
+  background: #eef1f5;
+  border-color: transparent;
+  color: #0b1220;
+}
+
+/* ---------- Animaciones ---------- */
+
+@keyframes ma-fondo {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes ma-entrar {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ma-aparecer {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 720px) {
+  .ma-cabecera {
+    padding: 20px 20px 18px;
+  }
+
+  .ma-titulo {
+    font-size: 20px;
+  }
+
+  .ma-lista,
+  .ma-lista--2 {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px 20px 6px;
+  }
+
+  .ma-pie {
+    padding: 16px 20px 18px;
+    flex-direction: column-reverse;
+  }
+
+  .ma-pie .ma-boton {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -5,7 +5,7 @@ import {
   EyeOff,
   Check,
   WifiOff,
-  MessageCircle,
+  Mail,
   ShieldCheck,
   Store,
   KeyRound,
@@ -20,11 +20,11 @@ const NOMBRE_NEGOCIO = 'Dulcería Los Querubines'
 
 const features = [
   { icon: WifiOff, text: 'Funciona sin conexión a internet' },
-  { icon: MessageCircle, text: 'Alertas automáticas por WhatsApp' },
+  { icon: Mail, text: 'Alertas automáticas por correo' },
   { icon: ShieldCheck, text: 'Control seguro de tu inventario' },
 ]
 
-export default function Login() {
+export default function Login({ nombreNegocio }) {  
   const navigate = useNavigate()
 
   const [errorMsg, setErrorMsg] = useState('')
@@ -120,7 +120,7 @@ export default function Login() {
 
         <p className="login-hero__subtitle">
           Controla entradas y salidas, evita quedarte sin stock y recibe avisos
-          por WhatsApp antes de que se agote lo que más vendes.
+          por correo antes de que se agote lo que más vendes.
         </p>
 
         <ul className="login-hero__features">
@@ -140,7 +140,7 @@ export default function Login() {
         {/* Nombre del negocio */}
         <div className="login-negocio">
           <Store size={16} strokeWidth={2.2} aria-hidden="true" />
-          {NOMBRE_NEGOCIO}
+          {nombreNegocio || 'Tu negocio'}
         </div>
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>

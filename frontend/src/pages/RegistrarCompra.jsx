@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useAjustes } from '../hooks/useConfiguracion'
+
 import {
   Search,
   X,
@@ -26,27 +28,21 @@ import {
   PlusCircle,
   Lock,
   PackageOpen,
+  Loader2,
+  RotateCcw,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { listarProductos, mensajeDeError } from '../services/productos'
+import { listarCompras, registrarCompra } from '../services/compras'
+import { mensajeDelBackend } from '../services/movimientos'
+import { textoUnidad } from '../utils/unidades'
 import '../styles/registrar-venta.css'
 import '../styles/registrar-compra.css'
-
-/* ============================================================
-   ESTADO INICIAL — Todo vacío hasta conectar el backend
-   ------------------------------------------------------------
-   PRODUCTOS:              catálogo del negocio
-   DETALLES:               info extra por producto (empaque, máximo, etc.)
-   PROVEEDORES_FRECUENTES: lista de proveedores ya usados
-   ============================================================ */
-const PRODUCTOS = []
-const DETALLES = {}
-const PROVEEDORES_FRECUENTES = []
-
-// TODO: traer de la Configuración del negocio
-const CONFIG = { maneja_caducidad: true }
+import { notificar } from '../services/notificar'
 
 const MAX_RESULTADOS = 6
+const MAX_FRECUENTES = 5
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const fechaLarga = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -79,18 +75,25 @@ function diasHasta(iso) {
   return Math.round((aFecha(iso) - hoy) / 86400000)
 }
 
-function plural(palabra, cantidad) {
-  return cantidad === 1 ? palabra : `${palabra}s`
-}
-
 function capitalizar(texto) {
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
-function PastillaHay({ disponible, minimo }) {
-  if (disponible === 0) return <span className="rv-stock rv-stock--agotado">Agotado</span>
-  if (disponible < minimo) return <span className="rv-stock rv-stock--bajo">Hay {disponible} · Stock bajo</span>
-  return <span className="rv-stock rv-stock--ok">Hay {disponible} pzas</span>
+function PastillaHay({ producto }) {
+  const unidad = textoUnidad(producto.unidad, producto.stock)
+  if (producto.stock === 0) return <span className="rv-stock rv-stock--agotado">Agotado</span>
+  if (producto.stock < producto.minimo) {
+    return (
+      <span className="rv-stock rv-stock--bajo">
+        Hay {producto.stock} {unidad} · Stock bajo
+      </span>
+    )
+  }
+  return (
+    <span className="rv-stock rv-stock--ok">
+      Hay {producto.stock} {unidad}
+    </span>
+  )
 }
 
 /* ============ Pantalla ============ */
@@ -99,40 +102,88 @@ export default function RegistrarCompra() {
   const inputRef = useRef(null)
   const location = useLocation()
   const navigate = useNavigate()
+  const CONFIG = useAjustes()
 
+  // Datos del backend
+  const [productos, setProductos] = useState([])
+  const [proveedoresFrecuentes, setProveedoresFrecuentes] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null)
+
+  // Compra en curso
   const [proveedor, setProveedor] = useState('')
   const [fecha, setFecha] = useState(hoyISO)
   const [nota, setNota] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [resaltado, setResaltado] = useState(0)
   const [compra, setCompra] = useState([])
-  const [stock, setStock] = useState(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p.stock])))
-  const [costos, setCostos] = useState(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p.costo])))
   const [intento, setIntento] = useState(false)
   const [modalAbierto, setModalAbierto] = useState(false)
-  const [compraRegistrada, setCompraRegistrada] = useState(null)
-  const [folio, setFolio] = useState(88)
+  const [guardando, setGuardando] = useState(false)
+  const [errorRegistro, setErrorRegistro] = useState(null)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
 
-  const productosPorId = useMemo(() => Object.fromEntries(PRODUCTOS.map((p) => [p.id, p])), [])
-  const sinProductos = PRODUCTOS.length === 0
+  async function cargarProductos() {
+    const lista = await listarProductos()
+    setProductos(lista.filter((p) => p.activo))
+  }
 
-  // Si viene de Alertas, agrega el producto con la cantidad sugerida
+  // Los proveedores a los que más se les compra
+  async function cargarFrecuentes() {
+    const compras = await listarCompras()
+    const conteo = {}
+
+    compras.forEach((c) => {
+      const nombre = (c.proveedor ?? '').trim()
+      if (nombre) conteo[nombre] = (conteo[nombre] || 0) + 1
+    })
+
+    setProveedoresFrecuentes(
+      Object.entries(conteo)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, MAX_FRECUENTES)
+        .map(([nombre]) => nombre)
+    )
+  }
+
+  async function cargarTodo() {
+    setCargando(true)
+    setErrorCarga(null)
+
+    try {
+      await cargarProductos()
+      await cargarFrecuentes().catch(() => setProveedoresFrecuentes([]))
+    } catch (e) {
+      setErrorCarga(mensajeDeError(e))
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    cargarTodo()
+  }, [])
+
+  const productosPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
+  const sinProductos = !cargando && !errorCarga && productos.length === 0
+
+  // Si viene de Alertas, agrega el producto con la cantidad sugerida (cuando ya cargaron)
   useEffect(() => {
     const pedido = location.state?.agregar
-    if (!pedido) return
-    agregar(pedido.id, pedido.piezas)
+    if (!pedido || cargando) return
+
+    if (productosPorId.has(pedido.id)) agregar(pedido.id, pedido.piezas)
     navigate(location.pathname, { replace: true, state: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [cargando])
 
   /* ---------- Búsqueda ---------- */
 
   const resultados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
     if (!texto) return []
-    return PRODUCTOS.filter((p) => normalizar(`${p.nombre} ${p.marca}`).includes(texto)).slice(0, MAX_RESULTADOS)
-  }, [busqueda])
+    return productos.filter((p) => normalizar(`${p.nombre} ${p.marca}`).includes(texto)).slice(0, MAX_RESULTADOS)
+  }, [busqueda, productos])
 
   const indiceResaltado = Math.min(resaltado, Math.max(resultados.length - 1, 0))
 
@@ -150,27 +201,28 @@ export default function RegistrarCompra() {
 
   const porSurtir = useMemo(
     () =>
-      PRODUCTOS.map((p) => ({ ...p, disponible: stock[p.id] ?? 0 }))
-        .filter((p) => p.disponible < p.minimo)
+      productos
+        .filter((p) => p.stock < p.minimo)
         .map((p) => {
-          const objetivo = DETALLES[p.id]?.maximo ?? p.minimo * 2
-          return { ...p, sugerido: Math.max(objetivo - p.disponible, 1) }
+          const objetivo = p.maximo ?? p.minimo * 2
+          return { ...p, sugerido: Math.max(objetivo - p.stock, 1) }
         })
-        .sort((a, b) => a.disponible / a.minimo - b.disponible / b.minimo),
-    [stock]
+        .sort((a, b) => a.stock / Math.max(a.minimo, 1) - b.stock / Math.max(b.minimo, 1)),
+    [productos]
   )
 
   /* ---------- Compra ---------- */
 
   function nuevoRenglon(id, cantidadPiezas = null) {
-    const detalles = DETALLES[id]
-    const porEmpaque = detalles?.piezasEmpaque ?? null
+    const producto = productosPorId.get(id)
+    const porEmpaque = producto?.piezasEmpaque ?? null
     const modo = porEmpaque ? 'empaque' : 'pieza'
 
     const cantidad =
       cantidadPiezas === null ? 1 : porEmpaque ? Math.max(1, Math.ceil(cantidadPiezas / porEmpaque)) : cantidadPiezas
 
-    return { id, modo, cantidad, costo: String(costos[id] ?? ''), caducidad: '' }
+    const costo = producto?.costo ? String(producto.costo) : ''
+    return { id, modo, cantidad, costo, caducidad: '' }
   }
 
   function agregar(id, cantidadPiezas = null) {
@@ -184,7 +236,7 @@ export default function RegistrarCompra() {
 
       return [...c, nuevoRenglon(id, cantidadPiezas)]
     })
-    setCompraRegistrada(null)
+    setErrorRegistro(null)
   }
 
   function agregarDesdeBusqueda(id) {
@@ -208,55 +260,67 @@ export default function RegistrarCompra() {
 
   /* ---------- Cálculos ---------- */
 
-  const renglones = compra.map((item) => {
-    const producto = productosPorId[item.id]
-    const detalles = DETALLES[item.id]
-    const porEmpaque = detalles?.piezasEmpaque ?? null
-    const empaque = detalles?.empaque ?? 'empaque'
-    const piezas = item.modo === 'empaque' && porEmpaque ? item.cantidad * porEmpaque : item.cantidad
+  const renglones = compra
+    .filter((item) => productosPorId.has(item.id))
+    .map((item) => {
+      const producto = productosPorId.get(item.id)
+      const porEmpaque = producto.piezasEmpaque ?? null
+      const empaque = producto.empaque ?? 'caja'
+      const piezas = item.modo === 'empaque' && porEmpaque ? item.cantidad * porEmpaque : item.cantidad
+      const unidad = producto.unidad
 
-    const costo = Number(item.costo)
-    const costoValido = item.costo !== '' && costo > 0
-    const costoAnterior = costos[item.id] ?? null
-    const cambioCosto =
-      costoValido && costoAnterior !== null && costo !== costoAnterior
-        ? costo > costoAnterior
-          ? 'sube'
-          : 'baja'
-        : null
+      const costo = Number(item.costo)
+      const costoValido = item.costo !== '' && costo > 0
+      const costoAnterior = producto.costo && producto.costo > 0 ? producto.costo : null
+      const cambioCosto =
+        costoValido && costoAnterior !== null && costo !== costoAnterior
+          ? costo > costoAnterior
+            ? 'sube'
+            : 'baja'
+          : null
 
-    const stockActual = stock[item.id] ?? 0
-    const caducidadVencida = item.caducidad !== '' && diasHasta(item.caducidad) < 0
+      // Costos sospechosos: casi siempre es el precio de la caja capturado como si fuera de la pieza (o al revés)
+      const costoMayorPrecio = costoValido && producto.precio > 0 && costo >= producto.precio
+      const costoMuyBajo = costoValido && costoAnterior !== null && costo < costoAnterior * 0.3
+      const costoSugerido = costoMayorPrecio && porEmpaque > 1 ? redondear(costo / porEmpaque) : null
+      const costoSospechoso = (costoMayorPrecio || costoMuyBajo) && !item.costoConfirmado
 
-    const conversion =
-      item.modo === 'empaque' && porEmpaque
-        ? `${item.cantidad} ${plural(empaque, item.cantidad)} × ${porEmpaque} = ${piezas} pzas`
-        : `${piezas} ${piezas === 1 ? 'pieza' : 'pzas'}`
+      const caducidadVencida = item.caducidad !== '' && diasHasta(item.caducidad) < 0
 
-    return {
-      ...item,
-      producto,
-      porEmpaque,
-      empaque,
-      piezas,
-      conversion,
-      costoNum: costo,
-      costoValido,
-      costoAnterior,
-      cambioCosto,
-      subtotal: costoValido ? redondear(piezas * costo) : 0,
-      stockActual,
-      nuevoStock: stockActual + piezas,
-      caducidadVencida,
-      conError: !costoValido || caducidadVencida,
-    }
-  })
+      const conversion =
+        item.modo === 'empaque' && porEmpaque
+          ? `${item.cantidad} ${textoUnidad(empaque, item.cantidad, true)} × ${porEmpaque} = ${piezas} ${textoUnidad(unidad, piezas)}`
+          : `${piezas} ${textoUnidad(unidad, piezas)}`
+
+      return {
+        ...item,
+        producto,
+        porEmpaque,
+        empaque,
+        unidad,
+        piezas,
+        conversion,
+        costoNum: costo,
+        costoValido,
+        costoAnterior,
+        cambioCosto,
+        costoMayorPrecio,
+        costoMuyBajo,
+        costoSugerido,
+        costoSospechoso,
+        subtotal: costoValido ? redondear(piezas * costo) : 0,
+        stockActual: producto.stock,
+        nuevoStock: producto.stock + piezas,
+        caducidadVencida,
+        conError: !costoValido || caducidadVencida || costoSospechoso,      }
+    })
 
   const totalPiezas = renglones.reduce((suma, r) => suma + r.piezas, 0)
   const total = redondear(renglones.reduce((suma, r) => suma + r.subtotal, 0))
   const faltaProveedor = !proveedor.trim()
   const renglonesConError = renglones.filter((r) => r.conError)
-  const puedeRegistrar = renglones.length > 0 && !faltaProveedor && !!fecha && renglonesConError.length === 0
+  const puedeRegistrar =
+    renglones.length > 0 && !faltaProveedor && !!fecha && renglonesConError.length === 0 && !guardando
   const subieronDeCosto = renglones.filter((r) => r.cambioCosto === 'sube')
 
   let motivoBloqueo = ''
@@ -264,9 +328,12 @@ export default function RegistrarCompra() {
     motivoBloqueo = 'escribe o elige el proveedor'
   } else if (renglonesConError.length > 0) {
     const r = renglonesConError[0]
-    motivoBloqueo = !r.costoValido
+      motivoBloqueo = !r.costoValido
       ? `falta el costo de ${r.producto.nombre}`
-      : `la caducidad de ${r.producto.nombre} ya pasó`
+      : r.costoSospechoso
+        ? `revisa el costo de ${r.producto.nombre}`
+        : `la caducidad de ${r.producto.nombre} ya pasó`
+    
   }
 
   /* ---------- Registrar y cancelar ---------- */
@@ -277,35 +344,53 @@ export default function RegistrarCompra() {
     setModalAbierto(true)
   }
 
-  function confirmarRegistro() {
+  async function confirmarRegistro() {
     if (!puedeRegistrar) return
 
-    // TODO: mandar la compra al backend (él genera las entradas de inventario)
-    setStock((s) => {
-      const copia = { ...s }
-      renglones.forEach((r) => {
-        copia[r.id] += r.piezas
-      })
-      return copia
-    })
+    setGuardando(true)
+    setErrorRegistro(null)
 
-    setCostos((c) => {
-      const copia = { ...c }
-      renglones.forEach((r) => {
-        copia[r.id] = r.costoNum
+    try {
+      const resultado = await registrarCompra({
+        proveedor: proveedor.trim(),
+        nota: nota.trim(),
+        fecha,
+        renglones: renglones.map((r) => ({
+          producto: r.id,
+          cantidad: r.piezas, // ya convertido a la unidad de venta
+          costo_unitario: r.costoNum.toFixed(2),
+          fecha_caducidad: r.caducidad || null,
+        })),
       })
-      return copia
-    })
 
-    setCompraRegistrada({ folio, proveedor: proveedor.trim(), piezas: totalPiezas, total })
-    setFolio((f) => f + 1)
-    setCompra([])
-    setProveedor('')
-    setNota('')
-    setFecha(hoyISO())
-    setIntento(false)
-    setModalAbierto(false)
-    enfocarBuscador()
+      // El backend ya sumó el stock y guardó el costo; aquí lo reflejamos al instante
+      const entraron = new Map(renglones.map((r) => [r.id, r]))
+      setProductos((lista) =>
+        lista.map((p) => {
+          const r = entraron.get(p.id)
+          return r ? { ...p, stock: p.stock + r.piezas, costo: r.costoNum } : p
+        })
+      )
+
+      notificar({
+        texto: `Compra #${resultado.id} registrada · ${proveedor.trim()} · ${moneda.format(Number(resultado.total))}`,
+      })
+      setCompra([])
+      setProveedor('')
+      setNota('')
+      setFecha(hoyISO())
+      setIntento(false)
+      setModalAbierto(false)
+      enfocarBuscador()
+
+      cargarFrecuentes().catch(() => {})
+    } catch (e) {
+      setModalAbierto(false)
+      setErrorRegistro(mensajeDelBackend(e) ?? mensajeDeError(e))
+      cargarProductos().catch(() => {})
+    } finally {
+      setGuardando(false)
+    }
   }
 
   function pedirCancelar() {
@@ -316,6 +401,7 @@ export default function RegistrarCompra() {
     setDialogoCancelar(false)
     setCompra([])
     setIntento(false)
+    setErrorRegistro(null)
     enfocarBuscador()
   }
 
@@ -395,16 +481,33 @@ export default function RegistrarCompra() {
         </ul>
       </footer>
 
-      {/* ============ SIN PRODUCTOS ============ */}
-      {sinProductos ? (
+      {cargando || errorCarga ? (
+        /* ============ CARGANDO / ERROR ============ */
+        <section className="rv-panel rv-sin-productos">
+          <span className="rv-sin-productos__icono" aria-hidden="true">
+            {cargando ? <Loader2 size={28} className="rv-girando" /> : <AlertCircle size={28} />}
+          </span>
+          <h2 className="rv-sin-productos__titulo">
+            {cargando ? 'Cargando productos…' : 'No pudimos cargar tus productos'}
+          </h2>
+          {errorCarga && (
+            <>
+              <p className="rv-sin-productos__texto">{errorCarga}</p>
+              <button type="button" className="rv-confirmar" onClick={cargarTodo}>
+                <RotateCcw size={16} aria-hidden="true" />
+                Reintentar
+              </button>
+            </>
+          )}
+        </section>
+      ) : sinProductos ? (
+        /* ============ SIN PRODUCTOS ============ */
         <section className="rv-panel rv-sin-productos">
           <span className="rv-sin-productos__icono" aria-hidden="true">
             <PackageOpen size={28} />
           </span>
           <h2 className="rv-sin-productos__titulo">Aún no tienes productos</h2>
-          <p className="rv-sin-productos__texto">
-            Para registrar una compra, primero agrega productos a tu catálogo.
-          </p>
+          <p className="rv-sin-productos__texto">Para registrar una compra, primero agrega productos a tu catálogo.</p>
           <button type="button" className="rv-confirmar" onClick={() => navigate('/catalogo/nuevo')}>
             <Plus size={16} aria-hidden="true" />
             Nuevo producto
@@ -436,6 +539,7 @@ export default function RegistrarCompra() {
                     <input
                       id="rc-proveedor"
                       placeholder="Ej. De la Rosa"
+                      maxLength={120}
                       value={proveedor}
                       onChange={(e) => setProveedor(e.target.value)}
                     />
@@ -461,6 +565,7 @@ export default function RegistrarCompra() {
                     <input
                       id="rc-fecha"
                       type="date"
+                      min={hoyISO()}
                       max={hoyISO()}
                       value={fecha}
                       onChange={(e) => setFecha(e.target.value)}
@@ -477,16 +582,17 @@ export default function RegistrarCompra() {
                     <input
                       id="rc-nota"
                       placeholder="Ej. Nota 4521"
+                      maxLength={200}
                       value={nota}
                       onChange={(e) => setNota(e.target.value)}
                     />
                   </div>
                 </div>
 
-                {PROVEEDORES_FRECUENTES.length > 0 && (
+                {(proveedoresFrecuentes.length > 0 || errorProveedor) && (
                   <div className="rc-frecuentes rc-frecuentes--fila">
-                    <span className="rc-frecuentes__titulo">Frecuentes:</span>
-                    {PROVEEDORES_FRECUENTES.map((p) => {
+                    {proveedoresFrecuentes.length > 0 && <span className="rc-frecuentes__titulo">Frecuentes:</span>}
+                    {proveedoresFrecuentes.map((p) => {
                       const activo = proveedor.trim() === p
 
                       return (
@@ -509,15 +615,6 @@ export default function RegistrarCompra() {
                         Escribe o elige el proveedor
                       </span>
                     )}
-                  </div>
-                )}
-
-                {PROVEEDORES_FRECUENTES.length === 0 && errorProveedor && (
-                  <div className="rc-frecuentes rc-frecuentes--fila">
-                    <span className="rc-error">
-                      <AlertCircle size={13} aria-hidden="true" />
-                      Escribe o elige el proveedor
-                    </span>
                   </div>
                 )}
               </div>
@@ -588,17 +685,17 @@ export default function RegistrarCompra() {
 
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
-                                {p.nombre}
-                                <PastillaHay disponible={stock[p.id] ?? 0} minimo={p.minimo} />
+                                {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                                <PastillaHay producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
-                                {p.marca} · {p.categoria}
+                                {[p.marca, p.categoria, p.descripcion].filter(Boolean).join(' · ')}
                               </p>
                             </div>
 
                             <div className="rv-resultado__precio">
                               <span>Último costo</span>
-                              <strong>{moneda.format(costos[p.id] ?? 0)}</strong>
+                              <strong>{p.costo ? moneda.format(p.costo) : '—'}</strong>
                             </div>
 
                             <button
@@ -640,9 +737,7 @@ export default function RegistrarCompra() {
                 </span>
                 <div>
                   <h2 className="rv-seccion__titulo">Por surtir</h2>
-                  <p className="rv-seccion__subtitulo">
-                    Se te están acabando. Clic para agregarlos con la cantidad sugerida
-                  </p>
+                  <p className="rv-seccion__subtitulo">Se te están acabando. Clic para agregarlos con la cantidad sugerida</p>
                 </div>
               </header>
 
@@ -669,18 +764,17 @@ export default function RegistrarCompra() {
                           <span className="rc-surtir__nombre">{p.nombre}</span>
                           <span className="rc-surtir__detalle">
                             <span
-                              className={
-                                'rc-sugerido__estado rc-sugerido__estado--' +
-                                (p.disponible === 0 ? 'agotado' : 'bajo')
-                              }
+                              className={'rc-sugerido__estado rc-sugerido__estado--' + (p.stock === 0 ? 'agotado' : 'bajo')}
                             >
-                              {p.disponible === 0 ? 'Agotado' : 'Stock bajo'}
+                              {p.stock === 0 ? 'Agotado' : 'Stock bajo'}
                             </span>
-                            {' · '}Quedan {p.disponible} · mín. {p.minimo}
+                            {' · '}Quedan {p.stock} · mín. {p.minimo}
                           </span>
                         </span>
 
-                        <span className="rc-surtir__sugerido">+{p.sugerido} pzas</span>
+                        <span className="rc-surtir__sugerido">
+                          +{p.sugerido} {textoUnidad(p.unidad, p.sugerido)}
+                        </span>
                         <PlusCircle size={18} className="rc-surtir__mas" aria-hidden="true" />
                       </button>
                     </li>
@@ -692,18 +786,7 @@ export default function RegistrarCompra() {
 
           {/* ============ COMPRA ACTUAL ============ */}
           <aside className="rv-panel rv-ticket" aria-label="Compra actual">
-            {compraRegistrada && (
-              <div className="rv-exito" role="status">
-                <CheckCircle2 size={18} aria-hidden="true" />
-                <span>
-                  <strong>Compra #{compraRegistrada.folio} registrada</strong> · {compraRegistrada.proveedor} · se
-                  sumaron {compraRegistrada.piezas} piezas al inventario
-                </span>
-                <button type="button" aria-label="Cerrar aviso" onClick={() => setCompraRegistrada(null)}>
-                  <X size={15} />
-                </button>
-              </div>
-            )}
+             
 
             <header className="rv-ticket__cabecera">
               <span className="rv-seccion__icono" aria-hidden="true">
@@ -736,10 +819,8 @@ export default function RegistrarCompra() {
                     <div className="rv-renglon__cuerpo">
                       {/* Línea 1: nombre + subtotal */}
                       <div className="rv-renglon__arriba">
-                        <p className="rv-renglon__nombre">{r.producto.nombre}</p>
-                        <span className="rv-renglon__subtotal">
-                          {r.costoValido ? moneda.format(r.subtotal) : '—'}
-                        </span>
+                        <p className="rv-renglon__nombre">{r.producto.nombre} {r.producto.gramaje && <span className="gramaje">{r.producto.gramaje}</span>}</p>
+                        <span className="rv-renglon__subtotal">{r.costoValido ? moneda.format(r.subtotal) : '—'}</span>
                       </div>
 
                       {/* Línea 2: pieza/caja + cantidad + borrar */}
@@ -752,7 +833,7 @@ export default function RegistrarCompra() {
                               className={r.modo === 'pieza' ? 'is-activo' : ''}
                               onClick={() => actualizar(r.id, { modo: 'pieza' })}
                             >
-                              Pieza
+                              {capitalizar(textoUnidad(r.unidad, 1, true))}
                             </button>
                             <button
                               type="button"
@@ -764,7 +845,7 @@ export default function RegistrarCompra() {
                             </button>
                           </div>
                         ) : (
-                          <span className="rc-solo-pieza">Por pieza</span>
+                          <span className="rc-solo-pieza">Por {textoUnidad(r.unidad, 1, true)}</span>
                         )}
 
                         <div className="rv-cantidad">
@@ -784,11 +865,7 @@ export default function RegistrarCompra() {
                             onChange={(e) => cambiarCantidad(r.id, parseInt(e.target.value, 10))}
                             aria-label={`Cantidad de ${r.producto.nombre}`}
                           />
-                          <button
-                            type="button"
-                            onClick={() => cambiarCantidad(r.id, r.cantidad + 1)}
-                            aria-label="Agregar uno"
-                          >
+                          <button type="button" onClick={() => cambiarCantidad(r.id, r.cantidad + 1)} aria-label="Agregar uno">
                             <Plus size={13} />
                           </button>
                         </div>
@@ -814,10 +891,10 @@ export default function RegistrarCompra() {
                             step="0.01"
                             inputMode="decimal"
                             value={r.costo}
-                            onChange={(e) => actualizar(r.id, { costo: e.target.value })}
-                            aria-label={`Costo por pieza de ${r.producto.nombre}`}
+                            onChange={(e) => actualizar(r.id, { costo: e.target.value, costoConfirmado: false })}
+                            aria-label={`Costo por ${textoUnidad(r.unidad, 1, true)} de ${r.producto.nombre}`}
                           />
-                          <span className="rc-sufijo">/pza</span>
+                          <span className="rc-sufijo">/{textoUnidad(r.unidad, 1)}</span>
                         </span>
 
                         {r.cambioCosto && (
@@ -832,16 +909,14 @@ export default function RegistrarCompra() {
                         )}
 
                         {CONFIG.maneja_caducidad && (
-                          <label
-                            className={'rc-fecha' + (r.caducidadVencida ? ' is-error' : '')}
-                            title="Caducidad (opcional)"
-                          >
-                            <CalendarDays size={13} aria-hidden="true" />
+                          <label className={'rc-fecha' + (r.caducidadVencida ? ' is-error' : '')} title="Caducidad (opcional)">
+                          <CalendarDays size={14} aria-hidden="true" />
                             <input
                               type="date"
+                              min={hoyISO()}
                               value={r.caducidad}
-                              onChange={(e) => actualizar(r.id, { caducidad: e.target.value })}
-                              aria-label={`Caducidad de ${r.producto.nombre} (opcional)`}
+                              onChange={(e) => cambiarCaducidad(r.id, e.target.value)}
+                              aria-label={`Caducidad de ${r.producto.nombre}`}
                             />
                           </label>
                         )}
@@ -853,12 +928,64 @@ export default function RegistrarCompra() {
                         {' · '}Stock {r.stockActual} → <strong>{r.nuevoStock}</strong>
                       </p>
 
-                      {r.conError && (
+                                            {(!r.costoValido || r.caducidadVencida) && (
                         <p className="rv-renglon__error">
                           <AlertTriangle size={12} aria-hidden="true" />
-                          {!r.costoValido ? 'Escribe el costo por pieza' : 'Esa fecha de caducidad ya pasó'}
+                          {!r.costoValido
+                            ? `Escribe el costo por ${textoUnidad(r.unidad, 1, true)}`
+                            : 'Esa fecha de caducidad ya pasó'}
                         </p>
                       )}
+
+                      {/* Costo sospechoso: hay que corregirlo o confirmarlo */}
+                      {r.costoValido && r.costoSospechoso && (
+                        <div className="rc-alerta-costo" role="alert">
+                          <p>
+                            <AlertTriangle size={14} aria-hidden="true" />
+                            <span>
+                              {r.costoMayorPrecio ? (
+                                <>
+                                  Lo estás comprando <strong>más caro de lo que lo vendes</strong> (
+                                  {moneda.format(r.producto.precio)} por {textoUnidad(r.unidad, 1)}).
+                                  {r.costoSugerido !== null && (
+                                    <>
+                                      {' '}
+                                      ¿Capturaste el precio de la {textoUnidad(r.empaque, 1)}? Por {textoUnidad(r.unidad, 1)}{' '}
+                                      serían <strong>{moneda.format(r.costoSugerido)}</strong> ({moneda.format(r.costoNum)} ÷{' '}
+                                      {r.porEmpaque}).
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  Es <strong>mucho menos</strong> de lo que te costaba ({moneda.format(r.costoAnterior)} por{' '}
+                                  {textoUnidad(r.unidad, 1)}). ¿Está bien?
+                                </>
+                              )}
+                            </span>
+                          </p>
+
+                          <div className="rc-alerta-costo__botones">
+                            {r.costoSugerido !== null && (
+                              <button
+                                type="button"
+                                className="rc-alerta-costo__boton is-principal"
+                                onClick={() => actualizar(r.id, { costo: String(r.costoSugerido), costoConfirmado: false })}
+                              >
+                                Usar {moneda.format(r.costoSugerido)} por {textoUnidad(r.unidad, 1)}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="rc-alerta-costo__boton"
+                              onClick={() => actualizar(r.id, { costoConfirmado: true })}
+                            >
+                              Sí, el costo es correcto
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
                     </div>
                   </li>
                 ))}
@@ -868,7 +995,7 @@ export default function RegistrarCompra() {
             {/* ============ CIERRE ============ */}
             <div className="rv-cierre">
               <div className="rc-piezas">
-                <span>Piezas que entran al inventario</span>
+                <span>Unidades que entran al inventario</span>
                 <strong>{totalPiezas}</strong>
               </div>
 
@@ -882,7 +1009,7 @@ export default function RegistrarCompra() {
                   <button
                     type="button"
                     className="rv-cancelar"
-                    disabled={compra.length === 0}
+                    disabled={compra.length === 0 || guardando}
                     onClick={pedirCancelar}
                   >
                     <X size={15} aria-hidden="true" />
@@ -891,14 +1018,10 @@ export default function RegistrarCompra() {
                   <button
                     type="button"
                     className="rv-confirmar"
-                    disabled={compra.length === 0}
+                    disabled={compra.length === 0 || guardando}
                     onClick={pedirRegistro}
                   >
-                    {intento && !puedeRegistrar ? (
-                      <Lock size={16} aria-hidden="true" />
-                    ) : (
-                      <Check size={16} aria-hidden="true" />
-                    )}
+                    {intento && !puedeRegistrar ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
                     Registrar
                   </button>
                 </div>
@@ -909,6 +1032,15 @@ export default function RegistrarCompra() {
                   <Lock size={15} aria-hidden="true" />
                   <span>
                     <strong>Falta un dato:</strong> {motivoBloqueo}
+                  </span>
+                </div>
+              )}
+
+              {errorRegistro && (
+                <div className="rv-aviso-error" role="alert">
+                  <AlertCircle size={15} aria-hidden="true" />
+                  <span>
+                    <strong>No se registró:</strong> {errorRegistro}
                   </span>
                 </div>
               )}
@@ -924,7 +1056,7 @@ export default function RegistrarCompra() {
             className="rc-modal"
             role="presentation"
             onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setModalAbierto(false)
+              if (e.target === e.currentTarget && !guardando) setModalAbierto(false)
             }}
           >
             <div className="rc-modal__caja" role="dialog" aria-modal="true" aria-labelledby="rc-modal-titulo">
@@ -942,6 +1074,7 @@ export default function RegistrarCompra() {
                   type="button"
                   className="rc-limpiar"
                   onClick={() => setModalAbierto(false)}
+                  disabled={guardando}
                   aria-label="Cerrar"
                 >
                   <X size={18} />
@@ -979,9 +1112,7 @@ export default function RegistrarCompra() {
                       <tr key={r.id}>
                         <td>
                           <span className="rc-modal__producto">{r.producto.nombre}</span>
-                          {r.caducidad && (
-                            <span className="rc-modal__cad">Cad. {fechaCorta.format(aFecha(r.caducidad))}</span>
-                          )}
+                          {r.caducidad && <span className="rc-modal__cad">Cad. {fechaCorta.format(aFecha(r.caducidad))}</span>}
                         </td>
                         <td>{r.conversion}</td>
                         <td className="is-der">
@@ -1014,19 +1145,23 @@ export default function RegistrarCompra() {
               <footer className="rc-modal__pie">
                 <div className="rc-modal__totales">
                   <span>
-                    {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {totalPiezas} piezas entran
-                    al inventario
+                    {renglones.length} {renglones.length === 1 ? 'producto' : 'productos'} · {totalPiezas} unidades entran al
+                    inventario
                   </span>
                   <strong>{moneda.format(total)}</strong>
                 </div>
 
                 <div className="rc-modal__botones">
-                  <button type="button" className="rv-cancelar" onClick={() => setModalAbierto(false)}>
+                  <button type="button" className="rv-cancelar" onClick={() => setModalAbierto(false)} disabled={guardando}>
                     Volver a editar
                   </button>
-                  <button type="button" className="rv-confirmar" onClick={confirmarRegistro} autoFocus>
-                    <Check size={16} aria-hidden="true" />
-                    Confirmar compra
+                  <button type="button" className="rv-confirmar" onClick={confirmarRegistro} disabled={guardando} autoFocus>
+                    {guardando ? (
+                      <Loader2 size={16} className="rv-girando" aria-hidden="true" />
+                    ) : (
+                      <Check size={16} aria-hidden="true" />
+                    )}
+                    {guardando ? 'Registrando…' : 'Confirmar compra'}
                   </button>
                 </div>
               </footer>

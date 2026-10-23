@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import useConfiguracion from '../hooks/useConfiguracion'
+import { nombreCorto } from '../services/configuracion'
+
 import {
   Menu,
   User,
@@ -17,9 +20,7 @@ import {
 import ConfirmDialog from './ConfirmDialog.jsx'
 import { getUsuarioActual, logout } from '../services/auth'
 import '../styles/topbar.css'
-
-// TODO: traer el nombre de Configuración > Negocio (backend)
-const NOMBRE_NEGOCIO = 'Los Querubines'
+ 
 
 const formatoFecha = new Intl.DateTimeFormat('es-MX', {
   weekday: 'long',
@@ -46,6 +47,8 @@ function horaActual() {
 }
 
 export default function Topbar({ onOpenSidebar }) {
+   const configuracion = useConfiguracion()
+  const nombreNegocio = nombreCorto(configuracion?.negocio.nombre) || '…'
   const { pathname } = useLocation()
   const navigate = useNavigate()
 
@@ -59,11 +62,18 @@ export default function Topbar({ onOpenSidebar }) {
 
   const ref = useRef(null)
 
-  // Usuario real desde el backend
+   // Usuario real desde el backend (y otra vez si se edita en Mi perfil)
   useEffect(() => {
-    getUsuarioActual()
-      .then(setUsuario)
-      .catch(() => setUsuario(null))
+    function cargarUsuario() {
+      getUsuarioActual()
+        .then(setUsuario)
+        .catch(() => setUsuario(null))
+    }
+
+    cargarUsuario()
+    window.addEventListener('inventia:usuario-actualizado', cargarUsuario)
+
+    return () => window.removeEventListener('inventia:usuario-actualizado', cargarUsuario)
   }, [])
 
   // Detecta si hay o no internet
@@ -167,7 +177,7 @@ export default function Topbar({ onOpenSidebar }) {
             </span>
             <span className="topbar__negocio-texto">
               <span className="topbar__negocio-prefijo">Dulcería: </span>
-              <strong>{NOMBRE_NEGOCIO}</strong>
+              <strong>{nombreNegocio}</strong>
             </span>
           </span>
 

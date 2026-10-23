@@ -1,0 +1,158 @@
+/* ============ CONTRASEÑA TEMPORAL OBLIGATORIA ============ */
+
+.co {
+  position: fixed;
+  inset: 0;
+  z-index: 300; /* encima de todo, incluso de las notificaciones */
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(11, 18, 32, 0.6);
+  backdrop-filter: blur(6px);
+}
+
+.co-caja {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 30px 28px 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 30px 70px rgba(11, 18, 32, 0.35);
+  scrollbar-width: none;
+  animation: co-entrar 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.co-caja::-webkit-scrollbar { display: none; }
+
+.co-icono {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #22c5b8, #1668e3);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(22, 104, 227, 0.28);
+}
+
+.co-titulo {
+  margin: 0;
+  color: #0b1220;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.co-sub {
+  margin: 6px 0 20px;
+  color: #64748b;
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.co-sub strong { color: #0b1220; }
+
+.co-campo { margin-bottom: 14px; }
+
+.co-campo label {
+  display: block;
+  margin-bottom: 6px;
+  color: #0b1220;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.co-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.co-input:focus-within {
+  border-color: #1668e3;
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.14);
+}
+
+.co-input.is-error { border-color: #dc2626; }
+
+.co-input input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #0b1220;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.co-ver {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: none;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.co-ayuda {
+  margin: 5px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.co-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 5px 0 0;
+  color: #dc2626;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.co-error--general {
+  justify-content: center;
+  margin: 4px 0 12px;
+}
+
+.co-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #22c5b8, #1668e3);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  box-shadow: 0 10px 22px rgba(22, 104, 227, 0.25);
+  cursor: pointer;
+}
+
+.co-boton:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.co-girando { animation: co-girar 0.9s linear infinite; }
+
+@keyframes co-entrar {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes co-girar { to { transform: rotate(360deg); } }

@@ -1,20 +1,53 @@
-"""Las vistas son los controladores que toman el serializers.py
+"""Las vistas son los controladores que toman el serializers.py y
 deciden qué hacer cuando el frontend pide o envía información."""
 
 from rest_framework import viewsets, mixins
-from .models import Categoria, Producto, Movimiento, Alerta
-from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer, AlertaSerializer
-from .services import registrar_movimiento
 
+from .models import Categoria, Producto, MovimientoInventario
+from .serializers import CategoriaSerializer, ProductoSerializer, MovimientoSerializer
+from .services import registrar_movimiento
+from usuarios.permissions import EsUsuarioAutenticado, EsPropietario
+from usuarios.models import Usuario
 
 class CategoriaViewSet(viewsets.ModelViewSet):
     queryset = Categoria.objects.all()
     serializer_class = CategoriaSerializer
 
+    def get_permissions(self):
+        # Consultar categorías: propietario y encargado
+        if self.action in ['list', 'retrieve']:
+            return [EsUsuarioAutenticado()]
+
+        # Crear, editar y eliminar categorías: solo propietario
+        return [EsPropietario()]
+
 
 class ProductoViewSet(viewsets.ModelViewSet):
-    queryset = Producto.objects.all()
+    queryset = Producto.objects.select_related("categoria").prefetch_related("promociones")
     serializer_class = ProductoSerializer
+
+    def get_permissions(self):
+        # Consultar productos: propietario y encargado
+        if self.action in ['list', 'retrieve']:
+            return [EsUsuarioAutenticado()]
+
+        # Crear, editar y eliminar productos: solo propietario
+        return [EsPropietario()]
+
+    
+    def perform_create(self, serializer):
+        """Si el producto nace con existencias, queda su entrada en el historial."""
+        producto = serializer.save()
+
+        if producto.stock_actual > 0:
+            MovimientoInventario.objects.create(
+                producto=producto,
+                usuario=Usuario.objects.get(pk=self.request.session["id_usuario"]),
+                tipo_movimiento=MovimientoInventario.TIPO_ENTRADA,
+                cantidad=producto.stock_actual,
+                stock_resultante=producto.stock_actual,
+                motivo="Inventario inicial (alta del producto)",
+            )
 
 
 class MovimientoViewSet(mixins.CreateModelMixin,
@@ -23,14 +56,284 @@ class MovimientoViewSet(mixins.CreateModelMixin,
                         viewsets.GenericViewSet):
     """Los movimientos se crean y consultan, pero no se editan ni se borran,
     para que el stock nunca quede descuadrado."""
-    queryset = Movimiento.objects.all().order_by("-fecha")
+
+    queryset = MovimientoInventario.objects.select_related("producto", "usuario").order_by("-fecha_movimiento")
     serializer_class = MovimientoSerializer
+    permission_classes = [EsUsuarioAutenticado]
 
     def perform_create(self, serializer):
         registrar_movimiento(serializer)
 
 
-class AlertaViewSet(viewsets.ReadOnlyModelViewSet):
-    """Las alertas las genera el sistema solo; aquí únicamente se consultan."""
-    queryset = Alerta.objects.all().order_by("-fecha_creacion")
-    serializer_class = AlertaSerializer
+
+# ============================================================
+#  VENTAS Y COMPRAS
+#  Se crean y se consultan; no se editan ni se borran.
+# ============================================================
+from rest_framework import status
+from rest_framework.response import Response
+
+from .models import Venta, Compra
+from .serializers import RegistrarVentaSerializer, VentaSerializer, RegistrarCompraSerializer, CompraSerializer
+from .services import registrar_venta, registrar_compra
+
+
+class VentaViewSet(mixins.CreateModelMixin,
+                   mixins.ListModelMixin,
+                   mixins.RetrieveModelMixin,
+                   viewsets.GenericViewSet):
+    queryset = Venta.objects.select_related("usuario").prefetch_related("detalles__producto").order_by("-fecha_venta")
+    serializer_class = VentaSerializer
+    permission_classes = [EsUsuarioAutenticado]
+
+    def create(self, request, *args, **kwargs):
+        entrada = RegistrarVentaSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        venta = registrar_venta(request, entrada.validated_data["renglones"])
+        return Response(VentaSerializer(venta).data, status=status.HTTP_201_CREATED)
+
+
+class CompraViewSet(mixins.CreateModelMixin,
+                    mixins.ListModelMixin,
+                    mixins.RetrieveModelMixin,
+                    viewsets.GenericViewSet):
+    queryset = Compra.objects.all().order_by("-fecha_compra")
+    serializer_class = CompraSerializer
+    permission_classes = [EsUsuarioAutenticado]
+
+    def create(self, request, *args, **kwargs):
+        entrada = RegistrarCompraSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        datos = entrada.validated_data
+        compra = registrar_compra(
+            request, datos["proveedor"], datos.get("nota", ""), datos["renglones"], datos.get("fecha")
+        )
+        return Response(CompraSerializer(compra).data, status=status.HTTP_201_CREATED)
+
+    
+
+# ============================================================
+#  CONFIGURACIÓN DEL NEGOCIO
+#  Todos la consultan (para saber qué mostrar); solo el propietario la cambia.
+# ============================================================
+from datetime import datetime
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+
+from rest_framework.views import APIView
+
+from .models import Negocio, Configuracion
+from usuarios.permissions import EsPropietario
+
+PREFERENCIAS = ["maneja_caducidad", "vende_mayoreo", "maneja_promociones", "usa_codigo_barras", "alertas_activas"]
+
+
+def _solo_digitos(texto):
+    return "".join(c for c in str(texto or "") if c.isdigit())
+
+
+def _datos_configuracion(negocio):
+    config, _ = Configuracion.objects.get_or_create(negocio=negocio)
+    return {
+        "negocio": {
+            "nombre": negocio.nombre,
+            "direccion": negocio.direccion or "",
+            "telefono": negocio.telefono or "",
+        },
+        "preferencias": {campo: getattr(config, campo) for campo in PREFERENCIAS},
+        "email": {
+            "correo_alertas": config.correo_alertas or "",
+            "hora_resumen": config.hora_resumen.strftime("%H:%M") if config.hora_resumen else "20:00",
+            "dias_aviso_caducidad": config.dias_aviso_caducidad,
+        },
+        "seguridad": {
+            "pin_configurado": bool(config.pin_hash),
+        },
+    }
+
+
+class ConfiguracionView(APIView):
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [EsUsuarioAutenticado()]
+        return [EsPropietario()]
+
+    def get(self, request):
+        negocio = Negocio.objects.first()
+        if not negocio:
+            return Response({"error": "Todavía no hay un negocio configurado."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_datos_configuracion(negocio))
+
+    def patch(self, request):
+        negocio = Negocio.objects.first()
+        if not negocio:
+            return Response({"error": "Todavía no hay un negocio configurado."}, status=status.HTTP_404_NOT_FOUND)
+
+        config, _ = Configuracion.objects.get_or_create(negocio=negocio)
+        errores = {}
+
+        # Datos del negocio
+        datos_negocio = request.data.get("negocio") or {}
+        if "nombre" in datos_negocio:
+            nombre = (datos_negocio.get("nombre") or "").strip()
+            if not nombre:
+                errores["nombre"] = "El nombre del negocio no puede quedar vacío."
+            else:
+                negocio.nombre = nombre
+        if "direccion" in datos_negocio:
+            negocio.direccion = (datos_negocio.get("direccion") or "").strip()
+        if "telefono" in datos_negocio:
+            telefono = _solo_digitos(datos_negocio.get("telefono"))
+            if len(telefono) != 10:
+                errores["telefono"] = "El teléfono de la dulcería es obligatorio (10 dígitos)."
+            else:
+                negocio.telefono = telefono
+
+        # Los 5 interruptores
+        preferencias = request.data.get("preferencias") or {}
+        for campo in PREFERENCIAS:
+            if campo in preferencias:
+                setattr(config, campo, bool(preferencias[campo]))
+
+        email = request.data.get("email") or {}
+        if "correo_alertas" in email:
+            correo = (email.get("correo_alertas") or "").strip().lower()
+            if correo:
+                try:
+                    validate_email(correo)
+                except ValidationError:
+                    errores["correo_alertas"] = "Escribe un correo válido."
+                else:
+                    config.correo_alertas = correo
+            elif config.alertas_activas:
+                errores["correo_alertas"] = "Escribe el correo que recibirá las alertas."
+            else:
+                config.correo_alertas = ""
+        if "hora_resumen" in email:
+            try:
+                config.hora_resumen = datetime.strptime(str(email["hora_resumen"]), "%H:%M").time()
+            except ValueError:
+                errores["hora_resumen"] = "Usa el formato HH:MM, por ejemplo 20:00."
+        if "dias_aviso_caducidad" in email:
+            try:
+                dias = int(email["dias_aviso_caducidad"])
+                if not 1 <= dias <= 120:
+                    raise ValueError
+                config.dias_aviso_caducidad = dias
+            except (TypeError, ValueError):
+                errores["dias_aviso_caducidad"] = "Escribe un número de días entre 1 y 120."
+
+        if errores:
+            return Response(errores, status=status.HTTP_400_BAD_REQUEST)
+
+        negocio.save()
+        config.save()
+        return Response(_datos_configuracion(negocio))
+
+
+    
+
+# ============================================================
+#  PROMOCIONES
+#  Todos las consultan (para vender); solo el propietario las crea, pausa o borra.
+# ============================================================
+from .models import Promocion
+from .serializers import PromocionSerializer
+
+
+class PromocionViewSet(viewsets.ModelViewSet):
+    serializer_class = PromocionSerializer
+    queryset = Promocion.objects.all().order_by("-fecha_inicio")
+
+    def get_queryset(self):
+        consulta = super().get_queryset()
+        producto = self.request.query_params.get("producto")
+        return consulta.filter(producto_id=producto) if producto else consulta
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [EsUsuarioAutenticado()]
+        return [EsPropietario()]
+
+
+
+# ============================================================
+#  PIN DEL PROPIETARIO Y AUTORIZACIONES DE PRECIO
+# ============================================================
+from decimal import Decimal, InvalidOperation
+
+from django.contrib.auth.hashers import check_password, make_password
+
+from .autorizaciones import firmar_autorizacion, motivo_valido, pin_con_formato, verificar_pin
+
+def _negocio_y_configuracion():
+    negocio = Negocio.objects.select_related("usuario_admin").first()
+    if not negocio:
+        return None, None
+    config, _ = Configuracion.objects.get_or_create(negocio=negocio)
+    return negocio, config
+
+
+class PinView(APIView):
+    """El propietario crea o cambia su PIN de 4 números."""
+
+    permission_classes = [EsPropietario]
+
+    def post(self, request):
+        negocio, config = _negocio_y_configuracion()
+        if not config:
+            return Response({"error": "Todavía no hay un negocio configurado."}, status=status.HTTP_404_NOT_FOUND)
+
+        nuevo = str(request.data.get("pin_nuevo") or "")
+        actual = str(request.data.get("pin_actual") or "")
+
+        if not pin_con_formato(nuevo):
+            return Response({"pin_nuevo": "El PIN debe ser de 4 números."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Si ya tenía PIN, para cambiarlo hay que saber el actual
+        if config.pin_hash and not check_password(actual, config.pin_hash):
+            return Response({"pin_actual": "El PIN actual no es correcto."}, status=status.HTTP_400_BAD_REQUEST)
+
+        config.pin_hash = make_password(nuevo)
+        config.pin_intentos_fallidos = 0
+        config.pin_bloqueado_hasta = None
+        config.save(update_fields=["pin_hash", "pin_intentos_fallidos", "pin_bloqueado_hasta"])
+
+        return Response({"mensaje": "PIN guardado"})
+
+
+class AutorizarPrecioView(APIView):
+    """Se pide desde la venta: el propietario teclea su PIN y el backend firma la autorización."""
+
+    permission_classes = [EsUsuarioAutenticado]
+
+    def post(self, request):
+        negocio, config = _negocio_y_configuracion()
+        if not config:
+            return Response({"error": "Todavía no hay un negocio configurado."}, status=status.HTTP_404_NOT_FOUND)
+
+        producto = Producto.objects.filter(pk=request.data.get("producto"), activo=True).first()
+        if not producto:
+            return Response({"producto": "Ese producto no existe o está desactivado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            precio = Decimal(str(request.data.get("precio"))).quantize(Decimal("0.01"))
+            if precio <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({"precio": "Escribe un precio mayor a $0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        motivo = (request.data.get("motivo") or "").strip()
+        if not motivo_valido(motivo):
+            return Response({"motivo": "Elige el motivo del cambio (si es «Otro», escríbelo)."}, status=status.HTTP_400_BAD_REQUEST)
+       
+        correcto, mensaje, bloqueado = verificar_pin(config, str(request.data.get("pin") or ""))
+        if not correcto:
+            return Response({"pin": mensaje, "bloqueado": bloqueado}, status=status.HTTP_400_BAD_REQUEST)
+       
+        propietario = negocio.usuario_admin or Usuario.objects.filter(rol="propietario").first()
+
+        return Response({
+            "autorizacion": firmar_autorizacion(producto.id, precio, motivo, propietario.id),
+            "autorizado_por": propietario.nombre_completo,
+        })

@@ -832,3 +832,96 @@ textarea.pf-input {
   color: var(--d-azul);
   cursor: default;
 }
+
+/* ============ CONECTADO AL BACKEND ============ */
+
+.pf-girando {
+  animation: pf-girar 0.9s linear infinite;
+}
+
+@keyframes pf-girar {
+  to { transform: rotate(360deg); }
+}
+
+/* Aviso de "todavía no se guarda" */
+.pf-pendiente {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px dashed #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.pf-pendiente svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pf-imagen-bloque .pf-pendiente,
+.pf-lateral .pf-pendiente {
+  margin: 8px 0 0;
+}
+/* La unidad del gramaje dentro del mismo campo */
+.pf-grupo__select {
+  border: none;
+  border-left: 1px solid #e6eaf0;
+  background: #f8fafc;
+  padding: 0 10px;
+  color: #475569;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.pf-ayuda-promos {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* ============ Frase en vivo y atajo de mayoreo ============ */
+
+.pf-frase {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eef6fd;
+  color: #0b3a66;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pf-frase strong {
+  color: #0b1220;
+}
+
+.pf-atajo {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px dashed #93c5fd;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #1668e3;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pf-atajo:hover {
+  border-style: solid;
+  background: #eef3fb;
+}

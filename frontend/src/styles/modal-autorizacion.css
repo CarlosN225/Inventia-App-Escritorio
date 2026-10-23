@@ -1,0 +1,424 @@
+/* ============================================================
+   MODAL DE AUTORIZACIÓN DE PRECIO
+   ============================================================ */
+
+.mz {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(11, 18, 32, 0.5);
+  backdrop-filter: blur(4px);
+  animation: mz-fondo 0.18s ease-out;
+}
+
+.mz-caja {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 28px 26px 22px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 30px 70px rgba(11, 18, 32, 0.35);
+  text-align: center;
+  animation: mz-entrar 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.mz-cerrar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.mz-cerrar:hover:not(:disabled) { background: #f1f4f9; color: #0b1220; }
+
+.mz-icono {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #22c5b8, #1668e3);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(22, 104, 227, 0.28);
+}
+
+.mz-icono.is-ambar {
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  box-shadow: 0 10px 22px rgba(249, 115, 22, 0.3);
+}
+
+.mz-titulo {
+  margin: 0;
+  color: #0b1220;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.mz-sub {
+  margin: 4px 0 16px;
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+/* ---------- El cambio de precio ---------- */
+
+.mz-cambio {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.mz-cambio__producto {
+  margin: 0 0 8px;
+  color: #0b1220;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.mz-cambio__precios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #94a3b8;
+}
+
+.mz-cambio__antes {
+  color: #94a3b8;
+  font-size: 15px;
+  text-decoration: line-through;
+}
+
+.mz-cambio__despues {
+  color: #0b1220;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.mz-cambio__dif {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mz-cambio__dif.is-sube { background: #e4f7ef; color: #047857; }
+.mz-cambio__dif.is-baja { background: #fdecec; color: #b91c1c; }
+
+/* ---------- Motivo ---------- */
+
+.mz-etiqueta {
+  display: block;
+  margin: 0 0 8px;
+  color: #0b1220;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.mz-requerido { color: #dc2626; }
+
+.mz-motivos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mz-motivo {
+  padding: 9px 10px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.mz-motivo:hover { border-color: #c9d8ed; color: #0b1220; }
+
+.mz-motivo.is-activo {
+  border-color: #1668e3;
+  background: #eef3fb;
+  color: #1668e3;
+}
+
+/* ---------- PIN ---------- */
+
+.mz-pin {
+  width: 100%;
+  height: 56px;
+  margin-bottom: 6px;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  color: #0b1220;
+  font: inherit;
+  font-size: 26px;
+  letter-spacing: 0.6em;
+  text-align: center;
+  outline: none;
+}
+
+.mz-pin::placeholder { letter-spacing: 0.4em; }
+
+.mz-pin:focus {
+  border-color: #1668e3;
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.14);
+}
+
+.mz-pin.is-error {
+  border-color: #dc2626;
+  animation: mz-temblar 0.3s ease;
+}
+
+.mz-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mz-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.mz-aviso svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ---------- Botones ---------- */
+
+.mz-botones {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mz-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0b1220;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mz-boton:hover:not(:disabled) { background: #f8fafc; }
+.mz-boton:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.mz-boton--primario {
+  border-color: transparent;
+  background: linear-gradient(135deg, #22c5b8, #1668e3);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(22, 104, 227, 0.25);
+}
+
+.mz-boton--primario:hover:not(:disabled) { background: linear-gradient(135deg, #22c5b8, #1668e3); }
+
+.mz-boton--ancho { width: 100%; }
+
+.mz-girando { animation: mz-girar 0.9s linear infinite; }
+
+/* ---------- Animaciones ---------- */
+
+@keyframes mz-fondo { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes mz-entrar {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mz-temblar {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-6px); }
+  75%      { transform: translateX(6px); }
+}
+
+@keyframes mz-girar { to { transform: rotate(360deg); } }
+
+@media (max-width: 480px) {
+  .mz-motivos { grid-template-columns: 1fr; }
+}
+
+/* ============ "Otro": el motivo escrito ============ */
+
+.mz-otro {
+  position: relative;
+  margin: -6px 0 16px;
+  animation: mz-desplegar 0.18s ease-out;
+}
+
+.mz-otro__texto {
+  width: 100%;
+  padding: 10px 12px 22px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  color: #0b1220;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+}
+
+.mz-otro__texto:focus {
+  border-color: #1668e3;
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.14);
+}
+
+.mz-otro__conteo {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+/* ============ La ayuda del PIN ============ */
+
+.mz-etiqueta--fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mz-ayuda-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #1668e3;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mz-ayuda-boton:hover { background: #eef3fb; }
+
+.mz-ayuda {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eef3fb;
+  color: #1e3a8a;
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  animation: mz-desplegar 0.18s ease-out;
+}
+
+@keyframes mz-desplegar {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+ /* ============ La ayuda del PIN, en un globito flotante ============ */
+
+.mz-ayuda-ancla {
+  position: relative;
+  display: inline-flex;
+}
+
+.mz-globo {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  width: 270px;
+  padding: 11px 13px 11px 15px;
+  border: 1px solid #dbe5f3;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: 0 14px 30px rgba(11, 18, 32, 0.14);
+  animation: mz-globo 0.15s ease-out;
+}
+
+.mz-globo strong {
+  color: #0b1220;
+}
+
+/* La colita del globo: un triángulo con borde (::before) y relleno blanco encima (::after) */
+.mz-globo::before,
+.mz-globo::after {
+  content: '';
+  position: absolute;
+  right: 22px;
+  border: 7px solid transparent;
+}
+
+.mz-globo::before {
+  top: 100%;
+  border-top-color: #dbe5f3;
+}
+
+.mz-globo::after {
+  top: calc(100% - 1px);
+  border-top-color: #ffffff;
+}
+
+@keyframes mz-globo {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* El modal nunca se sale de la pantalla: si no cabe, se desliza por dentro, sin barra visible */
+.mz-caja {
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.mz-caja::-webkit-scrollbar {
+  display: none; /* Chrome, Edge y el WebView del .exe */
+}

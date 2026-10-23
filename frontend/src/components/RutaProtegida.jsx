@@ -1,23 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
+
 import { getUsuarioActual } from '../services/auth'
 
+/* Le pregunta al backend si hay sesión. Si no la hay (por ejemplo, porque se
+   reinició la base o se cerró la sesión en otro lado), regresa al login. */
 export default function RutaProtegida() {
-  const [estado, setEstado] = useState('cargando') // 'cargando' | 'autenticado' | 'no-autenticado'
+  const [estado, setEstado] = useState('revisando') // revisando | ok | sin-sesion
 
   useEffect(() => {
+    let sigueMontado = true
+
     getUsuarioActual()
-      .then(() => setEstado('autenticado'))
-      .catch(() => setEstado('no-autenticado'))
+      .then(() => sigueMontado && setEstado('ok'))
+      .catch(() => sigueMontado && setEstado('sin-sesion'))
+
+    return () => {
+      sigueMontado = false
+    }
   }, [])
 
-  if (estado === 'cargando') {
-    return <div style={{ padding: 40 }}>Cargando...</div>
-  }
-
-  if (estado === 'no-autenticado') {
-    return <Navigate to="/" replace />
-  }
+  if (estado === 'revisando') return null
+  if (estado === 'sin-sesion') return <Navigate to="/" replace />
 
   return <Outlet />
 }

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useAjustes } from '../hooks/useConfiguracion'
+import { notificar } from '../services/notificar'
+import { listarVentas } from '../services/ventas'
+import { textoUnidad } from '../utils/unidades'
+
 import {
   ChevronRight,
   Package,
@@ -13,34 +18,46 @@ import {
   Eye,
   BarChart3,
   ImagePlus,
-  X,
   Save,
   Plus,
   Trash2,
   Candy,
-  Clock,
   AlertCircle,
   TrendingUp,
   CheckCircle2,
   ArrowLeft,
+  Loader2,
+  Info,
 } from 'lucide-react'
 
-import { PRODUCTOS, CATEGORIAS, DETALLES } from '../data/productos'
+import { getUsuarioActual } from '../services/auth'
+import {
+  obtenerProducto,
+  listarCategorias,
+  aDatosBackend,
+  crearProducto,
+  actualizarProducto,
+  erroresDeCampos,
+  mensajeDeError,
+  listarPromociones,
+  crearPromocion,
+  cambiarActivaPromocion,
+  borrarPromocion,
+} from '../services/productos'
 import '../styles/producto-form.css'
 
-// TODO: traer estos interruptores de la Configuración del negocio
-const CONFIG = {
-  maneja_caducidad: true,
-  vende_mayoreo: true,
-  maneja_promociones: true,
-  usa_codigo_barras: true,
-}
 
 const UNIDADES = [
   { id: 'pieza', label: 'Pieza', plural: 'piezas' },
   { id: 'bolsa', label: 'Bolsa', plural: 'bolsas' },
   { id: 'caja', label: 'Caja', plural: 'cajas' },
   { id: 'paquete', label: 'Paquete', plural: 'paquetes' },
+]
+
+const EMPAQUES = [
+  { id: 'caja', label: 'Caja' },
+  { id: 'bolsa', label: 'Bolsa' },
+  { id: 'paquete', label: 'Paquete' },
 ]
 
 const MAX_NOMBRE = 80
@@ -65,27 +82,36 @@ function diasHasta(iso) {
 function aTexto(valor) {
   return valor === null || valor === undefined ? '' : String(valor)
 }
+// "2026-10-09" de hoy, para que los calendarios no dejen elegir días pasados
+function hoyISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
-function crearFormulario(producto, detalles) {
+// Arma el formulario a partir de un producto del backend (ya traducido)
+function crearFormulario(producto) {
   return {
     nombre: producto?.nombre ?? '',
     marca: producto?.marca ?? '',
-    categoria: producto?.categoria ?? '',
-    descripcion: detalles?.descripcion ?? '',
+    contenido: aTexto(producto?.contenido),
+    unidadContenido: producto?.unidadContenido ?? 'g',
+    categoria: producto ? String(producto.categoriaId) : '',
+    descripcion: producto?.descripcion ?? '',
     precio: aTexto(producto?.precio),
-    precioMayoreo: aTexto(detalles?.precioMayoreo),
-    minimoMayoreo: aTexto(detalles?.minimoMayoreo),
-    unidad: detalles?.unidad ?? 'pieza',
-    piezasEmpaque: aTexto(detalles?.piezasEmpaque),
+    precioMayoreo: aTexto(producto?.precioMayoreo),
+    minimoMayoreo: aTexto(producto?.minimoMayoreo),
+    unidad: producto?.unidad ?? 'pieza',
+    piezasEmpaque: aTexto(producto?.piezasEmpaque),
+    tipoEmpaque: producto?.empaque ?? 'caja',
     stock: producto ? String(producto.stock) : '0',
     minimo: aTexto(producto?.minimo),
-    maximo: aTexto(detalles?.maximo),
-    fechaCaducidad: detalles?.fechaCaducidad ?? '',
-    codigoBarras: detalles?.codigoBarras ?? '',
+    maximo: aTexto(producto?.maximo),
+    fechaCaducidad: producto?.fechaCaducidad ?? '',
+    codigoBarras: producto?.codigoBarras ?? '',
   }
 }
 
-function validar(f) {
+function validar(f, CONFIG) {
   const errores = {}
   const precio = Number(f.precio)
 
@@ -102,6 +128,11 @@ function validar(f) {
   if (f.piezasEmpaque !== '' && Number(f.piezasEmpaque) < 1) {
     errores.piezasEmpaque = 'Debe ser al menos 1'
   }
+  
+  if (f.piezasEmpaque !== '' && f.tipoEmpaque === f.unidad) {
+    errores.piezasEmpaque = 'Lo que te llega no puede ser igual a lo que vendes (ej. 1 bolsa = 20 bolsas)'
+  }
+
 
   // El mayoreo es opcional, pero si se llena se llenan los dos campos
   if (CONFIG.vende_mayoreo && (f.precioMayoreo !== '' || f.minimoMayoreo !== '')) {
@@ -115,6 +146,7 @@ function validar(f) {
       errores.minimoMayoreo = 'Mínimo 2 piezas'
     }
   }
+  if (f.contenido !== '' && Number(f.contenido) <= 0) errores.contenido = 'Debe ser mayor a 0'
 
   return errores
 }
@@ -182,27 +214,124 @@ function Campo({ etiqueta, htmlFor, requerido, ayuda, error, contador, children 
   )
 }
 
+function Pendiente({ texto }) {
+  return (
+    <p className="pf-pendiente">
+      <Info size={14} aria-hidden="true" />
+      {texto}
+    </p>
+  )
+}
+
 /* ---------- Pantalla ---------- */
 
 export default function ProductoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
-
   const esNuevo = !id
-  const producto = esNuevo ? null : PRODUCTOS.find((p) => p.id === Number(id)) ?? null
-  const detalles = producto ? DETALLES[producto.id] ?? null : null
+  const CONFIG = useAjustes() // lo que el dueño prendió en Configuración
 
-  const [form, setForm] = useState(() => crearFormulario(producto, detalles))
-  const [promociones, setPromociones] = useState(() => detalles?.promociones ?? [])
+  // Datos del backend
+  const [producto, setProducto] = useState(null)
+  const [categorias, setCategorias] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null) // null | 'no-encontrado' | mensaje
+  const [ventasMes, setVentasMes] = useState(null) // { piezas, ingreso } de este producto en el mes
+  const [empaqueAbierto, setEmpaqueAbierto] = useState(false) // eligió un empaque pero aún no escribe cuántas trae
+
+
+  const [usuarioActual, setUsuarioActual] = useState(null)
+  const [cargandoUsuario, setCargandoUsuario] = useState(true)
+
+  // Formulario
+  const [form, setForm] = useState(() => crearFormulario(null))
+  const [errores, setErrores] = useState({})
+  const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState(null)
+
+  // Imagen y promociones (todavía no se guardan en el backend)
+  const [promociones, setPromociones] = useState([])
   const [nuevaPromo, setNuevaPromo] = useState(null)
   const [errorPromo, setErrorPromo] = useState('')
   const [imagen, setImagen] = useState(null)
   const [errorImagen, setErrorImagen] = useState('')
-  const [errores, setErrores] = useState({})
-  const [guardado, setGuardado] = useState(false)
-    const [incluirImagen, setIncluirImagen] = useState(false)
+  const [incluirImagen, setIncluirImagen] = useState(false)
 
   const inputImagenRef = useRef(null)
+
+  // Usuario con la sesión abierta (para saber si es propietario)
+  useEffect(() => {
+    getUsuarioActual()
+      .then(setUsuarioActual)
+      .catch(() => setUsuarioActual(null))
+      .finally(() => setCargandoUsuario(false))
+  }, [])
+
+  // Categorías y, si es edición, el producto
+  useEffect(() => {
+    let sigueMontado = true
+
+    async function cargar() {
+      setCargando(true)
+      setErrorCarga(null)
+
+      try {
+                const [listaCategorias, productoBackend, listaPromos] = await Promise.all([
+          listarCategorias(),
+          esNuevo ? Promise.resolve(null) : obtenerProducto(id),
+          esNuevo ? Promise.resolve([]) : listarPromociones(id),
+        ])
+
+        if (sigueMontado) setPromociones(listaPromos)
+
+        // Las ventas del mes de este producto (para el Resumen); si fallan, solo no se muestran
+        if (!esNuevo) {
+          listarVentas()
+            .then((ventas) => {
+              const inicioMes = new Date()
+              inicioMes.setDate(1)
+              inicioMes.setHours(0, 0, 0, 0)
+
+              let piezas = 0
+              let ingreso = 0
+              let costo = 0 // lo que costó lo vendido (con el costo de cada venta)
+              let sinCosto = 0 // piezas de ventas viejas sin costo guardado
+
+              ventas
+                .filter((v) => new Date(v.fecha_venta) >= inicioMes)
+                .forEach((v) =>
+                  (v.detalles ?? []).forEach((d) => {
+                    if (d.producto === Number(id)) {
+                      piezas += d.cantidad
+                      ingreso += Number(d.precio_unitario) * d.cantidad
+                    }
+                    if (d.costo_unitario != null) costo += Number(d.costo_unitario) * d.cantidad
+                      else sinCosto += d.cantidad
+                  })
+                )
+
+              if (sigueMontado) setVentasMes({ piezas, ingreso, costo, sinCosto })
+              })
+            .catch(() => {})
+        }
+
+        setCategorias(listaCategorias)
+        setProducto(productoBackend)
+        setForm(crearFormulario(productoBackend))
+      } catch (e) {
+        if (!sigueMontado) return
+        setErrorCarga(e.response?.status === 404 ? 'no-encontrado' : mensajeDeError(e))
+      } finally {
+        if (sigueMontado) setCargando(false)
+      }
+    }
+
+    cargar()
+
+    return () => {
+      sigueMontado = false
+    }
+  }, [id, esNuevo])
 
   // Libera la memoria de la imagen anterior cuando se cambia o se quita
   useEffect(() => {
@@ -252,19 +381,18 @@ export default function ProductoForm() {
     procesarArchivo(event.dataTransfer.files?.[0])
   }
 
-    // "Sí": abre el explorador de archivos de una vez
   function elegirConImagen() {
     setIncluirImagen(true)
     inputImagenRef.current?.click()
   }
 
-  // "No": quita la imagen y se queda el icono del dulce
   function elegirSinImagen() {
     setIncluirImagen(false)
     setImagen(null)
     setErrorImagen('')
   }
-  /* ---------- Promociones ---------- */
+
+  /* ---------- Promociones (vista previa, aún no se guardan) ---------- */
 
   function abrirNuevaPromo() {
     setNuevaPromo({ tipo: 'porcentaje', valor: '', inicio: '', fin: '' })
@@ -275,8 +403,8 @@ export default function ProductoForm() {
     setNuevaPromo((p) => ({ ...p, [campo]: valor }))
     setErrorPromo('')
   }
-
-  function agregarPromo() {
+ 
+   async function agregarPromo() {
     const valor = Number(nuevaPromo.valor)
 
     if (!valor || valor <= 0) return setErrorPromo('Escribe el valor del descuento')
@@ -284,38 +412,89 @@ export default function ProductoForm() {
     if (nuevaPromo.tipo === 'monto' && precio > 0 && valor >= precio) {
       return setErrorPromo('El descuento debe ser menor al precio de venta')
     }
-    if (!nuevaPromo.inicio || !nuevaPromo.fin) return setErrorPromo('Indica las fechas de inicio y fin')
+    if (nuevaPromo.inicio < hoyISO()) return setErrorPromo('La promoción no puede empezar en una fecha que ya pasó')    
     if (nuevaPromo.fin < nuevaPromo.inicio) return setErrorPromo('La fecha de fin debe ser después del inicio')
 
-    setPromociones((lista) => [
-      ...lista,
-      { id: Date.now(), tipo: nuevaPromo.tipo, valor, inicio: nuevaPromo.inicio, fin: nuevaPromo.fin, activa: true },
-    ])
-    setNuevaPromo(null)
+    const promo = { tipo: nuevaPromo.tipo, valor, inicio: nuevaPromo.inicio, fin: nuevaPromo.fin, activa: true }
+
+    // Producto nuevo: se guarda junto con el producto. Producto existente: se guarda ya.
+    if (esNuevo) {
+      setPromociones((lista) => [...lista, { ...promo, id: `nueva-${Date.now()}` }])
+      setNuevaPromo(null)
+      return
+    }
+
+    try {
+      const creada = await crearPromocion(producto.id, promo)
+      setPromociones((lista) => [...lista, creada])
+      setNuevaPromo(null)
+    } catch (e) {
+      const datos = e.response?.data
+      const primero = datos && typeof datos === 'object' ? Object.values(datos)[0] : null
+      setErrorPromo(primero ? String([].concat(primero)[0]) : mensajeDeError(e))
+    }
   }
 
-  // Enter dentro del formulario de promoción agrega la promoción, no guarda el producto
+  // Enter agrega la promoción; Esc la cancela (sin cerrar ni mandar el formulario del producto)
   function enterEnPromo(event) {
     if (event.key === 'Enter') {
       event.preventDefault()
       agregarPromo()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      setNuevaPromo(null)
+      setErrorPromo('')
     }
   }
 
-  function alternarPromo(idPromo) {
-    setPromociones((lista) => lista.map((p) => (p.id === idPromo ? { ...p, activa: !p.activa } : p)))
+  async function alternarPromo(idPromo) {
+    const promo = promociones.find((p) => p.id === idPromo)
+    if (!promo) return
+
+    if (esNuevo) {
+      setPromociones((lista) => lista.map((p) => (p.id === idPromo ? { ...p, activa: !p.activa } : p)))
+      return
+    }
+
+    try {
+      const actualizada = await cambiarActivaPromocion(idPromo, !promo.activa)
+      setPromociones((lista) => lista.map((p) => (p.id === idPromo ? actualizada : p)))
+    } catch (e) {
+      setErrorPromo(mensajeDeError(e))
+    }
   }
 
-  function eliminarPromo(idPromo) {
-    setPromociones((lista) => lista.filter((p) => p.id !== idPromo))
+  async function eliminarPromo(idPromo) {
+    if (esNuevo) {
+      setPromociones((lista) => lista.filter((p) => p.id !== idPromo))
+      return
+    }
+
+    try {
+      await borrarPromocion(idPromo)
+      setPromociones((lista) => lista.filter((p) => p.id !== idPromo))
+    } catch (e) {
+      setErrorPromo(mensajeDeError(e))
+    }
   }
 
   /* ---------- Guardar ---------- */
 
-  function guardar(event) {
+  async function guardar(event) {
     event.preventDefault()
+    setErrorGuardar(null)
 
-    const nuevosErrores = validar(form)
+    const nuevosErrores = validar(form, CONFIG)
+
+        // Una caducidad pasada solo se acepta si ya la tenía (para poder editar otras cosas de un producto vencido)
+    if (
+      form.fechaCaducidad &&
+      form.fechaCaducidad < hoyISO() &&
+      form.fechaCaducidad !== (producto?.fechaCaducidad ?? '')
+    ) {
+      nuevosErrores.fechaCaducidad = 'Esa fecha ya pasó; elige una de hoy en adelante'
+    }
     setErrores(nuevosErrores)
 
     if (Object.keys(nuevosErrores).length > 0) {
@@ -323,9 +502,41 @@ export default function ProductoForm() {
       return
     }
 
-    // TODO: mandar form, promociones e imagen al backend
-    setGuardado(true)
-    setTimeout(() => navigate('/catalogo'), 1200)
+    setGuardando(true)
+
+    try {
+      const datos = aDatosBackend(form, esNuevo)
+
+             const resultado = esNuevo
+        ? await crearProducto(datos)
+        : await actualizarProducto(producto.id, datos)
+
+      // Las promociones que se capturaron en un producto nuevo se guardan ya que existe
+      if (esNuevo) {
+        for (const promo of promociones) {
+          await crearPromocion(resultado.id, promo)
+        }
+      }
+
+      // TODO: guardar la imagen cuando exista su endpoint
+      // Regresa al catálogo con la notificación y el producto resaltado
+       notificar({
+        texto: esNuevo ? `${resultado.nombre} se agregó al catálogo` : `${resultado.nombre} se actualizó`,
+      })
+      navigate('/catalogo', { state: { resaltar: resultado.id } })
+    } catch (e) {
+      const deCampos = erroresDeCampos(e)
+
+      if (deCampos) {
+        setErrores(deCampos)
+      } else {
+        setErrorGuardar(mensajeDeError(e))
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setGuardando(false)
+    }
   }
 
   /* ---------- Cálculos en vivo ---------- */
@@ -337,12 +548,20 @@ export default function ProductoForm() {
   const margenInfo = nivelMargen(margenPct)
 
   const unidad = UNIDADES.find((u) => u.id === form.unidad) ?? UNIDADES[0]
+  const empaque = EMPAQUES.find((e) => e.id === form.tipoEmpaque) ?? EMPAQUES[0]
   const piezasEmpaque = Number(form.piezasEmpaque) || 0
   const minimoMayoreo = Number(form.minimoMayoreo) || 0
   const empaquesMayoreo =
     piezasEmpaque > 0 && minimoMayoreo > 0 && minimoMayoreo % piezasEmpaque === 0
       ? minimoMayoreo / piezasEmpaque
       : null
+  
+      // "Suelto" = no llega en empaque; se capturan las piezas directo al comprar
+  const llegaSuelto = form.piezasEmpaque === '' && !empaqueAbierto
+  const empaqueTexto = empaque.label.toLowerCase()
+  const empaqueCompleto = empaque.id === 'paquete' ? `el ${empaqueTexto} completo` : `la ${empaqueTexto} completa`
+  const precioMayoreoNum = Number(form.precioMayoreo) || 0
+
 
   const stockActual = Number(form.stock) || 0
   const stockMinimo = Number(form.minimo) || 0
@@ -363,18 +582,52 @@ export default function ProductoForm() {
           ? { clase: 'aviso', texto: `Caduca en ${diasCaducidad} días` }
           : { clase: 'ok', texto: 'Vigente' }
 
-  const vendidasMes = detalles?.vendidasMes ?? 0
-  const gananciaMes = utilidad !== null ? vendidasMes * utilidad : null
   const hayErrores = Object.keys(errores).length > 0
 
-  /* ---------- Producto que no existe ---------- */
+  /* ---------- Solo el propietario puede entrar ---------- */
 
-  if (!esNuevo && !producto) {
+  if (cargandoUsuario) return null
+
+  if (usuarioActual?.rol !== 'propietario') {
     return (
       <div className="pf">
         <div className="pf-panel pf-no-encontrado">
-          <h1 className="pf-titulo">Producto no encontrado</h1>
-          <p>Puede que se haya desactivado o que la dirección esté mal escrita.</p>
+          <h1 className="pf-titulo">Solo el propietario puede dar de alta o editar productos</h1>
+          <p>Si necesitas agregar o cambiar un producto, pídeselo al dueño.</p>
+          <button type="button" className="pf-boton pf-boton--secundario" onClick={() => navigate('/catalogo')}>
+            <ArrowLeft size={15} aria-hidden="true" />
+            Volver al catálogo
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ---------- Cargando o con error ---------- */
+
+  if (cargando) {
+    return (
+      <div className="pf">
+        <div className="pf-panel pf-no-encontrado">
+          <Loader2 size={24} className="pf-girando" aria-hidden="true" />
+          <p>{esNuevo ? 'Preparando el formulario…' : 'Cargando producto…'}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (errorCarga) {
+    return (
+      <div className="pf">
+        <div className="pf-panel pf-no-encontrado">
+          <h1 className="pf-titulo">
+            {errorCarga === 'no-encontrado' ? 'Producto no encontrado' : 'No pudimos cargar el producto'}
+          </h1>
+          <p>
+            {errorCarga === 'no-encontrado'
+              ? 'Puede que la dirección esté mal escrita.'
+              : errorCarga}
+          </p>
           <button type="button" className="pf-boton pf-boton--secundario" onClick={() => navigate('/catalogo')}>
             <ArrowLeft size={15} aria-hidden="true" />
             Volver al catálogo
@@ -399,27 +652,26 @@ export default function ProductoForm() {
 
           <div className="pf-titulo-fila">
             <h1 className="pf-titulo">{esNuevo ? 'Nuevo producto' : 'Editar producto'}</h1>
-            {!esNuevo && <span className="pf-pastilla pf-pastilla--ok">Activo</span>}
+            {!esNuevo &&
+              (producto.activo ? (
+                <span className="pf-pastilla pf-pastilla--ok">Activo</span>
+              ) : (
+                <span className="pf-pastilla pf-pastilla--gris">Desactivado</span>
+              ))}
           </div>
         </div>
-
-        {/* TODO: fecha real desde el backend */}
-        {!esNuevo && (
-          <p className="pf-modificado">
-            <Clock size={14} aria-hidden="true" />
-            Última modificación: hoy a las 10:42
-          </p>
-        )}
       </header>
 
-      {guardado && (
-        <div className="pf-aviso pf-aviso--ok" role="status">
-          <CheckCircle2 size={18} aria-hidden="true" />
-          {esNuevo ? 'Producto creado.' : 'Cambios guardados.'} Regresando al catálogo…
+     
+
+      {errorGuardar && (
+        <div className="pf-aviso pf-aviso--error" role="alert">
+          <AlertCircle size={18} aria-hidden="true" />
+          {errorGuardar}
         </div>
       )}
 
-      {hayErrores && (
+      {hayErrores && !errorGuardar && (
         <div className="pf-aviso pf-aviso--error" role="alert">
           <AlertCircle size={18} aria-hidden="true" />
           Revisa los campos marcados en rojo.
@@ -432,7 +684,7 @@ export default function ProductoForm() {
           {/* Información básica */}
           <Seccion icono={Package} titulo="Información básica" completa>
             <div className="pf-info">
-                      <div className="pf-imagen-bloque">
+              <div className="pf-imagen-bloque">
                 <span className="pf-imagen-pregunta">¿Incluir imagen?</span>
 
                 <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Incluir imagen">
@@ -493,21 +745,10 @@ export default function ProductoForm() {
                   </p>
                 ) : !incluirImagen ? (
                   <p className="pf-ayuda">Se mostrará este icono</p>
-                ) : imagen ? (
-                  <button
-                    type="button"
-                    className="pf-enlace"
-                    onClick={() => inputImagenRef.current?.click()}
-                  >
-                    Cambiar imagen
-                  </button>
                 ) : (
-                  <p className="pf-ayuda">
-                    Del celular o descargada de internet · JPG, PNG o WebP · máx. {MAX_IMAGEN_MB} MB
-                  </p>
+                  <Pendiente texto="La foto todavía no se guarda; se conecta muy pronto." />
                 )}
               </div>
-        
 
               <div className="pf-info__campos">
                 <Campo
@@ -532,7 +773,7 @@ export default function ProductoForm() {
                 </Campo>
 
                 <div className="pf-fila pf-fila--2">
-                  <Campo etiqueta="Marca" htmlFor="pf-marca">
+                  <Campo etiqueta="Marca" htmlFor="pf-marca" error={errores.marca}>
                     <input
                       id="pf-marca"
                       className="pf-input"
@@ -550,16 +791,45 @@ export default function ProductoForm() {
                       onChange={(e) => cambiar('categoria', e.target.value)}
                     >
                       <option value="">Elige una categoría</option>
-                      {CATEGORIAS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
+                      {categorias.map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.nombre}
                         </option>
                       ))}
                     </select>
                   </Campo>
                 </div>
-
-                <Campo etiqueta="Descripción (opcional)" htmlFor="pf-descripcion">
+                <Campo
+                  etiqueta="Contenido neto (gramaje)"
+                  htmlFor="pf-contenido"
+                  error={errores.contenido}
+                  ayuda="Ej. 28 g o 600 ml · ayuda a distinguir presentaciones"
+                >
+                  <div className={'pf-grupo' + (errores.contenido ? ' is-error' : '')}>
+                    <input
+                      id="pf-contenido"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputMode="decimal"
+                      placeholder="Ej. 28"
+                      value={form.contenido}
+                      onChange={(e) => cambiar('contenido', e.target.value)}
+                    />
+                    <select
+                      className="pf-grupo__select"
+                      value={form.unidadContenido}
+                      onChange={(e) => cambiar('unidadContenido', e.target.value)}
+                      aria-label="Unidad del contenido"
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">L</option>
+                    </select>
+                  </div>
+                </Campo>
+                <Campo etiqueta="Descripción (opcional)" htmlFor="pf-descripcion" error={errores.descripcion}>
                   <textarea
                     id="pf-descripcion"
                     className="pf-input"
@@ -596,18 +866,18 @@ export default function ProductoForm() {
               <Campo
                 etiqueta="Último costo"
                 htmlFor="pf-costo"
-                ayuda={costo !== null ? 'Se actualiza con cada compra' : 'Se llenará con la primera compra'}
+                ayuda={costo !== null && costo > 0 ? 'Se actualiza con cada compra' : 'Se llenará con la primera compra'}
               >
                 <div className="pf-grupo is-lectura">
                   <span className="pf-grupo__extra">$</span>
-                  <input id="pf-costo" readOnly value={costo !== null ? costo.toFixed(2) : '—'} />
+                  <input id="pf-costo" readOnly value={costo !== null && costo > 0 ? costo.toFixed(2) : '—'} />
                   <span className="pf-grupo__extra">MXN</span>
                 </div>
               </Campo>
 
               <div className="pf-campo">
                 <span className="pf-etiqueta">Margen calculado</span>
-                {margenInfo ? (
+                {margenInfo && costo > 0 ? (
                   <div className={`pf-margen pf-margen--${margenInfo.clase}`}>
                     <p className="pf-margen__valor">
                       <TrendingUp size={15} aria-hidden="true" />
@@ -672,11 +942,34 @@ export default function ProductoForm() {
                   </Campo>
                 </div>
 
-                <p className="pf-ayuda">
-                  Se aplica solo al registrar la venta, cuando se llega a la cantidad mínima.
-                  {empaquesMayoreo !== null &&
-                    ` ${minimoMayoreo} ${unidad.plural} = ${empaquesMayoreo} empaque${empaquesMayoreo === 1 ? '' : 's'}.`}
-                </p>
+                {/* Atajo: el mayoreo empieza justo en el empaque completo */}
+                {piezasEmpaque > 1 && minimoMayoreo !== piezasEmpaque && (
+                  <button
+                    type="button"
+                    className="pf-atajo"
+                    onClick={() => cambiar('minimoMayoreo', String(piezasEmpaque))}
+                  >
+                    <Boxes size={14} aria-hidden="true" />
+                    Usar {empaqueCompleto} ({piezasEmpaque} {unidad.plural})
+                  </button>
+                )}
+
+                {precioMayoreoNum > 0 && minimoMayoreo > 0 ? (
+                  <p className="pf-frase">
+                    {empaquesMayoreo === 1
+                      ? `${empaqueCompleto.charAt(0).toUpperCase()}${empaqueCompleto.slice(1)}: `
+                      : `Desde ${minimoMayoreo} ${unidad.plural}: `}
+                    <strong>
+                      {minimoMayoreo} × {moneda.format(precioMayoreoNum)} = {moneda.format(minimoMayoreo * precioMayoreoNum)}
+                    </strong>
+                    {precio > 0 && <> (en lugar de {moneda.format(minimoMayoreo * precio)})</>}
+                  </p>
+                ) : (
+                  <p className="pf-ayuda">
+                    Se aplica solo al vender, cuando se llega a la cantidad mínima. Ideal para cobrar{' '}
+                    {piezasEmpaque > 1 ? empaqueCompleto : 'la caja completa'} a precio especial.
+                  </p>
+                )}
               </div>
             </Seccion>
           )}
@@ -684,9 +977,10 @@ export default function ProductoForm() {
           {/* Unidad y empaque */}
           <Seccion icono={Box} titulo="Unidad y empaque">
             <div className="pf-pila">
+              {/* 1. Lo que se lleva el cliente: es la unidad del stock */}
               <div className="pf-campo">
                 <span className="pf-etiqueta">
-                  Se vende por <span className="pf-requerido">*</span>
+                  ¿Cuál es lo mínimo que vendes? <span className="pf-requerido">*</span>
                 </span>
                 <div className="pf-segmentado" role="group" aria-label="Unidad de venta">
                   {UNIDADES.map((u) => (
@@ -701,37 +995,92 @@ export default function ProductoForm() {
                     </button>
                   ))}
                 </div>
+                <p className="pf-ayuda">
+                  Lo que se lleva el cliente cuando compra uno. Si a veces lo vendes suelto, elige <strong>Pieza</strong>:
+                  el stock se cuenta en esa unidad.
+                </p>
               </div>
 
-              <Campo
-                etiqueta="¿Cuántas trae cada empaque del proveedor?"
-                htmlFor="pf-empaque"
-                error={errores.piezasEmpaque}
-              >                
-              <div className={'pf-grupo' + (errores.piezasEmpaque ? ' is-error' : '')}>
-                  <input
-                    id="pf-empaque"
-                    type="number"
-                    min="1"
-                    step="1"
-                    inputMode="numeric"
-                    placeholder="Ej. 30"
-                    value={form.piezasEmpaque}
-                    onChange={(e) => cambiar('piezasEmpaque', e.target.value)}
-                  />
-                  <span className="pf-grupo__extra">{unidad.plural}</span>
+              {/* 2. Cómo llega: nunca en lo mismo que se vende */}
+              <div className="pf-campo">
+                <span className="pf-etiqueta">¿Cómo te llega del proveedor?</span>
+                <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Cómo llega del proveedor">
+                  <button
+                    type="button"
+                    aria-pressed={llegaSuelto}
+                    className={'pf-segmentado__opcion' + (llegaSuelto ? ' is-activo' : '')}
+                    onClick={() => {
+                      setEmpaqueAbierto(false)
+                      cambiar('piezasEmpaque', '')
+                    }}
+                  >
+                    Suelto
+                  </button>
+                  {EMPAQUES.filter((e) => e.id !== form.unidad).map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      aria-pressed={!llegaSuelto && form.tipoEmpaque === e.id}
+                      className={
+                        'pf-segmentado__opcion' + (!llegaSuelto && form.tipoEmpaque === e.id ? ' is-activo' : '')
+                      }
+                      onClick={() => {
+                        setEmpaqueAbierto(true)
+                        cambiar('tipoEmpaque', e.id)
+                      }}
+                    >
+                      {e.label}
+                    </button>
+                  ))}
                 </div>
-              </Campo>
+              </div>
 
-              {piezasEmpaque > 0 ? (
-                <span className="pf-conversion">
-                  1 empaque del proveedor = {piezasEmpaque} {unidad.plural}
-                </span>
-              ) : (
-                <p className="pf-ayuda">Ayuda a registrar compras por caja sin hacer cuentas.</p>
+              {/* 3. Cuántas trae (solo si llega en empaque) */}
+              {!llegaSuelto && (
+                <Campo
+                  etiqueta={`¿Cuántas ${unidad.plural} trae cada ${empaqueTexto}?`}
+                  htmlFor="pf-empaque"
+                  error={errores.piezasEmpaque}
+                >
+                  <div className={'pf-grupo' + (errores.piezasEmpaque ? ' is-error' : '')}>
+                    <input
+                      id="pf-empaque"
+                      type="number"
+                      min="2"
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="Ej. 25"
+                      value={form.piezasEmpaque}
+                      onChange={(e) => cambiar('piezasEmpaque', e.target.value)}
+                    />
+                    <span className="pf-grupo__extra">{unidad.plural}</span>
+                  </div>
+                </Campo>
               )}
+
+              {/* La frase en vivo, para que no haya dudas */}
+              <p className="pf-frase">
+                {llegaSuelto ? (
+                  <>
+                    Te llega <strong>suelto</strong>: al registrar una compra capturas directo cuántas {unidad.plural}{' '}
+                    entraron.
+                  </>
+                ) : piezasEmpaque > 0 && form.tipoEmpaque !== form.unidad ? (
+                  <>
+                    Te llega <strong>1 {empaqueTexto} con {piezasEmpaque} {unidad.plural}</strong>. Puedes vender cada{' '}
+                    {unidad.label.toLowerCase()} o {empaqueCompleto}.
+                  </>
+                ) : form.tipoEmpaque === form.unidad ? (
+                  <>Elige cómo te llega: no puede ser igual a lo que vendes.</>
+                ) : (
+                  <>
+                    Escribe cuántas {unidad.plural} trae cada {empaqueTexto}.
+                  </>
+                )}
+              </p>
             </div>
           </Seccion>
+
 
           {/* Inventario */}
           <Seccion
@@ -766,11 +1115,7 @@ export default function ProductoForm() {
                 ) : esNuevo ? (
                   <p className="pf-ayuda">Lo que tienes hoy en el anaquel</p>
                 ) : (
-                  <button
-                    type="button"
-                    className="pf-enlace"
-                    onClick={() => navigate('/correccion-inventario')}
-                  >
+                  <button type="button" className="pf-enlace" onClick={() => navigate('/correccion-inventario')}>
                     ¿No cuadra? Corregir inventario
                   </button>
                 )}
@@ -833,15 +1178,14 @@ export default function ProductoForm() {
               <Campo
                 etiqueta="Próxima fecha de caducidad"
                 htmlFor="pf-caducidad"
+                error={errores.fechaCaducidad}
                 ayuda={
-                  form.fechaCaducidad
-                    ? 'Se actualiza sola al registrar compras'
-                    : 'Déjalo vacío si el producto no caduca'
+                  form.fechaCaducidad ? 'Se actualiza sola al registrar compras' : 'Déjalo vacío si el producto no caduca'
                 }
               >
                 <input
                   id="pf-caducidad"
-                  type="date"
+                  type="date" min={hoyISO()}
                   className="pf-input"
                   value={form.fechaCaducidad}
                   onChange={(e) => cambiar('fechaCaducidad', e.target.value)}
@@ -860,9 +1204,10 @@ export default function ProductoForm() {
               <Campo
                 etiqueta="Código EAN / UPC"
                 htmlFor="pf-codigo"
+                error={errores.codigoBarras}
                 ayuda="Con lector USB: deja el cursor aquí y escanea"
               >
-                <div className="pf-grupo">
+                <div className={'pf-grupo' + (errores.codigoBarras ? ' is-error' : '')}>
                   <span className="pf-grupo__extra">
                     <Barcode size={16} aria-hidden="true" />
                   </span>
@@ -892,7 +1237,8 @@ export default function ProductoForm() {
                   </span>
                 )
               }
-            >
+              >
+ 
               {promociones.length > 0 ? (
                 <ul className="pf-promos">
                   {promociones.map((p) => {
@@ -980,7 +1326,7 @@ export default function ProductoForm() {
                     <Campo etiqueta="Inicia" htmlFor="pf-promo-inicio">
                       <input
                         id="pf-promo-inicio"
-                        type="date"
+                        type="date" min={hoyISO()}
                         className="pf-input"
                         value={nuevaPromo.inicio}
                         onChange={(e) => cambiarPromo('inicio', e.target.value)}
@@ -991,7 +1337,7 @@ export default function ProductoForm() {
                     <Campo etiqueta="Termina" htmlFor="pf-promo-fin">
                       <input
                         id="pf-promo-fin"
-                        type="date"
+                        type="date" min={nuevaPromo.inicio || hoyISO()}
                         className="pf-input"
                         value={nuevaPromo.fin}
                         onChange={(e) => cambiarPromo('fin', e.target.value)}
@@ -1026,7 +1372,12 @@ export default function ProductoForm() {
                   <Plus size={15} aria-hidden="true" />
                   Agregar promoción
                 </button>
-              )}
+            
+              )} 
+               <p className="pf-ayuda-promos">
+                Puedes programar varias promociones en fechas distintas (ej. Día de Muertos, Navidad). Solo se aplica la
+                que está vigente hoy, y no se pueden encimar.
+              </p>
             </Seccion>
           )}
         </div>
@@ -1048,7 +1399,14 @@ export default function ProductoForm() {
                 {imagen ? <img src={imagen.url} alt="" /> : <Candy size={30} aria-hidden="true" />}
               </div>
               {form.marca && <span className="pf-chip">{form.marca}</span>}
-              <p className="pf-vista__nombre">{form.nombre || 'Nombre del producto'}</p>
+              <p className="pf-vista__nombre">
+                {form.nombre || 'Nombre del producto'}
+                {form.contenido && (
+                  <span className="gramaje">
+                    {form.contenido} {form.unidadContenido === 'l' ? 'L' : form.unidadContenido}
+                  </span>
+                )}
+              </p>
               <div className="pf-vista__pie">
                 <span className="pf-vista__precio">{moneda.format(precio)}</span>
                 <span className="pf-vista__stock">{stockActual} disp.</span>
@@ -1070,22 +1428,33 @@ export default function ProductoForm() {
             {esNuevo ? (
               <p className="pf-ayuda">El resumen aparece cuando el producto tenga ventas.</p>
             ) : (
-              <dl className="pf-resumen">
-                <div>
-                  <dt>Stock disponible</dt>
-                  <dd>
-                    {stockActual} {unidad.plural}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Vendidas este mes</dt>
-                  <dd>{vendidasMes}</dd>
-                </div>
-                <div>
-                  <dt>Ganancia estimada del mes</dt>
-                  <dd className="is-verde">{gananciaMes !== null ? moneda.format(gananciaMes) : '—'}</dd>
-                </div>
-              </dl>
+              <>
+                <dl className="pf-resumen">
+                  <div>
+                    <dt>Stock disponible</dt>
+                    <dd>
+                      {stockActual} {unidad.plural}
+                    </dd>
+                  </div>
+                                   <div>
+                    <dt>Vendidas este mes</dt>
+                    <dd>
+                      {ventasMes
+                        ? `${ventasMes.piezas} ${textoUnidad(producto?.unidad ?? 'pieza', ventasMes.piezas)}`
+                        : '—'}
+                    </dd>
+                  </div>
+
+                  <div>
+                   <dd>
+                      {ventasMes && (ventasMes.sinCosto === 0 || producto?.costo)
+                        ? moneda.format(ventasMes.ingreso - ventasMes.costo - ventasMes.sinCosto * (producto?.costo ?? 0))
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
+   
+              </>
             )}
           </section>
         </aside>
@@ -1101,9 +1470,13 @@ export default function ProductoForm() {
           <button type="button" className="pf-boton pf-boton--secundario" onClick={() => navigate('/catalogo')}>
             Cancelar
           </button>
-          <button type="submit" className="pf-boton pf-boton--primario" disabled={guardado}>
-            <Save size={16} aria-hidden="true" />
-            {esNuevo ? 'Crear producto' : 'Guardar cambios'}
+          <button type="submit" className="pf-boton pf-boton--primario" disabled={guardando}>
+            {guardando ? (
+              <Loader2 size={16} className="pf-girando" aria-hidden="true" />
+            ) : (
+              <Save size={16} aria-hidden="true" />
+            )}
+            {guardando ? 'Guardando…' : esNuevo ? 'Crear producto' : 'Guardar cambios'}
           </button>
         </div>
       </footer>
