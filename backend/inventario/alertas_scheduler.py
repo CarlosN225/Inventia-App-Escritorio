@@ -1,21 +1,31 @@
-from datetime import timedelta
+"""Lo que corre solo cada minuto mientras INVENTIA está abierto."""
+import logging
+
 from django.utils import timezone
-from .models import AlertaStock
-from .correo_alertas import obtener_configuracion, enviar_resumen_hoy, reintentar_pendientes
+
+from .correo_alertas import obtener_configuracion, reintentar_pendientes, revisar_hoy
+
+logger = logging.getLogger("inventia.alertas")
 
 
 def revisar_alertas():
     config = obtener_configuracion()
     if not config or not config.alertas_activas:
         return
+
     ahora = timezone.localtime()
-    # Si la computadora estaba apagada a la hora programada, enviar al arrancar.
+
+    # A la hora elegida (o al prender la compu, si ya pasó) se hace la revisión del día.
+    # revisar_hoy() decide si de verdad hay que escribir: la regla de oro vive ahí.
     if ahora.time().replace(tzinfo=None) >= config.hora_resumen:
-        hoy = timezone.localdate()
-        registro = AlertaStock.objects.filter(fecha_resumen=hoy).first()
-        if not registro or not registro.enviada:
-            try: enviar_resumen_hoy()
-            except Exception: pass
-    # Reintentos solo cada cinco minutos; los fallos permanecen guardados.
+        try:
+            revisar_hoy()
+        except Exception:
+            logger.exception("Falló la revisión diaria de alertas")
+
+    # Si algo de hoy quedó pendiente, se reintenta cada cinco minutos
     if ahora.minute % 5 == 0:
-        reintentar_pendientes()
+        try:
+            reintentar_pendientes()
+        except Exception:
+            logger.exception("Falló el reintento de alertas")

@@ -64,7 +64,12 @@ class Configuracion(models.Model):
 class AlertaStock(models.Model):
     """Registro durable de cada resumen diario por correo."""
     id = models.AutoField(primary_key=True, serialize=False)
-    fecha_resumen = models.DateField(unique=True)
+    # Ya no es única: el mismo día puede haber revisión automática y envíos con el botón
+    fecha_resumen = models.DateField(db_index=True)
+    # Por qué se generó: novedad | recordatorio | sin_novedad | manual | descartado
+    motivo = models.CharField(max_length=15, blank=True, default="")
+    # Los riesgos que había en ese momento (JSON); comparándola se sabe qué es nuevo
+    firma = models.TextField(blank=True, default="")
     mensaje = models.TextField()
     enviada = models.BooleanField(default=False)
     fecha_generacion = models.DateTimeField(auto_now_add=True)
