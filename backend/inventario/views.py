@@ -117,6 +117,8 @@ class CompraViewSet(mixins.CreateModelMixin,
 #  Todos la consultan (para saber qué mostrar); solo el propietario la cambia.
 # ============================================================
 from datetime import datetime
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
 from rest_framework.views import APIView
 
@@ -139,9 +141,8 @@ def _datos_configuracion(negocio):
             "telefono": negocio.telefono or "",
         },
         "preferencias": {campo: getattr(config, campo) for campo in PREFERENCIAS},
-        "whatsapp": {
-            "contacto_alertas": config.contacto_alertas or "",
-            "telefono_alertas": config.telefono_alertas or "",
+        "email": {
+            "correo_alertas": config.correo_alertas or "",
             "hora_resumen": config.hora_resumen.strftime("%H:%M") if config.hora_resumen else "20:00",
             "dias_aviso_caducidad": config.dias_aviso_caducidad,
         },
@@ -194,28 +195,28 @@ class ConfiguracionView(APIView):
             if campo in preferencias:
                 setattr(config, campo, bool(preferencias[campo]))
 
-        # WhatsApp
-        whatsapp = request.data.get("whatsapp") or {}
-        if "telefono_alertas" in whatsapp:
-            telefono = _solo_digitos(whatsapp.get("telefono_alertas"))
-            if len(telefono) != 10:
-                errores["telefono_alertas"] = "El WhatsApp es obligatorio (10 dígitos)."
-            else:
-                config.telefono_alertas = telefono
-            if "contacto_alertas" in whatsapp:
-                contacto = (whatsapp.get("contacto_alertas") or "").strip()
-                if not contacto:
-                    errores["contacto_alertas"] = "Escribe de quién es este WhatsApp."
+        email = request.data.get("email") or {}
+        if "correo_alertas" in email:
+            correo = (email.get("correo_alertas") or "").strip().lower()
+            if correo:
+                try:
+                    validate_email(correo)
+                except ValidationError:
+                    errores["correo_alertas"] = "Escribe un correo válido."
                 else:
-                    config.contacto_alertas = contacto       
-        if "hora_resumen" in whatsapp:
+                    config.correo_alertas = correo
+            elif config.alertas_activas:
+                errores["correo_alertas"] = "Escribe el correo que recibirá las alertas."
+            else:
+                config.correo_alertas = ""
+        if "hora_resumen" in email:
             try:
-                config.hora_resumen = datetime.strptime(str(whatsapp["hora_resumen"]), "%H:%M").time()
+                config.hora_resumen = datetime.strptime(str(email["hora_resumen"]), "%H:%M").time()
             except ValueError:
                 errores["hora_resumen"] = "Usa el formato HH:MM, por ejemplo 20:00."
-        if "dias_aviso_caducidad" in whatsapp:
+        if "dias_aviso_caducidad" in email:
             try:
-                dias = int(whatsapp["dias_aviso_caducidad"])
+                dias = int(email["dias_aviso_caducidad"])
                 if not 1 <= dias <= 120:
                     raise ValueError
                 config.dias_aviso_caducidad = dias

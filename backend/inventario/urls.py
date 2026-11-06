@@ -20,3 +20,10 @@ urlpatterns = [
         path('configuracion/pin/', PinView.as_view(), name='configuracion-pin'),
     path('autorizaciones/precio/', AutorizarPrecioView.as_view(), name='autorizar-precio'),
 ]
+from .alertas_api import ResumenAlertasView, EstadoAlertasView, EnviarAhoraView, PruebaCorreoView
+urlpatterns += [
+    path('alertas/resumen/', ResumenAlertasView.as_view(), name='alertas-resumen'),
+    path('alertas/estado/', EstadoAlertasView.as_view(), name='alertas-estado'),
+    path('alertas/enviar-ahora/', EnviarAhoraView.as_view(), name='alertas-enviar-ahora'),
+    path('alertas/prueba/', PruebaCorreoView.as_view(), name='alertas-prueba'),
+]

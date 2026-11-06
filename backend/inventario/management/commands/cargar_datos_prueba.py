@@ -256,8 +256,7 @@ class Command(BaseCommand):
                 "usa_codigo_barras": False,
                 "alertas_activas": True,
                 "vende_mayoreo": True,
-                "telefono_alertas": propietaria.telefono_whatsapp,
-                "contacto_alertas": propietaria.nombre_completo,
+                "correo_alertas": propietaria.correo,
             },
         )
 
