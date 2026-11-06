@@ -16,7 +16,7 @@
   --d-verde: #4cc38a;
   --d-ambar: #e5a54b;
   --d-rojo: #f07171;
-  --wa-oscuro: #5cc4e6;
+  --correo-acento: var(--color-brand);
 }
 
 :root[data-theme='dark'] .al-panel {
@@ -35,20 +35,20 @@
   color: #f07171;
 }
 
-:root[data-theme='dark'] .al-wa {
-  border: 1px solid #1f4d36;
-  background: linear-gradient(180deg, #1f4d36 0%, var(--color-surface) 100%);
+:root[data-theme='dark'] .al-correo {
+  border: 1px solid var(--color-border);
+  background: linear-gradient(180deg, #1b2638 0%, var(--color-surface) 100%);
 }
 
-:root[data-theme='dark'] .al-wa__texto {
+:root[data-theme='dark'] .al-correo__texto {
   color: #c8c8c8;
 }
 
-:root[data-theme='dark'] .al-wa__estado {
-  border-left: 1px solid #1f4d36;
+:root[data-theme='dark'] .al-correo__estado {
+  border-left: 1px solid var(--color-border);
 }
 
-:root[data-theme='dark'] .al-wa__linea {
+:root[data-theme='dark'] .al-correo__linea {
   color: #c8c8c8;
 }
 
@@ -150,33 +150,14 @@
   color: #4cc38a;
 }
 
-:root[data-theme='dark'] .al-chat__avatar {
+:root[data-theme='dark'] .al-email {
+  border-color: var(--color-border);
   background: var(--color-surface);
 }
-
-:root[data-theme='dark'] .al-chat__fondo {
-  background: #2e2414;
-}
-
-:root[data-theme='dark'] .al-chat__fecha {
-  background: var(--color-surface);
-  color: #c8c8c8;
-}
-
-:root[data-theme='dark'] .al-burbuja {
-  background: #15291f;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.24);
-  color: var(--color-text);
-}
-
-:root[data-theme='dark'] .al-burbuja__mas {
-  color: #c8c8c8;
-}
-
-:root[data-theme='dark'] .al-burbuja__hora {
-  color: #c8c8c8;
-}
-
+:root[data-theme='dark'] .al-email__cabecera { border-color: var(--color-border); background: var(--color-surface-2); color: var(--color-text-muted); }
+:root[data-theme='dark'] .al-email__cabecera p:last-child { color: var(--color-text); }
+:root[data-theme='dark'] .al-email__cuerpo { color: var(--color-text); }
+:root[data-theme='dark'] .al-email__firma { color: var(--color-text-muted); }
 :root[data-theme='dark'] .al-nota {
   background: var(--color-surface);
   color: #c8c8c8;
@@ -317,7 +298,7 @@
   color: #5cc4e6;
 }
 
-:root[data-theme='dark'] .as-pregunta__icono.is-whatsapp {
+:root[data-theme='dark'] .as-pregunta__icono.is-email {
   background: #15291f;
   color: #4cc38a;
 }

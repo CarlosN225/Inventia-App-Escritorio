@@ -4,7 +4,7 @@ import {
   Store,
   SlidersHorizontal,
   Users,
-  MessageCircle,
+  Mail,
   Lock,
   CalendarDays,
   Boxes,
@@ -50,6 +50,7 @@ import {
 
 import '../styles/configuracion.css'
 import { notificar } from '../services/notificar.js'
+import { probarCorreo } from '../services/alertas'
 
 /* ============================================================
    ESTADO INICIAL
@@ -70,11 +71,10 @@ const AJUSTES_INICIALES = {
     alertas_activas: false,
   },
 
-  whatsapp: {
-    numero: '',
+  email: {
+    correo: '',
     hora: '20:00',
     diasCaducidad: 30,
-    contacto: '',
   },
 }
 
@@ -100,10 +100,10 @@ const SECCIONES = [
     icono: Users,
   },
   {
-    id: 'whatsapp',
-    titulo: 'WhatsApp y alertas',
-    sub: 'Número y horario',
-    icono: MessageCircle,
+    id: 'email',
+    titulo: 'Correo y alertas',
+    sub: 'Correo y horario',
+    icono: Mail,
   },
   {
     id: 'seguridad',
@@ -153,7 +153,7 @@ const PREFERENCIAS = [
   },
   {
     id: 'alertas_activas',
-    titulo: 'Alertas por WhatsApp',
+    titulo: 'Alertas por correo',
     desc: () =>
       'Un resumen diario con lo que se acaba y lo que está por caducar.',
     icono: Bell,
@@ -269,11 +269,10 @@ function desdeBackend(config) {
       telefono: config.negocio.telefono ?? '',
     },
     preferencias: { ...config.preferencias },
-    whatsapp: {
-      contacto: config.whatsapp.contacto_alertas ?? '',
-      numero: config.whatsapp.telefono_alertas ?? '',
-      hora: config.whatsapp.hora_resumen ?? '20:00',
-      diasCaducidad: config.whatsapp.dias_aviso_caducidad ?? 30,
+    email: {
+      correo: config.email.correo_alertas ?? '',
+      hora: config.email.hora_resumen ?? '20:00',
+      diasCaducidad: config.email.dias_aviso_caducidad ?? 30,
     },
   }
 }
@@ -287,11 +286,10 @@ function haciaBackend(ajustes) {
       telefono: soloDigitos(ajustes.negocio.telefono),
     },
     preferencias: ajustes.preferencias,
-    whatsapp: {
-      contacto_alertas: ajustes.whatsapp.contacto.trim(),
-      telefono_alertas: soloDigitos(ajustes.whatsapp.numero),
-      hora_resumen: ajustes.whatsapp.hora,
-      dias_aviso_caducidad: ajustes.whatsapp.diasCaducidad,
+    email: {
+      correo_alertas: ajustes.email.correo.trim().toLowerCase(),
+      hora_resumen: ajustes.email.hora,
+      dias_aviso_caducidad: ajustes.email.diasCaducidad,
     },
   }
 }
@@ -444,6 +442,8 @@ export default function Configuracion() {
 
   const [guardando, setGuardando] =
     useState(false)
+
+  const [probandoCorreo, setProbandoCorreo] = useState(false)
 
 
   // PIN del propietario
@@ -632,6 +632,26 @@ export default function Configuracion() {
     }))
   }
 
+  async function enviarPruebaCorreo() {
+    if (probandoCorreo) return
+    setProbandoCorreo(true)
+    try {
+      await probarCorreo()
+      notificar({ texto: `Correo de prueba enviado a ${ajustes.email.correo}.` })
+    } catch (error) {
+      const codigo = error?.response?.data?.error
+      const mensajes = {
+        brevo_no_configurado: 'Faltan las credenciales SMTP de Brevo en backend/.env.',
+        brevo_remitente_no_configurado: 'Configura BREVO_FROM_EMAIL con un remitente verificado en Brevo.',
+        correo_no_configurado: 'Configura el correo que recibirá las alertas.',
+        correo_no_enviado: 'Brevo no pudo enviar el correo. Revisa el remitente verificado y las credenciales.',
+      }
+      notificar({ tipo: 'error', texto: mensajes[codigo] || 'No se pudo enviar el correo de prueba.' })
+    } finally {
+      setProbandoCorreo(false)
+    }
+  }
+
   const hayCambios =
     JSON.stringify(ajustes) !==
     JSON.stringify(guardados)
@@ -652,12 +672,8 @@ export default function Configuracion() {
       'Deben ser 10 dígitos'
   }
 
-    if (!cargandoAjustes && soloDigitos(ajustes.whatsapp.numero).length !== 10) {
-    errores.numero = 'Escribe un WhatsApp de 10 dígitos'
-  }
-
-  if (!cargandoAjustes && !ajustes.whatsapp.contacto.trim()) {
-    errores.contacto = 'Escribe de quién es este WhatsApp'
+  if (!cargandoAjustes && ajustes.preferencias.alertas_activas && !correoValido(ajustes.email.correo)) {
+    errores.correo = 'Escribe un correo válido para recibir las alertas'
   }
 
   const hayErrores =
@@ -826,7 +842,7 @@ export default function Configuracion() {
 
     if (!telefonoNuevo) {
       erroresNuevo.telefono_whatsapp =
-        'Escribe un número de WhatsApp'
+        'Escribe un teléfono de contacto'
     } else if (
       telefonoNuevo.length !== 10
     ) {
@@ -998,7 +1014,7 @@ export default function Configuracion() {
 
     if (!telefonoEditar) {
       erroresEditar.telefono_whatsapp =
-        'Escribe un número de WhatsApp'
+        'Escribe un teléfono de contacto'
     } else if (
       telefonoEditar.length !== 10
     ) {
@@ -1731,7 +1747,7 @@ export default function Configuracion() {
 
                         <p className="cf-pref__desc">
                           {p.desc(
-                            ajustes.whatsapp
+                            ajustes.email
                               .diasCaducidad
                           )}
                         </p>
@@ -1925,22 +1941,22 @@ export default function Configuracion() {
                         )}
                       </div>
 
-                      {/* WHATSAPP */}
+                      {/* TELÉFONO DE CONTACTO */}
 
                       <div className="cf-campo">
 
                         <label
                           className="cf-etiqueta"
-                          htmlFor="cf-nuevo-whatsapp"
+                          htmlFor="cf-nuevo-telefono"
                         >
-                          Número de WhatsApp{' '}
+                          Teléfono de contacto{' '}
                           <span className="cf-requerido">
                             *
                           </span>
                         </label>
 
                         <input
-                          id="cf-nuevo-whatsapp"
+                          id="cf-nuevo-telefono"
                           inputMode="numeric"
                           maxLength={10}
                           className={
@@ -2542,295 +2558,98 @@ export default function Configuracion() {
           )}
 
           {/* ====================================================
-              WHATSAPP
+              CORREO Y ALERTAS
               ==================================================== */}
 
-          {seccion === 'whatsapp' && (
+          {seccion === 'email' && (
             <section className="cf-panel cf-seccion">
-
               <header className="cf-seccion__cabecera">
-
                 <div>
-
-                  <h2 className="cf-seccion__titulo">
-                    WhatsApp y alertas
-                  </h2>
-
-                  <p className="cf-seccion__sub">
-                    Un solo mensaje al día con lo
-                    que se acaba y lo que caduca.
-                  </p>
-
+                  <h2 className="cf-seccion__titulo">Correo y alertas</h2>
+                  <p className="cf-seccion__sub">Recibe un resumen diario con lo que se acaba y lo que está por caducar.</p>
                 </div>
-
                 <Interruptor
-                  encendido={
-                    ajustes.preferencias
-                      .alertas_activas
-                  }
-                  etiqueta="Alertas por WhatsApp"
-                  onCambiar={() =>
-                    cambiar(
-                      'preferencias',
-                      'alertas_activas',
-                      !ajustes
-                        .preferencias
-                        .alertas_activas
-                    )
-                  }
+                  encendido={ajustes.preferencias.alertas_activas}
+                  etiqueta="Alertas por correo"
+                  onCambiar={() => cambiar('preferencias', 'alertas_activas', !ajustes.preferencias.alertas_activas)}
                 />
-
               </header>
 
-              {!ajustes.preferencias
-                .alertas_activas && (
-
+              {!ajustes.preferencias.alertas_activas && (
                 <p className="cf-info">
-
-                  <Info
-                    size={16}
-                    aria-hidden="true"
-                  />
-
-                  <span>
-                    Las alertas están apagadas.
-                    Préndelas con el interruptor
-                    de arriba para recibir el resumen.
-                  </span>
-
+                  <Info size={16} aria-hidden="true" />
+                  <span>Las alertas están apagadas. Actívalas para recibir el resumen diario.</span>
                 </p>
               )}
 
               <div className="cf-campos">
-
                 <div className="cf-campo">
-
-                  <label
-                    className="cf-etiqueta"
-                    htmlFor="cf-whatsapp"
-                  >
-                    Número de WhatsApp{' '}
-                    <span className="cf-requerido">
-                      *
-                    </span>
+                  <label className="cf-etiqueta" htmlFor="cf-correo-alertas">
+                    Correo que recibirá las alertas <span className="cf-requerido">*</span>
                   </label>
-
                   <input
-                    id="cf-whatsapp"
-                    inputMode="tel"
-                    maxLength={10}
-                    className={
-                      'cf-input' +
-                      (errores.numero
-                        ? ' is-error'
-                        : '')
-                    }
-                    value={
-                      ajustes.whatsapp.numero
-                    }
-                    disabled={
-                      !ajustes.preferencias
-                    }
-                    onChange={(e) =>
-                      cambiar(
-                        'whatsapp',
-                        'numero',
-                        soloDigitos(
-                          e.target.value
-                        )
-                      )
-                    }
-                    placeholder="10 dígitos"
+                    id="cf-correo-alertas"
+                    type="email"
+                    autoComplete="email"
+                    className={'cf-input' + (errores.correo ? ' is-error' : '')}
+                    value={ajustes.email.correo}
+                    disabled={!ajustes.preferencias.alertas_activas}
+                    onChange={(e) => cambiar('email', 'correo', e.target.value)}
+                    placeholder="nombre@correo.com"
                   />
-
-                  {errores.numero ? (
-                    <p className="cf-error">
-
-                      <AlertCircle
-                        size={13}
-                        aria-hidden="true"
-                      />
-
-                      {errores.numero}
-
-                    </p>
+                  {errores.correo ? (
+                    <p className="cf-error"><AlertCircle size={13} aria-hidden="true" />{errores.correo}</p>
                   ) : (
-                    <p className="cf-ayuda">
-                     Aquí llegan los avisos y el resumen diario
-                    </p>
-                  )}
-
-                </div>
-
-                <div className="cf-campo">
-                  <label className="cf-etiqueta" htmlFor="cf-contacto">
-                    ¿De quién es este WhatsApp? <span className="cf-requerido">*</span>
-                  </label>
-
-                  <input
-                    id="cf-contacto"
-                    className={'cf-input' + (errores.contacto ? ' is-error' : '')}
-                    value={ajustes.whatsapp.contacto}
-                    onChange={(e) => cambiar('whatsapp', 'contacto', e.target.value)}
-                    placeholder="Ej. Ana Luisa · dueña"
-                    maxLength={120}
-                  />
-
-                  {errores.contacto ? (
-                    <p className="cf-error">
-                      <AlertCircle size={13} aria-hidden="true" />
-                      {errores.contacto}
-                    </p>
-                  ) : (
-                    <p className="cf-ayuda">Para saber a quién le llegan las notificaciones</p>
+                    <p className="cf-ayuda">Puedes usar el correo de tu cuenta o cambiarlo por otro.</p>
                   )}
                 </div>
 
                 <div className="cf-campo">
-
-                  <label
-                    className="cf-etiqueta"
-                    htmlFor="cf-hora"
-                  >
-                    Hora del resumen
-                  </label>
-
+                  <label className="cf-etiqueta" htmlFor="cf-hora">Hora del resumen</label>
                   <select
                     id="cf-hora"
                     className="cf-input"
-                    value={
-                      ajustes.whatsapp.hora
-                    }
-                    disabled={
-                      !ajustes.preferencias
-                        .alertas_activas
-                    }
-                    onChange={(e) =>
-                      cambiar(
-                        'whatsapp',
-                        'hora',
-                        e.target.value
-                      )
-                    }
+                    value={ajustes.email.hora}
+                    disabled={!ajustes.preferencias.alertas_activas}
+                    onChange={(e) => cambiar('email', 'hora', e.target.value)}
                   >
-
-                    {HORAS.map((h) => (
-                      <option
-                        key={h.valor}
-                        value={h.valor}
-                      >
-                        {h.texto}
-                      </option>
-                    ))}
-
+                    {HORAS.map((h) => <option key={h.valor} value={h.valor}>{h.texto}</option>)}
                   </select>
-
-                  <p className="cf-ayuda">
-                    Recomendado: al cerrar,
-                    para planear el surtido del
-                    día siguiente
-                  </p>
-
+                  <p className="cf-ayuda">El resumen se envía una vez al día a la hora elegida.</p>
                 </div>
 
                 <div className="cf-campo">
-
-                  <label
-                    className="cf-etiqueta"
-                    htmlFor="cf-dias"
-                  >
-                    Avisar de caducidad con
-                  </label>
-
+                  <label className="cf-etiqueta" htmlFor="cf-dias">Avisar de caducidad con</label>
                   <select
                     id="cf-dias"
                     className="cf-input"
-                    value={
-                      ajustes.whatsapp
-                        .diasCaducidad
-                    }
-                    disabled={
-                      !ajustes.preferencias
-                        .maneja_caducidad
-                    }
-                    onChange={(e) =>
-                      cambiar(
-                        'whatsapp',
-                        'diasCaducidad',
-                        Number(
-                          e.target.value
-                        )
-                      )
-                    }
+                    value={ajustes.email.diasCaducidad}
+                    disabled={!ajustes.preferencias.maneja_caducidad}
+                    onChange={(e) => cambiar('email', 'diasCaducidad', Number(e.target.value))}
                   >
-
-                    {[15, 30, 45, 60].map(
-                      (d) => (
-                        <option
-                          key={d}
-                          value={d}
-                        >
-                          {d} días de anticipación
-                        </option>
-                      )
-                    )}
-
+                    {[15, 30, 45, 60].map((d) => <option key={d} value={d}>{d} días de anticipación</option>)}
                   </select>
-
-                  {!ajustes.preferencias
-                    .maneja_caducidad && (
-                    <p className="cf-ayuda">
-                      Activa "Fecha de caducidad"
-                      en Preferencias para usarlo
-                    </p>
+                  {!ajustes.preferencias.maneja_caducidad && (
+                    <p className="cf-ayuda">Activa “Fecha de caducidad” en Preferencias para usarlo.</p>
                   )}
-
                 </div>
 
                 <div className="cf-campo">
-
-                  <span className="cf-etiqueta">
-                    Probar
-                  </span>
-
+                  <span className="cf-etiqueta">Probar configuración</span>
                   <button
                     type="button"
                     className="cf-boton"
-                    disabled={
-                      !enLinea ||
-                      !ajustes.preferencias
-                        .alertas_activas ||
-                      !!errores.numero
-                    }
-                    onClick={() =>
-                      setAviso({
-                        texto: `Mensaje de prueba enviado al ${ajustes.whatsapp.numero}`,
-                      })
-                    }
+                    disabled={!enLinea || !ajustes.preferencias.alertas_activas || !!errores.correo || probandoCorreo || hayCambios}
+                    onClick={enviarPruebaCorreo}
                   >
-
-                    <Send
-                      size={14}
-                      aria-hidden="true"
-                    />
-
-                    Enviar mensaje de prueba
-
+                    {probandoCorreo ? <Loader2 size={14} className="cf-girando" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
+                    {probandoCorreo ? 'Enviando…' : 'Enviar correo de prueba'}
                   </button>
-
-                  <p className="cf-ayuda">
-                    {enLinea
-                      ? 'Revisa que te llegue al WhatsApp'
-                      : 'Necesitas internet para enviarlo'}
-                  </p>
-
+                  <p className="cf-ayuda">{hayCambios ? 'Guarda primero los cambios para probar este correo.' : 'Te enviaremos un mensaje para confirmar que funciona.'}</p>
                 </div>
-
               </div>
-
             </section>
           )}
-
           {/* ====================================================
               SEGURIDAD (PIN)
               ==================================================== */}
@@ -3226,22 +3045,22 @@ export default function Configuracion() {
 
               </div>
 
-              {/* WHATSAPP */}
+              {/* TELÉFONO DE CONTACTO */}
 
               <div className="cf-campo">
 
                 <label
                   className="cf-etiqueta"
-                  htmlFor="editar-whatsapp"
+                  htmlFor="editar-telefono"
                 >
-                  Número de WhatsApp{' '}
+                  Teléfono de contacto{' '}
                   <span className="cf-requerido">
                     *
                   </span>
                 </label>
 
                 <input
-                  id="editar-whatsapp"
+                  id="editar-telefono"
                   inputMode="numeric"
                   maxLength={10}
                   className={

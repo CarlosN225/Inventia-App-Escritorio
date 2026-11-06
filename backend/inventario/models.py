@@ -44,9 +44,8 @@ class Configuracion(models.Model):
     usa_codigo_barras = models.BooleanField(default=False)
     alertas_activas = models.BooleanField(default=True)
     vende_mayoreo = models.BooleanField(default=False)
-    telefono_alertas = models.CharField(max_length=20, blank=True, default="")
-    contacto_alertas = models.CharField(max_length=120, blank=True, default="")  # de quién es el WhatsApp
-        # PIN del propietario para autorizar cambios de precio (cifrado, nunca en texto)
+    correo_alertas = models.EmailField(max_length=150, blank=True, default="")
+    # PIN del propietario para autorizar cambios de precio (cifrado, nunca en texto)
     pin_hash = models.CharField(max_length=128, blank=True, default="")
     pin_intentos_fallidos = models.PositiveSmallIntegerField(default=0)
     pin_bloqueado_hasta = models.DateTimeField(null=True, blank=True)
@@ -60,6 +59,23 @@ class Configuracion(models.Model):
 
     def __str__(self):
         return f"Configuracion de {self.negocio.nombre}"
+
+
+class AlertaStock(models.Model):
+    """Registro durable de cada resumen diario por correo."""
+    id = models.AutoField(primary_key=True, serialize=False)
+    fecha_resumen = models.DateField(unique=True)
+    mensaje = models.TextField()
+    enviada = models.BooleanField(default=False)
+    fecha_generacion = models.DateTimeField(auto_now_add=True)
+    fecha_envio = models.DateTimeField(null=True, blank=True)
+    ultimo_error = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        db_table = "AlertaStock"
+        ordering = ["-fecha_generacion"]
+        verbose_name = "Alerta de stock"
+        verbose_name_plural = "Alertas de stock"
 
 
 class Categoria(models.Model):

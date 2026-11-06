@@ -1,4 +1,8 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 """
 Django settings for inventia_backend project.
 
@@ -117,7 +121,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Mexico_City'
 
 USE_I18N = True
 
@@ -134,11 +138,20 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+BREVO_SMTP_LOGIN = os.getenv('BREVO_SMTP_LOGIN', '')
+BREVO_SMTP_KEY = os.getenv('BREVO_SMTP_KEY', '')
+EMAIL_BACKEND = (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if BREVO_SMTP_LOGIN and BREVO_SMTP_KEY
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = 'smtp-relay.brevo.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = BREVO_SMTP_LOGIN
+EMAIL_HOST_PASSWORD = BREVO_SMTP_KEY
+BREVO_FROM_EMAIL = os.getenv('BREVO_FROM_EMAIL', '')
+DEFAULT_FROM_EMAIL = BREVO_FROM_EMAIL
 
 
 # CORS / sesión (5173 = npm run dev, 4173 = npm run preview)

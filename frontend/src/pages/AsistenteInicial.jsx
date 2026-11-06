@@ -14,7 +14,6 @@ import {
   Boxes,
   Tag,
   Barcode,
-  MessageCircle,
   ArrowLeft,
   ArrowRight,
   AlertCircle,
@@ -67,10 +66,10 @@ const PREGUNTAS = [
   },
   {
     id: 'alertas_activas',
-    icono: MessageCircle,
-    titulo: '¿Quieres recibir un resumen diario por WhatsApp?',
+    icono: Mail,
+    titulo: '¿Quieres recibir un resumen diario por correo?',
     ejemplo: 'Lo que se acaba y lo que está por caducar, todas las noches',
-    activo: 'Resumen diario por WhatsApp',
+    activo: 'Resumen diario por correo',
     recomendado: true,
   },
 ]
@@ -93,11 +92,6 @@ const NIVELES = ['', 'Débil', 'Regular', 'Buena', 'Segura']
 
 function soloDigitos(texto) {
   return (texto ?? '').replace(/\D/g, '')
-}
-
-function formatearTelefono(texto) {
-  const d = soloDigitos(texto)
-  return d.length === 10 ? `${d.slice(0, 2)} ${d.slice(2, 6)} ${d.slice(6)}` : texto
 }
 
 function primerNombre(nombre) {
@@ -127,19 +121,13 @@ function erroresCuenta(p) {
   if (!p.nombre_completo.trim()) e.nombre_completo = 'Escribe tu nombre'
   if (!p.correo.trim()) e.correo = 'Escribe tu correo'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.correo.trim())) e.correo = 'Revisa que el correo esté bien escrito'
-  if (soloDigitos(p.telefono_whatsapp).length !== 10) e.telefono_whatsapp = 'Escribe tu WhatsApp (10 dígitos)'
+  if (soloDigitos(p.telefono_whatsapp).length !== 10) e.telefono_whatsapp = 'Escribe tu teléfono (10 dígitos)'
   if (reglasContrasena(p.contrasena).some((r) => !r.ok)) e.contrasena = 'Cumple todas las reglas de abajo'
   if (!p.confirmar || p.confirmar !== p.contrasena) e.confirmar = 'Las contraseñas no coinciden'
   return e
 }
 
-function erroresPreferencias(pref, propietario) {
-  const e = {}
-  if (pref.alertas_activas && soloDigitos(propietario.telefono_whatsapp).length !== 10) {
-    e.alertas_activas = 'Para el resumen diario necesitas poner tu WhatsApp en el paso 2'
-  }
-  return e
-}
+function erroresPreferencias() { return {} }
 
 /* ============ Piezas reutilizables ============ */
 
@@ -371,7 +359,7 @@ export default function AsistenteInicial() {
             <header className="as-seccion__cabecera">
               <div>
                 <h1 className="as-titulo">1. Cuéntanos de tu dulcería</h1>
-                <p className="as-subtitulo">Así aparecerá en la barra de arriba y en tus avisos de WhatsApp.</p>
+                <p className="as-subtitulo">Así aparecerá en la barra de arriba y en tus avisos por correo.</p>
               </div>
               <span className="as-insignia">
                 <Zap size={13} aria-hidden="true" />
@@ -449,14 +437,14 @@ export default function AsistenteInicial() {
               </Campo>
 
               <Campo
-                id="as-whatsapp" required
-                etiqueta="Tu WhatsApp"
+                id="as-telefono" required
+                etiqueta="Tu teléfono"
                 icono={Phone}
                 error={errorDe(2, 'telefono_whatsapp')}
-                ayuda="Aquí te llegan los avisos y el resumen diario · 10 dígitos"
+                ayuda="Teléfono de contacto · 10 dígitos"
               >
                 <input
-                  id="as-whatsapp"
+                  id="as-telefono"
                   inputMode="tel"
                   placeholder="55 1234 5678"
                   value={propietario.telefono_whatsapp}
@@ -545,7 +533,7 @@ export default function AsistenteInicial() {
 
                 return (
                   <li key={q.id} className={'as-pregunta' + (error ? ' is-error' : '')}>
-                    <span className={'as-pregunta__icono' + (q.id === 'alertas_activas' ? ' is-whatsapp' : '')} aria-hidden="true">
+                    <span className={'as-pregunta__icono' + (q.id === 'alertas_activas' ? ' is-email' : '')} aria-hidden="true">
                       <Icono size={18} />
                     </span>
 
@@ -627,12 +615,7 @@ export default function AsistenteInicial() {
                     <li key={q.id} className="as-chip as-chip--verde">
                       <Check size={13} strokeWidth={3} aria-hidden="true" />
                       {q.activo}
-                      {q.id === 'alertas_activas' && (
-                        <>
-                          {' '}
-                          al <strong>{formatearTelefono(propietario.telefono_whatsapp)}</strong>
-                        </>
-                      )}
+                      {q.id === 'alertas_activas' && <> al <strong>{propietario.correo}</strong></>}
                     </li>
                   ) : (
                     <li key={q.id} className="as-chip as-chip--gris">

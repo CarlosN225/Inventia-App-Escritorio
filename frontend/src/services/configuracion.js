@@ -21,7 +21,7 @@ export function obtenerConfiguracion(forzar = false) {
   return cache
 }
 
-/* cambios: { negocio: {...}, preferencias: {...}, whatsapp: {...} } (solo lo que cambió) */
+/* cambios: { negocio: {...}, preferencias: {...}, email: {...} } (solo lo que cambió) */
 export async function guardarConfiguracion(cambios) {
   const response = await axios.patch(`${API_URL}/configuracion/`, cambios, CON_SESION)
   cache = Promise.resolve(response.data)
@@ -49,10 +49,9 @@ export function leerAjustes(config) {
   return {
     ...PREFERENCIAS_POR_DEFECTO,
     ...(config?.preferencias ?? {}),
-    diasAviso: config?.whatsapp?.dias_aviso_caducidad ?? 30,
-    horaResumen: config?.whatsapp?.hora_resumen ?? '20:00',
-    telefonoAlertas: config?.whatsapp?.telefono_alertas ?? '',
-    contactoAlertas: config?.whatsapp?.contacto_alertas ?? '',
+    diasAviso: config?.email?.dias_aviso_caducidad ?? 30,
+    horaResumen: config?.email?.hora_resumen ?? '20:00',
+    correoAlertas: config?.email?.correo_alertas ?? '',
     pinConfigurado: !!config?.seguridad?.pin_configurado,
   }
 }

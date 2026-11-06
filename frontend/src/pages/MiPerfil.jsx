@@ -346,7 +346,7 @@ export default function MiPerfil() {
 
               <div className="mp-campo">
                 <label className="mp-etiqueta" htmlFor="mp-telefono">
-                  WhatsApp
+                  Teléfono de contacto
                 </label>
                 <div className={'mp-input-grupo' + (erroresDatos.telefono ? ' is-error' : '')}>
                   <Phone size={16} aria-hidden="true" />

@@ -328,7 +328,7 @@ def restablecer_contrasena_view(request, usuario_id):
 def actualizar_mi_perfil_view(request):
     """
     El usuario puede modificar únicamente
-    su nombre y WhatsApp.
+    su nombre y teléfono de contacto.
     """
 
     usuario = obtener_usuario_sesion(request)
@@ -494,7 +494,7 @@ def crear_primer_propietario_view(request):
             )
         if len(digitos(telefono_whatsapp)) != 10:
             return Response(
-                {'error': 'El WhatsApp es obligatorio (10 dígitos)'},
+                {'error': 'El teléfono de contacto es obligatorio (10 dígitos)'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -525,8 +525,7 @@ def crear_primer_propietario_view(request):
                 maneja_promociones=bool(preferencias.get('maneja_promociones', True)),
                 usa_codigo_barras=bool(preferencias.get('usa_codigo_barras', False)),
                 alertas_activas=bool(preferencias.get('alertas_activas', True)),
-                telefono_alertas=telefono_whatsapp,
-                contacto_alertas=nombre_completo
+                correo_alertas=correo
             )
 
     return Response(

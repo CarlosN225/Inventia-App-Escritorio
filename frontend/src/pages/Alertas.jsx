@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  MessageCircle,
-  CheckCheck,
+  Mail,
   Clock,
   Send,
   AlertTriangle,
   CalendarClock,
-  Candy,
   Truck,
   PackageMinus,
   Tag,
@@ -21,6 +19,7 @@ import {
 
 import { useAjustes } from '../hooks/useConfiguracion'
 import { listarProductos, mensajeDeError } from '../services/productos'
+import { enviarResumenCorreo } from '../services/alertas'
 import { notificar } from '../services/notificar'
 import { textoUnidad } from '../utils/unidades'
 import '../styles/alertas.css'
@@ -28,22 +27,11 @@ import '../styles/alertas.css'
 const MAX_EN_MENSAJE = 3
 
 const formatoDiaMes = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
-const formatoChat = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-
-function capitalizar(texto) {
-  return texto.charAt(0).toUpperCase() + texto.slice(1)
-}
 
 // "20:00" -> "8:00 p.m."
 function horaBonita(hhmm) {
   const [h, m] = (hhmm || '20:00').split(':').map(Number)
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'p.m.' : 'a.m.'}`
-}
-
-// "5512345678" -> "55 1234 5678"
-function telefonoBonito(texto) {
-  const d = (texto ?? '').replace(/\D/g, '')
-  return d.length === 10 ? `${d.slice(0, 2)} ${d.slice(2, 6)} ${d.slice(6)}` : 'tu WhatsApp'
 }
 
 function textoCaducidad(dias) {
@@ -83,14 +71,12 @@ function CabeceraGrupo({ grupo, plegado, onAlternar, extra }) {
 export default function Alertas() {
   const navigate = useNavigate()
 
-  // Lo que el dueño configuró: caducidad, días de aviso y el WhatsApp
+  // Lo que el propietario configuró: caducidad, días de aviso y correo
   const ajustes = useAjustes()
   const diasAviso = ajustes.diasAviso
   const conCaducidad = ajustes.maneja_caducidad
-  const conWhatsApp = ajustes.alertas_activas
+  const conCorreo = ajustes.alertas_activas
   const hora = horaBonita(ajustes.horaResumen)
-  const numero = telefonoBonito(ajustes.telefonoAlertas)
-  const contacto = (ajustes.contactoAlertas ?? '').trim().split(/\s+/).slice(0, 2).join(' ')
 
   const [productos, setProductos] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -99,6 +85,7 @@ export default function Alertas() {
   const [pestana, setPestana] = useState('stock')
   const [plegados, setPlegados] = useState(() => new Set())
   const [enLinea, setEnLinea] = useState(navigator.onLine)
+  const [enviando, setEnviando] = useState(false)
 
   async function cargarProductos() {
     setCargando(true)
@@ -211,15 +198,39 @@ export default function Alertas() {
     navigate('/registrar-merma', { state: { productoId: producto.id } })
   }
 
-  function enviarAhora() {
-    // TODO (Héctor): pedirle al backend que mande el resumen por WhatsApp en este momento
-    notificar({
-      tipo: 'aviso',
-      texto: 'El envío inmediato se activa al conectar el servicio de WhatsApp.',
-    })
+  async function enviarAhora() {
+    if (enviando) return
+    setEnviando(true)
+    try {
+      const resultado = await enviarResumenCorreo()
+      notificar({
+        tipo: 'ok',
+        texto: resultado.enviada
+          ? 'Resumen enviado a tu correo.'
+          : 'El resumen quedó pendiente y se enviará cuando vuelva la conexión.',
+      })
+    } catch (e) {
+      const codigo = e.response?.data?.error
+      const textos = {
+        correo_no_enviado: 'El correo quedó guardado para reintento. Revisa tu conexión y la configuración de Brevo.',
+        brevo_no_configurado: 'Faltan las credenciales SMTP de Brevo en backend/.env.',
+        brevo_remitente_no_configurado: 'Configura un remitente verificado de Brevo en backend/.env.',
+        correo_no_configurado: 'Configura primero el correo en Ajustes.',
+        alertas_desactivadas: 'Activa las alertas por correo en Ajustes.',
+        configuracion_no_encontrada: 'Completa la configuración del negocio antes de enviar alertas.',
+      }
+      notificar({
+        tipo: 'error',
+        texto: textos[codigo] || (e.response?.status === 403
+          ? 'Solo el propietario puede enviar el resumen por correo.'
+          : 'No se pudo enviar el resumen. Inténtalo de nuevo.'),
+      })
+    } finally {
+      setEnviando(false)
+    }
   }
 
-  /* ---------- Mensaje de WhatsApp (se arma con los datos reales) ---------- */
+  /* ---------- Vista previa del correo ---------- */
 
   const hoy = new Date()
   const stockEnMensaje = stockBajo.slice(0, MAX_EN_MENSAJE)
@@ -252,22 +263,21 @@ export default function Alertas() {
         )}
       </header>
 
-      {/* ============ RESUMEN DE WHATSAPP ============ */}
-      {conWhatsApp && (
-        <section className="al-wa">
-          <span className="al-wa__icono" aria-hidden="true">
-            <MessageCircle size={24} />
+      {/* ============ RESUMEN POR CORREO ============ */}
+      {conCorreo && (
+        <section className="al-correo">
+          <span className="al-correo__icono" aria-hidden="true">
+            <Mail size={24} />
           </span>
 
-          <div className="al-wa__info">
-            <p className="al-wa__titulo">Resumen diario por WhatsApp</p>
-            <p className="al-wa__texto">
-              Un solo mensaje todos los días a las <strong>{hora}</strong> al <strong>{numero}</strong>
-              {contacto && <> ({contacto})</>}, con lo que se acaba{conCaducidad ? ' y lo que caduca' : ''}.
+          <div className="al-correo__info">
+            <p className="al-correo__titulo">Resumen diario por correo</p>
+            <p className="al-correo__texto">
+              Un correo al día a las <strong>{hora}</strong> con lo que se acaba{conCaducidad ? ' y lo que caduca' : ''}.
             </p>
           </div>
 
-          <div className="al-wa__estado">
+          <div className="al-correo__estado">
             {enLinea ? (
               <span className="al-proximo">
                 <Clock size={14} aria-hidden="true" />
@@ -281,25 +291,25 @@ export default function Alertas() {
             )}
           </div>
 
-          <div className="al-wa__acciones">
+          <div className="al-correo__acciones">
             <button
               type="button"
               className="al-boton"
               onClick={enviarAhora}
-              disabled={!enLinea}
+              disabled={!enLinea || enviando}
               title={enLinea ? 'Manda el resumen de hoy en este momento' : 'Necesitas internet para enviarlo'}
             >
-              <Send size={14} aria-hidden="true" />
-              Enviar ahora
+              {enviando ? <Loader2 size={14} className="al-girando" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
+              {enviando ? 'Enviando…' : 'Enviar ahora'}
             </button>
             <button type="button" className="al-enlace" onClick={() => navigate('/configuracion')}>
-              Cambiar horario o número
+              Cambiar horario o correo
             </button>
           </div>
         </section>
       )}
 
-      <div className={'al-grid' + (conWhatsApp ? '' : ' al-grid--sola')}>
+      <div className={'al-grid' + (conCorreo ? '' : ' al-grid--sola')}>
         {/* ============ LISTAS ============ */}
         <section className="al-panel">
           {cargando ? (
@@ -540,91 +550,53 @@ export default function Alertas() {
           )}
         </section>
 
-        {/* ============ VISTA PREVIA (solo con WhatsApp prendido) ============ */}
-        {conWhatsApp && (
+        {/* ============ VISTA PREVIA DEL CORREO ============ */}
+        {conCorreo && (
           <aside className="al-lateral">
             <section className="al-panel">
               <h2 className="al-lateral__titulo">
-                <MessageCircle size={17} aria-hidden="true" />
-                Así llega a tu WhatsApp
+                <Mail size={17} aria-hidden="true" />
+                Así luce el correo
               </h2>
               <p className="al-lateral__texto">
-                Sin spam: un solo mensaje al día con todo junto, para que planees tu surtido sin abrir la app.
+                Un resumen diario con el estado del inventario para que planees tu surtido.
               </p>
 
-              <div className="al-chat">
-                <div className="al-chat__cabecera">
-                  <span className="al-chat__avatar" aria-hidden="true">
-                    <Candy size={16} />
-                  </span>
-                  <div>
-                    <p className="al-chat__nombre">INVENTIA</p>
-                    <p className="al-chat__sub">Avisos de tu dulcería</p>
-                  </div>
+              <article className="al-email">
+                <div className="al-email__cabecera">
+                  <p className="al-email__de"><strong>De:</strong> INVENTIA</p>
+                  <p className="al-email__para"><strong>Para:</strong> {ajustes.correoAlertas || 'tu correo'}</p>
+                  <p className="al-email__asunto">INVENTIA · Resumen del {formatoDiaMes.format(hoy)}</p>
                 </div>
-
-                <div className="al-chat__fondo">
-                  <span className="al-chat__fecha">{capitalizar(formatoChat.format(hoy))}</span>
-
-                  <div className="al-burbuja">
-                    <p>
-                      <strong>INVENTIA · Resumen del {formatoDiaMes.format(hoy)}</strong>
-                    </p>
-
-                    <p className="al-burbuja__seccion">
-                      <strong>Stock bajo ({stockBajo.length}):</strong>
-                    </p>
-                    {stockBajo.length === 0 ? (
-                      <p>Todo surtido.</p>
-                    ) : (
-                      <ul>
-                        {stockEnMensaje.map((p) => (
-                          <li key={p.id}>
-                            {p.nombre}: {p.stock === 0 ? <strong>agotado</strong> : `quedan ${p.stock}`}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {stockBajo.length > MAX_EN_MENSAJE && (
-                      <p className="al-burbuja__mas">…y {stockBajo.length - MAX_EN_MENSAJE} más</p>
-                    )}
-
-                    {conCaducidad && (
-                      <>
-                        <p className="al-burbuja__seccion">
-                          <strong>Por caducar ({porCaducar.length}):</strong>
-                        </p>
-                        {porCaducar.length === 0 ? (
-                          <p>Nada en los próximos {diasAviso} días.</p>
-                        ) : (
-                          <ul>
-                            {caducarEnMensaje.map((p) => (
-                              <li key={p.id}>
-                                {p.nombre}: {p.diasCaducar} días ({p.stock} {textoUnidad(p.unidad, p.stock)})
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {porCaducar.length > MAX_EN_MENSAJE && (
-                          <p className="al-burbuja__mas">…y {porCaducar.length - MAX_EN_MENSAJE} más</p>
-                        )}
-                      </>
-                    )}
-
-                    <p className="al-burbuja__hora">
-                      {hora}
-                      <CheckCheck size={14} aria-hidden="true" />
-                    </p>
-                  </div>
+                <div className="al-email__cuerpo">
+                  <p>Hola, este es el resumen de tu inventario:</p>
+                  <p className="al-email__seccion"><strong>Stock bajo ({stockBajo.length})</strong></p>
+                  {stockBajo.length === 0 ? <p>Todo surtido.</p> : (
+                    <ul>{stockEnMensaje.map((p) => (
+                      <li key={p.id}>{p.nombre}: {p.stock === 0 ? <strong>agotado</strong> : `quedan ${p.stock}`}</li>
+                    ))}</ul>
+                  )}
+                  {stockBajo.length > MAX_EN_MENSAJE && <p>…y {stockBajo.length - MAX_EN_MENSAJE} más</p>}
+                  {conCaducidad && (
+                    <>
+                      <p className="al-email__seccion"><strong>Por caducar ({porCaducar.length})</strong></p>
+                      {porCaducar.length === 0 ? <p>Nada en los próximos {diasAviso} días.</p> : (
+                        <ul>{caducarEnMensaje.map((p) => (
+                          <li key={p.id}>{p.nombre}: {p.diasCaducar} días ({p.stock} {textoUnidad(p.unidad, p.stock)})</li>
+                        ))}</ul>
+                      )}
+                      {porCaducar.length > MAX_EN_MENSAJE && <p>…y {porCaducar.length - MAX_EN_MENSAJE} más</p>}
+                    </>
+                  )}
+                  <p className="al-email__firma">INVENTIA · Inventario de tu negocio</p>
                 </div>
-              </div>
+              </article>
             </section>
 
             <p className="al-nota">
               <WifiOff size={17} aria-hidden="true" />
               <span>
-                <strong>Funciona aunque no haya internet.</strong> Si a la hora del envío tu dulcería no tiene conexión,
-                el resumen se guarda y se manda solito en cuanto regrese la señal.
+                <strong>El envío requiere conexión a internet.</strong> Si la conexión se interrumpe, el resumen queda pendiente y el sistema vuelve a intentarlo.
               </span>
             </p>
           </aside>

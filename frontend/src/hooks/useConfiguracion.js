@@ -30,7 +30,7 @@ export default function useConfiguracion() {
 }
 
 
-/* Lo mismo, pero ya listo para usar: { maneja_caducidad, vende_mayoreo, …, diasAviso, horaResumen, telefonoAlertas } */
+/* Lo mismo, pero ya listo para usar: { maneja_caducidad, vende_mayoreo, …, diasAviso, horaResumen, correoAlertas } */
 export function useAjustes() {
   return leerAjustes(useConfiguracion())
 }

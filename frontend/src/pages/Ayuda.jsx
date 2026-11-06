@@ -16,7 +16,7 @@ import {
   Lock,
   ChevronDown,
   ArrowRight,
-  MessageCircle,
+  Phone,
   Mail,
   SearchX,
 } from 'lucide-react'
@@ -106,8 +106,8 @@ const GUIAS = [
     pasos: [
       'En Alertas ves lo que está debajo del mínimo y lo que caduca pronto.',
       'Desde ahí registras la compra o la merma con un clic.',
-      'Cada día te llega un solo resumen por WhatsApp, a la hora que elijas.',
-      'Si no hay internet a esa hora, el resumen se manda en cuanto regrese.',
+      'Cada día te llega un resumen por correo a la hora que elijas.',
+      'Si falla la conexión, el sistema conserva el resumen y vuelve a intentar enviarlo.',
     ],
   },
 ]
@@ -124,7 +124,7 @@ const PREGUNTAS = [
   {
     pregunta: '¿Qué pasa si se va el internet?',
     respuesta:
-      'Puedes seguir usando INVENTIA normal. Todo se guarda en tu computadora y se sincroniza solo en cuanto vuelva la conexión. Lo único que espera es el resumen de WhatsApp.',
+      'Puedes seguir usando INVENTIA normal. Todo se guarda en tu computadora y se sincroniza solo en cuanto vuelva la conexión. El resumen por correo se envía cuando la conexión regresa.',
   },
   {
     pregunta: '¿Por qué no puedo editar ni borrar un movimiento?',
@@ -174,7 +174,7 @@ const PREGUNTAS = [
 
 // TODO: poner los datos reales de soporte del equipo
 const SOPORTE = {
-  whatsapp: '55 0000 0000',
+  telefono: '55 0000 0000',
   correo: 'soporte@inventia.mx',
   horario: 'Lunes a sábado, de 9:00 a 18:00',
 }
@@ -359,8 +359,8 @@ export default function Ayuda() {
 
                 <ul className="ay-contacto__datos">
                   <li>
-                    <MessageCircle size={16} aria-hidden="true" />
-                    WhatsApp: <strong>{SOPORTE.whatsapp}</strong>
+                    <Phone size={16} aria-hidden="true" />
+                    Teléfono: <strong>{SOPORTE.telefono}</strong>
                   </li>
                   <li>
                     <Mail size={16} aria-hidden="true" />
