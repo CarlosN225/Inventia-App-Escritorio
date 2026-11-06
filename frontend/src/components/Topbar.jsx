@@ -13,7 +13,6 @@ import {
   CalendarDays,
   Wifi,
   WifiOff,
-  RefreshCw,
   ShieldCheck,
 } from 'lucide-react'
 
@@ -42,10 +41,6 @@ function capitalizar(texto) {
   return texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : ''
 }
 
-function horaActual() {
-  return new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
 export default function Topbar({ onOpenSidebar }) {
    const configuracion = useConfiguracion()
   const nombreNegocio = nombreCorto(configuracion?.negocio.nombre) || '…'
@@ -57,8 +52,6 @@ export default function Topbar({ onOpenSidebar }) {
   const [usuario, setUsuario] = useState(null)
   const [enLinea, setEnLinea] = useState(navigator.onLine)
   const [hoy, setHoy] = useState(() => new Date())
-  const [sincronizando, setSincronizando] = useState(false)
-  const [ultimaSync, setUltimaSync] = useState(() => horaActual())
 
   const ref = useRef(null)
 
@@ -124,16 +117,6 @@ export default function Topbar({ onOpenSidebar }) {
     navigate(ruta)
   }
 
-  function sincronizar() {
-    if (!enLinea || sincronizando) return
-    // TODO: mandar al backend lo que se guardó sin conexión
-    setSincronizando(true)
-    setTimeout(() => {
-      setSincronizando(false)
-      setUltimaSync(horaActual())
-    }, 1200)
-  }
-
   function requestLogout() {
     setOpen(false)
     setConfirmOpen(true)
@@ -189,27 +172,16 @@ export default function Topbar({ onOpenSidebar }) {
           </span>
         </div>
 
-        {/* ============ DERECHA: internet + sincronizar + perfil ============ */}
+        {/* ============ DERECHA: internet + perfil ============ */}
         <div className="topbar__right">
           <span
             className={'topbar__conexion ' + (enLinea ? 'is-en-linea' : 'is-sin-conexion')}
             role="status"
-            title={enLinea ? 'Tienes internet' : 'Sin internet: todo se guarda en la compu y se sincroniza al volver'}
+            title={enLinea ? 'Tienes internet' : 'Sin internet: puedes seguir trabajando normal. Solo el resumen por correo espera a que regrese la conexión'}
           >
             {enLinea ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}
             {enLinea ? 'En línea' : 'Sin conexión · tus datos se guardan'}
           </span>
-
-          <button
-            type="button"
-            className={'topbar__sync' + (sincronizando ? ' is-girando' : '')}
-            onClick={sincronizar}
-            disabled={!enLinea}
-            title={enLinea ? `Sincronizar ahora · última vez: ${ultimaSync}` : 'Necesitas internet para sincronizar'}
-            aria-label="Sincronizar"
-          >
-            <RefreshCw size={16} />
-          </button>
 
           {/* Solo el monito de perfil */}
           <div className="topbar__user-wrap" ref={ref}>

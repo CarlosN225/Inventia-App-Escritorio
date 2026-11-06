@@ -124,7 +124,7 @@ const PREGUNTAS = [
   {
     pregunta: '¿Qué pasa si se va el internet?',
     respuesta:
-      'Puedes seguir usando INVENTIA normal. Todo se guarda en tu computadora y se sincroniza solo en cuanto vuelva la conexión. El resumen por correo se envía cuando la conexión regresa.',
+      'Puedes seguir usando INVENTIA normal. Toda tu información se guarda en tu computadora, así que no necesitas internet para trabajar. Lo único que espera es el resumen por correo, que se envía en cuanto regresa la conexión.',
   },
   {
     pregunta: '¿Por qué no puedo editar ni borrar un movimiento?',
