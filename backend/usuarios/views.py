@@ -21,6 +21,19 @@ from .serializers import (
 )
 from .permissions import EsUsuarioAutenticado, EsPropietario
 
+from datetime import timedelta
+from django.utils import timezone
+
+
+def proximo_lunes():
+    """Fecha y hora del próximo lunes a las 6:00 a.m. (hora local)."""
+    ahora = timezone.localtime()
+    lunes = ahora.replace(hour=6, minute=0, second=0, microsecond=0)
+    lunes += timedelta(days=(0 - ahora.weekday()) % 7)
+    if lunes <= ahora:
+        lunes += timedelta(days=7)
+    return lunes
+
 
 def obtener_usuario_sesion(request):
     """
@@ -65,12 +78,13 @@ def login_view(request):
     request.session['id_usuario'] = usuario.id
     request.session['rol'] = usuario.rol
 
-    # Mantener sesión: 30 días si lo marcó.
+    # Mantener sesión: hasta el próximo lunes a las 6:00 a.m. si lo marcó.
     # Si no, la sesión se cierra al cerrar la aplicación.
     if request.data.get('mantener_sesion'):
-        request.session.set_expiry(60 * 60 * 24 * 30)
+        request.session.set_expiry(proximo_lunes())
     else:
         request.session.set_expiry(0)
+        
 
     return Response({
         'usuario': UsuarioSerializer(usuario).data,
