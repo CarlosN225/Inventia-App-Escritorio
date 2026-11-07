@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { olvidarConfiguracion } from './configuracion';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -15,6 +16,7 @@ export async function login(correo, contrasena, mantenerSesion = false) {
         }
     );
 
+    olvidarConfiguracion(); // que se vea el negocio de esta cuenta, no el de la anterior
     return response.data;
 }
 
@@ -27,6 +29,7 @@ export async function logout() {
         }
     );
 
+    olvidarConfiguracion();
     return response.data;
 }
 

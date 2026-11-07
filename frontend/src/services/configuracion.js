@@ -21,6 +21,13 @@ export function obtenerConfiguracion(forzar = false) {
   return cache
 }
 
+/* Al entrar o salir de una cuenta se olvida lo guardado, para que la barra de arriba
+   y las pantallas no muestren el negocio de la sesión anterior */
+export function olvidarConfiguracion() {
+  cache = null
+  window.dispatchEvent(new Event(EVENTO_CONFIGURACION))
+}
+
 /* cambios: { negocio: {...}, preferencias: {...}, email: {...} } (solo lo que cambió) */
 export async function guardarConfiguracion(cambios) {
   const response = await axios.patch(`${API_URL}/configuracion/`, cambios, CON_SESION)
