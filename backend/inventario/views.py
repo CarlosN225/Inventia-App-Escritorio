@@ -34,7 +34,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         # Crear, editar y eliminar productos: solo propietario
         return [EsPropietario()]
 
-    
+
     def perform_create(self, serializer):
         """Si el producto nace con existencias, queda su entrada en el historial."""
         producto = serializer.save()
@@ -110,7 +110,7 @@ class CompraViewSet(mixins.CreateModelMixin,
         )
         return Response(CompraSerializer(compra).data, status=status.HTTP_201_CREATED)
 
-    
+
 
 # ============================================================
 #  CONFIGURACIÓN DEL NEGOCIO
@@ -123,7 +123,6 @@ from django.core.validators import validate_email
 from rest_framework.views import APIView
 
 from .models import Negocio, Configuracion
-from usuarios.permissions import EsPropietario
 
 PREFERENCIAS = ["maneja_caducidad", "vende_mayoreo", "maneja_promociones", "usa_codigo_barras", "alertas_activas"]
 
@@ -232,7 +231,7 @@ class ConfiguracionView(APIView):
         return Response(_datos_configuracion(negocio))
 
 
-    
+
 
 # ============================================================
 #  PROMOCIONES
@@ -315,7 +314,9 @@ class AutorizarPrecioView(APIView):
 
         producto = Producto.objects.filter(pk=request.data.get("producto"), activo=True).first()
         if not producto:
-            return Response({"producto": "Ese producto no existe o está desactivado."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"producto": "Ese producto no existe o está desactivado."}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             precio = Decimal(str(request.data.get("precio"))).quantize(Decimal("0.01"))
@@ -326,12 +327,14 @@ class AutorizarPrecioView(APIView):
 
         motivo = (request.data.get("motivo") or "").strip()
         if not motivo_valido(motivo):
-            return Response({"motivo": "Elige el motivo del cambio (si es «Otro», escríbelo)."}, status=status.HTTP_400_BAD_REQUEST)
-       
+            return Response(
+                {"motivo": "Elige el motivo del cambio (si es «Otro», escríbelo)."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
         correcto, mensaje, bloqueado = verificar_pin(config, str(request.data.get("pin") or ""))
         if not correcto:
             return Response({"pin": mensaje, "bloqueado": bloqueado}, status=status.HTTP_400_BAD_REQUEST)
-       
+
         propietario = negocio.usuario_admin or Usuario.objects.filter(rol="propietario").first()
 
         return Response({

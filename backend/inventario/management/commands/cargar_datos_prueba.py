@@ -52,7 +52,9 @@ CATEGORIAS = [
 ]
 
 # Qué tanto se vende cada categoría (para que el Top tenga sentido)
-POPULARIDAD = {0: 3, 1: 4, 2: 4, 3: 2, 4: 3, 5: 2, 6: 4, 7: 2, 8: 4, 9: 1, 10: 0.3, 11: 1, 12: 1, 13: 1, 14: 0.8, 15: 0.5}
+POPULARIDAD = {
+    0: 3, 1: 4, 2: 4, 3: 2, 4: 3, 5: 2, 6: 4, 7: 2, 8: 4, 9: 1, 10: 0.3, 11: 1, 12: 1, 13: 1, 14: 0.8, 15: 0.5,
+}
 
 # (nombre, categoría (índice), unidad_medida, precio_venta, precio_mayoreo,
 #  cantidad_minima_mayoreo, piezas_por_empaque, maneja_caducidad)

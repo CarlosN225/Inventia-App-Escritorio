@@ -1,0 +1,22 @@
+Name                                Stmts   Miss  Cover   Missing
+-----------------------------------------------------------------
+inventario\__init__.py                  0      0 100.0%
+inventario\alertas_api.py              61      2  96.7%   71, 73
+inventario\alertas_scheduler.py        19      4  78.9%   23-24, 30-31
+inventario\autorizaciones.py           46      0 100.0%
+inventario\correo_alertas.py          195     13  93.3%   179, 192, 210-217, 225, 229, 236, 288, 364-365
+inventario\correo_html.py             127      8  93.7%   82-86, 88, 109-110
+inventario\management\__init__.py       0      0 100.0%
+inventario\models.py                  206     10  95.1%   31, 61, 98, 160, 190, 210, 256, 278, 306, 389
+inventario\serializers.py             166      0 100.0%
+inventario\services.py                113      1  99.1%   49
+inventario\urls.py                     13      0 100.0%
+inventario\views.py                   190      0 100.0%
+usuarios\__init__.py                    0      0 100.0%
+usuarios\models.py                     20      1  95.0%   29
+usuarios\permissions.py                16      3  81.2%   34-37
+usuarios\serializers.py                40      5  87.5%   74-87
+usuarios\urls.py                        3      0 100.0%
+usuarios\views.py                     227      9  96.0%   36, 47, 353, 392, 471-472, 517, 647-648
+-----------------------------------------------------------------
+TOTAL                                1442     56  96.1%

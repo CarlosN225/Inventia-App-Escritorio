@@ -86,7 +86,7 @@ def login_view(request):
         request.session.set_expiry(proximo_lunes())
     else:
         request.session.set_expiry(0)
-        
+
 
     return Response({
         'usuario': UsuarioSerializer(usuario).data,

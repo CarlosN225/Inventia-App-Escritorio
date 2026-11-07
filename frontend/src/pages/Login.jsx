@@ -15,9 +15,6 @@ import {
 import logoInventia from '../assets/logo-inventia-sf.png'
 import { login, getUsuarioActual } from '../services/auth'
 
-// TODO: traerlo del backend cuando exista el modelo Negocio
-const NOMBRE_NEGOCIO = 'Dulcería Los Querubines'
-
 const features = [
   { icon: WifiOff, text: 'Funciona sin conexión a internet' },
   { icon: Mail, text: 'Alertas automáticas por correo' },
@@ -97,7 +94,7 @@ export default function Login({ nombreNegocio }) {
       setTimeout(() => {
         navigate('/panel')
       }, 900)
-    } catch (err) {
+    } catch {
       setStatus('idle')
       setErrorMsg('Correo o contraseña incorrectos')
     }

@@ -114,7 +114,9 @@ def armar_resumen(config, hoy=None, conocida=None):
             "clave": clave,
         })
     # Lo nuevo primero, luego lo agotado, luego lo que tiene menos respecto a su mínimo
-    stock.sort(key=lambda i: (not i["nuevo"], not i["agotado"], i["stock"] / i["minimo"] if i["minimo"] else 0, i["nombre"]))
+    stock.sort(key=lambda i: (
+        not i["nuevo"], not i["agotado"], i["stock"] / i["minimo"] if i["minimo"] else 0, i["nombre"]
+    ))
 
     por_caducar = []
     for p in caducan:

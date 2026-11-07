@@ -1,5 +1,4 @@
 import os
-import sys
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'inventia_backend.settings')
 
