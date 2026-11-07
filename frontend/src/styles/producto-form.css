@@ -925,3 +925,96 @@ textarea.pf-input {
   border-style: solid;
   background: #eef3fb;
 }
+/* ============ GLOBITO DE INFORMACIÓN (ⓘ al final de una pregunta) ============ */
+.pf-campo__fila:has(> .pf-globo) { align-items: center; }
+
+.pf-globo {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.pf-globo__boton {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--d-gris-2, #94a3b8);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.pf-globo__boton:hover,
+.pf-globo__boton.is-activo {
+  background: #eef3fb;
+  color: var(--d-azul, #1668e3);
+}
+
+.pf-globo__burbuja {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -6px;
+  z-index: 30;
+  display: block;
+  width: 300px;
+  padding: 12px 14px;
+  border: 1px solid #dbe7f7;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(11, 18, 32, 0.14);
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  animation: pf-globo-aparecer 0.12s ease-out;
+}
+
+/* La colita que apunta al iconito */
+.pf-globo__burbuja::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid #dbe7f7;
+  border-left: 1px solid #dbe7f7;
+  background: #ffffff;
+  transform: rotate(45deg);
+}
+
+.pf-globo__nota {
+  display: block;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eef1f5;
+  color: #64748b;
+}
+
+@keyframes pf-globo-aparecer {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+:root[data-theme='dark'] .pf-globo__boton:hover,
+:root[data-theme='dark'] .pf-globo__boton.is-activo {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+:root[data-theme='dark'] .pf-globo__burbuja,
+:root[data-theme='dark'] .pf-globo__burbuja::before {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+:root[data-theme='dark'] .pf-globo__burbuja { color: var(--color-text); }
+:root[data-theme='dark'] .pf-globo__nota {
+  border-top-color: var(--color-border);
+  color: var(--color-text-muted);
+}

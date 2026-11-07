@@ -214,6 +214,50 @@ function Campo({ etiqueta, htmlFor, requerido, ayuda, error, contador, children 
   )
 }
 
+// Iconito ⓘ al final de una pregunta: al darle clic abre un globito con la explicación
+function Globo({ titulo, children }) {
+  const [abierto, setAbierto] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!abierto) return undefined
+
+    function clicFuera(e) {
+      if (ref.current && !ref.current.contains(e.target)) setAbierto(false)
+    }
+    function tecla(e) {
+      if (e.key === 'Escape') setAbierto(false)
+    }
+
+    document.addEventListener('mousedown', clicFuera)
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('mousedown', clicFuera)
+      document.removeEventListener('keydown', tecla)
+    }
+  }, [abierto])
+
+  return (
+    <span className="pf-globo" ref={ref}>
+      <button
+        type="button"
+        className={'pf-globo__boton' + (abierto ? ' is-activo' : '')}
+        aria-label={`Qué significa: ${titulo}`}
+        aria-expanded={abierto}
+        onClick={() => setAbierto((v) => !v)}
+      >
+        <Info size={15} aria-hidden="true" />
+      </button>
+
+      {abierto && (
+        <span className="pf-globo__burbuja" role="tooltip">
+          {children}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function Pendiente({ texto }) {
   return (
     <p className="pf-pendiente">
@@ -846,7 +890,13 @@ export default function ProductoForm() {
           {/* Precio y costo */}
           <Seccion icono={Tag} titulo="Precio y costo" completa>
             <div className="pf-fila pf-fila--3">
-              <Campo etiqueta="Precio de venta" htmlFor="pf-precio" requerido error={errores.precio}>
+              <Campo
+                etiqueta={`Precio de venta (por ${unidad.label.toLowerCase()})`}
+                htmlFor="pf-precio"
+                requerido
+                error={errores.precio}
+                ayuda={`Lo que cobras por cada ${unidad.label.toLowerCase()}. La unidad se elige en "¿Se vende por…?".`}
+              >
                 <div className={'pf-grupo' + (errores.precio ? ' is-error' : '')}>
                   <span className="pf-grupo__extra">$</span>
                   <input
@@ -979,9 +1029,26 @@ export default function ProductoForm() {
             <div className="pf-pila">
               {/* 1. Lo que se lleva el cliente: es la unidad del stock */}
               <div className="pf-campo">
-                <span className="pf-etiqueta">
-                  ¿Cuál es lo mínimo que vendes? <span className="pf-requerido">*</span>
-                </span>
+                <div className="pf-campo__fila">
+                  <span className="pf-etiqueta">
+                    ¿Se vende por…? <span className="pf-requerido">*</span>
+                  </span>
+                  <Globo titulo="¿Se vende por…?">
+                    Es lo que se lleva el cliente al pagar <strong>y con lo que se cuenta tu inventario</strong>.
+                    {precio > 0 ? (
+                      <>
+                        {' '}Cada {unidad.label.toLowerCase()} se vende a <strong>{moneda.format(precio)}</strong> y
+                        tu stock se cuenta en {unidad.plural}.
+                      </>
+                    ) : (
+                      <> Ej.: si eliges Pieza, el precio de venta es por pieza y el stock se cuenta en piezas.</>
+                    )}
+                    <span className="pf-globo__nota">
+                      Ejemplos: un chocolate se vende por <strong>Pieza</strong>; unas papitas, por{' '}
+                      <strong>Bolsa</strong>.
+                    </span>
+                  </Globo>
+                </div>
                 <div className="pf-segmentado" role="group" aria-label="Unidad de venta">
                   {UNIDADES.map((u) => (
                     <button
@@ -995,15 +1062,20 @@ export default function ProductoForm() {
                     </button>
                   ))}
                 </div>
-                <p className="pf-ayuda">
-                  Lo que se lleva el cliente cuando compra uno. Si a veces lo vendes suelto, elige <strong>Pieza</strong>:
-                  el stock se cuenta en esa unidad.
-                </p>
               </div>
 
               {/* 2. Cómo llega: nunca en lo mismo que se vende */}
               <div className="pf-campo">
-                <span className="pf-etiqueta">¿Cómo te llega del proveedor?</span>
+                <div className="pf-campo__fila">
+                  <span className="pf-etiqueta">¿Cómo te llega del proveedor?</span>
+                  <Globo titulo="¿Cómo te llega del proveedor?">
+                    Es <strong>como lo compras</strong>, no como lo vendes. Sirve para registrar compras más rápido
+                    (1 bolsa = 25 {unidad.plural}, por ejemplo) y para cobrar el empaque completo de un clic al vender.
+                    <span className="pf-globo__nota">
+                      Si te lo dan por {unidad.label.toLowerCase()}, sin empaque, elige <strong>Suelto</strong>.
+                    </span>
+                  </Globo>
+                </div>
                 <div className="pf-segmentado pf-segmentado--chico" role="group" aria-label="Cómo llega del proveedor">
                   <button
                     type="button"

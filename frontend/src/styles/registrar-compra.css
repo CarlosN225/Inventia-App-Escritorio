@@ -16,10 +16,27 @@
   flex-shrink: 0;
 }
 
-/* El panel de abajo (resultados o por surtir) se queda con lo que sobre */
-.rv--compra .rv-izquierda > .rv-panel:last-child {
-  flex: 1 1 0;
-  min-height: 0;
+/* En compu: el panel de abajo (resultados o por surtir) se queda con lo que sobre.
+   En ventana angosta crece con su contenido (si no, se aplastaba y la compra se le encimaba). */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .rv--compra .rv-izquierda > .rv-panel:last-child {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 1099px), (max-height: 599px) {
+  .rv--compra .rv-izquierda > .rv-panel:last-child {
+    flex: 0 0 auto;
+  }
+
+  /* La lista de resultados o por surtir no crece sin fin: se desplaza por dentro */
+  .rv--compra .rv-abajo .rv-lista,
+  .rv--compra .rv-abajo .rv-top,
+  .rv--compra .rv-abajo .rc-surtir {
+    max-height: 420px;
+    overflow-y: auto;
+  }
 }
 
 /* ============ ARRIBA MÁS COMPACTO (datos + buscador) ============
