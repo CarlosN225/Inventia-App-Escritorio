@@ -891,3 +891,114 @@
   background: #f5f3ff;
   color: #6d28d9;
 }
+/* ============================================================
+   EXPORTAR: menú con Excel y PDF
+   ============================================================ */
+
+.hi-exportar {
+  --exp-fondo: #ffffff;
+  --exp-hover: #f5f8fd;
+  --exp-borde: var(--d-borde);
+  --exp-texto: var(--d-marino);
+  --exp-gris: var(--d-gris);
+  --exp-excel: #0f8a5f;
+  --exp-excel-suave: #e7f6ef;
+  --exp-pdf: #c62828;
+  --exp-pdf-suave: #fdecec;
+
+  position: relative;
+}
+
+.hi-exportar .hi-boton svg:last-child:not(:first-child) {
+  margin-left: -2px;
+  color: var(--d-gris);
+}
+
+.hi-exportar__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 250px;
+  padding: 6px;
+  border: 1px solid var(--exp-borde);
+  border-radius: 12px;
+  background: var(--exp-fondo);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+  animation: hi-menu-aparece 140ms ease-out;
+}
+
+@keyframes hi-menu-aparece {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hi-exportar__menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--exp-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hi-exportar__menu button:hover {
+  background: var(--exp-hover);
+}
+
+.hi-exportar__menu button > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.hi-exportar__menu strong {
+  font-size: 13.5px;
+}
+
+.hi-exportar__menu small {
+  color: var(--exp-gris);
+  font-size: 12px;
+}
+
+.hi-exportar__icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.hi-exportar__icono--excel { background: var(--exp-excel-suave); color: var(--exp-excel); }
+.hi-exportar__icono--pdf   { background: var(--exp-pdf-suave);   color: var(--exp-pdf); }
+
+.hi-exportar__nota {
+  margin: 4px 0 0;
+  padding: 7px 10px 3px;
+  border-top: 1px solid var(--exp-borde);
+  color: var(--exp-gris);
+  font-size: 11.5px;
+}
+
+/* Tema oscuro del menú */
+:root[data-theme='dark'] .hi-exportar {
+  --exp-fondo: var(--color-surface);
+  --exp-hover: var(--color-surface-2);
+  --exp-borde: var(--color-border);
+  --exp-texto: var(--color-text);
+  --exp-gris: var(--color-text-muted);
+  --exp-excel: var(--color-success);
+  --exp-excel-suave: var(--color-success-soft);
+  --exp-pdf: var(--color-danger);
+  --exp-pdf-suave: var(--color-danger-soft);
+}
+
+:root[data-theme='dark'] .hi-exportar__menu {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}

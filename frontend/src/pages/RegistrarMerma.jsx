@@ -22,6 +22,7 @@ import {
   Lightbulb,
   Loader2,
   RotateCcw,
+  PackageOpen,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
@@ -342,6 +343,28 @@ export default function RegistrarMerma() {
     )
   }
 
+  /* ---------- Sin productos (negocio recién creado) ---------- */
+
+  if (productos.length === 0) {
+    return (
+      <div className="rm rm--centro">
+        <section className="rm-panel rm-cargando rm-sin-productos">
+          <span className="rm-sin-productos__icono" aria-hidden="true">
+            <PackageOpen size={28} />
+          </span>
+          <h2 className="rm-sin-productos__titulo">Aún no tienes productos</h2>
+          <p className="rm-sin-productos__texto">
+            Para registrar una merma, primero agrega productos a tu catálogo. Empieza por los que más vendes.
+          </p>
+          <button type="button" className="rm-boton rm-boton--primario" onClick={() => navigate('/catalogo/nuevo')}>
+            <Plus size={16} aria-hidden="true" />
+            Nuevo producto
+          </button>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="rm">
       {/* ============ FORMULARIO ============ */}
@@ -392,6 +415,8 @@ export default function RegistrarMerma() {
                 </div>
               ) : (
                 <>
+                  {/* Los resultados flotan sobre el formulario: así no empujan nada hacia abajo */}
+                  <div className="rm-busqueda">
                   <div className={'rm-buscador' + (errorProducto ? ' is-error' : '')}>
                     <Search size={17} aria-hidden="true" />
                     <input
@@ -445,6 +470,7 @@ export default function RegistrarMerma() {
                         ))}
                       </ul>
                     ))}
+                  </div>
 
                   {errorProducto && (
                     <p className="rm-error">

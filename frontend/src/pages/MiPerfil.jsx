@@ -375,13 +375,8 @@ export default function MiPerfil() {
                   <input value={usuario.correo} readOnly aria-label="Correo" />
                   <Lock size={14} aria-hidden="true" />
                 </div>
-                {esPropietario ? (
-                  <button type="button" className="mp-enlace" onClick={() => navigate('/configuracion')}>
-                    Se cambia en Configuración › Usuarios
-                  </button>
-                ) : (
-                  <p className="mp-ayuda">Solo el propietario puede cambiarlo</p>
-                )}
+                {/* El correo del propietario no se cambia: no mostramos nada que sugiera lo contrario */}
+                {!esPropietario && <p className="mp-ayuda">Solo el propietario puede cambiarlo</p>}
               </div>
 
               <div className="mp-campo">
@@ -391,7 +386,7 @@ export default function MiPerfil() {
                   <input value={esPropietario ? 'Propietario' : 'Encargado'} readOnly aria-label="Rol" />
                   <Lock size={14} aria-hidden="true" />
                 </div>
-                <p className="mp-ayuda">Lo asigna el propietario</p>
+                {!esPropietario && <p className="mp-ayuda">Lo asigna el propietario</p>}
               </div>
             </div>
 

@@ -26,10 +26,13 @@ import {
   Zap,
   Home,
   Sparkles,
+  Clock,
+  Send,
 } from 'lucide-react'
 
 import logo from '../assets/logo-inventia-sf.png'
 import { estadoInicial, crearPrimerPropietario, login } from '../services/auth'
+import { probarCorreo } from '../services/alertas'
 import '../styles/asistente.css'
 
 const PASOS = ['Tu negocio', 'Tu cuenta', 'Cómo trabajas', '¡Listo!']
@@ -67,12 +70,25 @@ const PREGUNTAS = [
   {
     id: 'alertas_activas',
     icono: Mail,
-    titulo: '¿Quieres recibir un resumen diario por correo?',
-    ejemplo: 'Lo que se acaba y lo que está por caducar, todas las noches',
-    activo: 'Resumen diario por correo',
+    titulo: '¿Te avisamos por correo cuando haga falta?',
+    ejemplo: 'Solo si algo se agota, se está acabando o va a caducar. Si no hay novedades, no te llega nada.',
+    activo: 'Avisos por correo',
     recomendado: true,
   },
 ]
+
+// Las mismas opciones que en Configuración → Correo y alertas
+const HORAS = [
+  { valor: '18:00', texto: '6:00 p.m.' },
+  { valor: '19:00', texto: '7:00 p.m.' },
+  { valor: '20:00', texto: '8:00 p.m.' },
+  { valor: '21:00', texto: '9:00 p.m.' },
+  { valor: '22:00', texto: '10:00 p.m.' },
+]
+
+const DIAS_CADUCIDAD = [15, 30, 45, 60]
+
+const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const DATOS_INICIALES = {
   negocio: { nombre: '', direccion: '', telefono: '' },
@@ -83,6 +99,9 @@ const DATOS_INICIALES = {
     maneja_promociones: true,
     usa_codigo_barras: false,
     alertas_activas: true,
+    correo_alertas: null, // null = el mismo correo de su cuenta
+    hora_resumen: '20:00',
+    dias_aviso_caducidad: 30,
   },
 }
 
@@ -99,6 +118,15 @@ function primerNombre(nombre) {
   return partes.slice(0, 2).join(' ')
 }
 
+function textoHora(valor) {
+  return HORAS.find((h) => h.valor === valor)?.texto ?? valor
+}
+
+// Si no lo cambió, los avisos llegan al correo de su cuenta
+function correoDeAvisos(preferencias, propietario) {
+  return (preferencias.correo_alertas ?? propietario.correo).trim().toLowerCase()
+}
+
 function reglasContrasena(contrasena) {
   return [
     { texto: 'Al menos 8 caracteres', ok: contrasena.length >= 8 },
@@ -112,7 +140,9 @@ function reglasContrasena(contrasena) {
 function erroresNegocio(n) {
   const e = {}
   if (!n.nombre.trim()) e.nombre = 'Escribe el nombre de tu dulcería'
-  if (soloDigitos(n.telefono).length !== 10) e.telefono = 'Escribe el teléfono de la dulcería (10 dígitos)'
+  // Opcional: no todas las dulcerías tienen teléfono; si lo escriben, que tenga 10 dígitos
+  const digitos = soloDigitos(n.telefono).length
+  if (digitos > 0 && digitos !== 10) e.telefono = 'Le faltan números: son 10 dígitos'
   return e
 }
 
@@ -120,14 +150,24 @@ function erroresCuenta(p) {
   const e = {}
   if (!p.nombre_completo.trim()) e.nombre_completo = 'Escribe tu nombre'
   if (!p.correo.trim()) e.correo = 'Escribe tu correo'
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.correo.trim())) e.correo = 'Revisa que el correo esté bien escrito'
-  if (soloDigitos(p.telefono_whatsapp).length !== 10) e.telefono_whatsapp = 'Escribe tu teléfono (10 dígitos)'
+  else if (!CORREO_VALIDO.test(p.correo.trim())) e.correo = 'Revisa que el correo esté bien escrito'
+  // El teléfono ya es opcional; si lo escribe, que tenga 10 dígitos
+  const digitos = soloDigitos(p.telefono_whatsapp).length
+  if (digitos > 0 && digitos !== 10) e.telefono_whatsapp = 'Le faltan números: son 10 dígitos'
   if (reglasContrasena(p.contrasena).some((r) => !r.ok)) e.contrasena = 'Cumple todas las reglas de abajo'
   if (!p.confirmar || p.confirmar !== p.contrasena) e.confirmar = 'Las contraseñas no coinciden'
   return e
 }
 
-function erroresPreferencias() { return {} }
+function erroresPreferencias(pref, propietario) {
+  const e = {}
+  if (pref.alertas_activas) {
+    const correo = correoDeAvisos(pref, propietario)
+    if (!correo) e.correo_alertas = 'Escribe a qué correo te avisamos'
+    else if (!CORREO_VALIDO.test(correo)) e.correo_alertas = 'Revisa que el correo esté bien escrito'
+  }
+  return e
+}
 
 /* ============ Piezas reutilizables ============ */
 
@@ -190,6 +230,7 @@ export default function AsistenteInicial() {
   const [erroresServidor, setErroresServidor] = useState({})
   const [guardando, setGuardando] = useState(false)
   const [errorGeneral, setErrorGeneral] = useState(null) // { texto, yaConfigurada }
+  const [prueba, setPrueba] = useState({ estado: 'nada', texto: '' }) // correo de prueba del paso 4
 
   // Si la app ya tiene dueño, no se puede volver a configurar (salvo en modo demo)
   useEffect(() => {
@@ -274,7 +315,10 @@ export default function AsistenteInicial() {
           direccion: negocio.direccion.trim(),
           telefono: soloDigitos(negocio.telefono),
         },
-        preferencias,
+        preferencias: {
+          ...preferencias,
+          correo_alertas: correoDeAvisos(preferencias, propietario),
+        },
       })
 
       // Entra solito, para que no tenga que volver a escribir su contraseña
@@ -286,6 +330,15 @@ export default function AsistenteInicial() {
 
       if (e.response?.status === 403) {
         setErrorGeneral({ texto: 'Esta app ya tiene un propietario. Entra con tu cuenta.', yaConfigurada: true })
+      } else if (mensaje && /avisos/i.test(mensaje)) {
+        setErroresServidor({ correo_alertas: mensaje })
+        irA(3)
+      } else if (mensaje && /teléfono de la dulcería/i.test(mensaje)) {
+        setErroresServidor({ telefono: mensaje })
+        irA(1)
+      } else if (mensaje && /teléfono de contacto/i.test(mensaje)) {
+        setErroresServidor({ telefono_whatsapp: mensaje })
+        irA(2)
       } else if (mensaje && /correo/i.test(mensaje)) {
         setErroresServidor({ correo: mensaje })
         irA(2)
@@ -299,6 +352,30 @@ export default function AsistenteInicial() {
       }
     } finally {
       setGuardando(false)
+    }
+  }
+
+  /* ---------- Correo de prueba (paso 4) ---------- */
+
+  async function mandarPrueba() {
+    setPrueba({ estado: 'enviando', texto: '' })
+
+    if (demo) {
+      setTimeout(() => setPrueba({ estado: 'ok', texto: '' }), 700)
+      return
+    }
+
+    try {
+      await probarCorreo()
+      setPrueba({ estado: 'ok', texto: '' })
+    } catch (e) {
+      const sinInternet = !e.response
+      setPrueba({
+        estado: 'error',
+        texto: sinInternet
+          ? 'Sin conexión. Revisa tu internet y vuelve a intentar.'
+          : 'No se pudo enviar. Revísalo luego en Configuración.',
+      })
     }
   }
 
@@ -393,7 +470,7 @@ export default function AsistenteInicial() {
 
               <Campo
                 id="as-tel-negocio"
-                etiqueta="Teléfono de la dulcería" required
+                etiqueta="Teléfono de la dulcería (opcional)"
                 icono={Phone}
                 error={errorDe(1, 'telefono')}
                 ayuda="Para que te localicen clientes y proveedores · 10 dígitos"
@@ -437,11 +514,11 @@ export default function AsistenteInicial() {
               </Campo>
 
               <Campo
-                id="as-telefono" required
-                etiqueta="Tu teléfono"
+                id="as-telefono"
+                etiqueta="Tu teléfono (opcional)"
                 icono={Phone}
                 error={errorDe(2, 'telefono_whatsapp')}
-                ayuda="Teléfono de contacto · 10 dígitos"
+                ayuda="Por si tus encargados necesitan localizarte · 10 dígitos"
               >
                 <input
                   id="as-telefono"
@@ -529,10 +606,11 @@ export default function AsistenteInicial() {
               {PREGUNTAS.map((q) => {
                 const Icono = q.icono
                 const valor = preferencias[q.id]
-                const error = errorDe(3, q.id)
+                const conCorreo = q.id === 'alertas_activas' && valor
+                const errorCorreo = conCorreo ? errorDe(3, 'correo_alertas') : null
 
                 return (
-                  <li key={q.id} className={'as-pregunta' + (error ? ' is-error' : '')}>
+                  <li key={q.id} className={'as-pregunta' + (conCorreo ? ' con-extra' : '') + (errorCorreo ? ' is-error' : '')}>
                     <span className={'as-pregunta__icono' + (q.id === 'alertas_activas' ? ' is-email' : '')} aria-hidden="true">
                       <Icono size={18} />
                     </span>
@@ -543,16 +621,25 @@ export default function AsistenteInicial() {
                         {q.recomendado && <span className="as-recomendado">Recomendado</span>}
                       </p>
                       <p className="as-pregunta__ejemplo">{q.ejemplo}</p>
-                      {error && (
-                        <p className="as-error">
-                          <AlertCircle size={13} aria-hidden="true" />
-                          {error}
-                          <button type="button" className="as-enlace" onClick={() => irA(2)}>
-                            Ponerlo ahora
-                          </button>
-                        </p>
-                      )}
                     </div>
+
+                    {/* Con caducidad: con cuántos días de anticipación avisar */}
+                    {q.id === 'maneja_caducidad' && valor && (
+                      <label className="as-mini">
+                        Avisar
+                        <select
+                          value={preferencias.dias_aviso_caducidad}
+                          onChange={(e) => cambiar('preferencias', 'dias_aviso_caducidad', Number(e.target.value))}
+                          aria-label="Con cuántos días de anticipación avisar de la caducidad"
+                        >
+                          {DIAS_CADUCIDAD.map((d) => (
+                            <option key={d} value={d}>
+                              {d} días antes
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
 
                     <div className="as-sino" role="radiogroup" aria-label={q.titulo}>
                       {[true, false].map((opcion) => (
@@ -569,6 +656,47 @@ export default function AsistenteInicial() {
                         </button>
                       ))}
                     </div>
+
+                    {/* Con avisos: a qué correo y a qué hora revisamos */}
+                    {conCorreo && (
+                      <div className="as-pregunta__extra">
+                        <label className={'as-mini as-mini--correo' + (errorCorreo ? ' is-error' : '')}>
+                          <Mail size={14} aria-hidden="true" />
+                          Enviar a
+                          <input
+                            type="email"
+                            autoComplete="email"
+                            placeholder="nombre@micorreo.com"
+                            value={preferencias.correo_alertas ?? propietario.correo}
+                            onChange={(e) => cambiar('preferencias', 'correo_alertas', e.target.value)}
+                            aria-label="Correo para los avisos"
+                          />
+                        </label>
+
+                        <label className="as-mini">
+                          <Clock size={14} aria-hidden="true" />
+                          Revisar a las
+                          <select
+                            value={preferencias.hora_resumen}
+                            onChange={(e) => cambiar('preferencias', 'hora_resumen', e.target.value)}
+                            aria-label="Hora en que se revisa el inventario"
+                          >
+                            {HORAS.map((h) => (
+                              <option key={h.valor} value={h.valor}>
+                                {h.texto}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        {errorCorreo && (
+                          <p className="as-error">
+                            <AlertCircle size={13} aria-hidden="true" />
+                            {errorCorreo}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </li>
                 )
               })}
@@ -608,14 +736,54 @@ export default function AsistenteInicial() {
                 </span>
               </div>
 
-              <p className="as-resumen__etiqueta">Lo que activaste</p>
+              <div className="as-resumen__fila">
+                <p className="as-resumen__etiqueta">Lo que activaste</p>
+
+                {/* Para que vea que sí le llegan los avisos */}
+                {preferencias.alertas_activas && (
+                  <div className="as-prueba">
+                    {prueba.estado === 'ok' && (
+                      <span className="as-prueba__ok">
+                        <Check size={13} strokeWidth={3} aria-hidden="true" />
+                        Enviado. Revisa tu bandeja (y la carpeta de spam).
+                      </span>
+                    )}
+                    {prueba.estado === 'error' && (
+                      <span className="as-prueba__error">
+                        <AlertCircle size={13} aria-hidden="true" />
+                        {prueba.texto}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="as-boton as-boton--secundario as-boton--chico"
+                      onClick={mandarPrueba}
+                      disabled={prueba.estado === 'enviando'}
+                    >
+                      {prueba.estado === 'enviando' ? (
+                        <Loader2 size={14} className="as-girando" aria-hidden="true" />
+                      ) : (
+                        <Send size={14} aria-hidden="true" />
+                      )}
+                      {prueba.estado === 'ok' ? 'Mandar otro' : 'Mándame un correo de prueba'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <ul className="as-chips">
                 {PREGUNTAS.map((q) =>
                   preferencias[q.id] ? (
                     <li key={q.id} className="as-chip as-chip--verde">
                       <Check size={13} strokeWidth={3} aria-hidden="true" />
                       {q.activo}
-                      {q.id === 'alertas_activas' && <> al <strong>{propietario.correo}</strong></>}
+                      {q.id === 'maneja_caducidad' && <> · aviso {preferencias.dias_aviso_caducidad} días antes</>}
+                      {q.id === 'alertas_activas' && (
+                        <>
+                          {' '}a <strong>{correoDeAvisos(preferencias, propietario)}</strong> · revisión{' '}
+                          {textoHora(preferencias.hora_resumen)}
+                        </>
+                      )}
                     </li>
                   ) : (
                     <li key={q.id} className="as-chip as-chip--gris">

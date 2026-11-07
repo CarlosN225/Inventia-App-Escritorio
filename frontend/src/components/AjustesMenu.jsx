@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Settings, Sun, Moon, Monitor, SlidersHorizontal } from 'lucide-react'
 import { getTemaGuardado, guardarTema } from '../services/tema'
+import { intentarSalir } from '../services/salidaSegura'
 import '../styles/ajustes-menu.css'
 
 const OPCIONES = [
@@ -63,7 +64,9 @@ export default function AjustesMenu({ collapsed, esPropietario }) {
 
   function irAConfiguracion() {
     setAbierto(false)
-    navigate('/configuracion')
+    if (pathname === '/configuracion') return
+    // Si hay una venta a medias, primero pregunta (ver services/salidaSegura.js)
+    intentarSalir(() => navigate('/configuracion'))
   }
 
   return (

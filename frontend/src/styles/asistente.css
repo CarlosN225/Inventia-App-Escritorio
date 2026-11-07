@@ -828,3 +828,228 @@
   box-shadow: none;
   background: transparent;
 }
+
+/* ============ PASO 3: datos extra de caducidad y correo ============ */
+
+.as-pregunta.con-extra { flex-wrap: wrap; }
+
+/* Renglón de abajo (solo con avisos por correo): a qué correo y a qué hora */
+.as-pregunta__extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  flex-basis: 100%;
+  padding-left: 58px; /* alineado con el texto de la pregunta */
+}
+
+.as-mini {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 4px 0 11px;
+  border: 1px solid var(--as-borde);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--as-gris);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.as-mini:focus-within {
+  border-color: var(--as-azul);
+  box-shadow: 0 0 0 3px rgba(22, 104, 227, 0.12);
+}
+
+.as-mini.is-error { border-color: var(--as-rojo); }
+
+.as-mini select,
+.as-mini input {
+  height: 100%;
+  padding: 0 6px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--as-marino);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.as-mini--correo {
+  flex: 1;
+  min-width: 260px;
+  padding-right: 10px;
+}
+
+.as-mini--correo input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  cursor: text;
+}
+
+.as-pregunta__extra .as-error { flex-basis: 100%; }
+
+/* ============ PASO 4: correo de prueba ============ */
+
+.as-resumen__fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.as-resumen__fila .as-resumen__etiqueta { margin: 0; }
+
+.as-prueba {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 10px;
+}
+
+.as-prueba__ok,
+.as-prueba__error {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.as-prueba__ok { color: var(--as-verde); }
+.as-prueba__error { color: var(--as-rojo); }
+
+/* Ícono y título de cada opción en un mismo renglón */
+.as-opcion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.as-opcion__titulo { margin: 0; }
+.as-opcion__texto,
+.as-opcion .as-boton { grid-column: 1 / -1; }
+
+/* ============ QUE TODO QUEPA SIN SCROLL ============
+   En pantallas de compu normales (y con zoom) se aprieta un poco todo. */
+@media (min-width: 761px) and (max-height: 960px) {
+  .as { gap: 14px; padding: 18px 20px 16px; }
+  .as-marca__logo { width: 44px; height: 44px; }
+  .as-marca__nombre { font-size: 23px; }
+  .as-paso button { gap: 5px; }
+  .as-paso__circulo { width: 34px; height: 34px; font-size: 14px; }
+  .as-paso + .as-paso::before { top: 16px; }
+
+  .as-tarjeta { padding: 22px 28px; }
+  .as-seccion__cabecera { margin-bottom: 16px; padding-bottom: 14px; }
+  .as-titulo { font-size: 23px; }
+  .as-subtitulo { margin-top: 4px; font-size: 14px; }
+  .as-campos { gap: 14px 20px; }
+  .as-acciones { margin-top: 18px; padding-top: 16px; }
+  .as-boton { height: 42px; }
+
+  /* Paso 3 */
+  .as-preguntas { gap: 8px; }
+  .as-pregunta { gap: 14px; padding: 10px 14px; }
+  .as-pregunta__icono { width: 36px; height: 36px; }
+  .as-pregunta__titulo { font-size: 14.5px; }
+  .as-pregunta__ejemplo { margin-top: 1px; font-size: 12.5px; }
+  .as-sino button { height: 34px; min-width: 64px; }
+  .as-mini { height: 34px; }
+  .as-pregunta__extra { padding-left: 50px; }
+
+  /* Paso 4 */
+  .as-listo__icono { margin-bottom: 12px; }
+  .as-listo__dulce { width: 64px; height: 64px; border-radius: 18px; box-shadow: 0 0 0 7px rgba(34, 197, 184, 0.08), 0 10px 24px rgba(11, 18, 32, 0.08); }
+  .as-listo__dulce svg { width: 28px; height: 28px; }
+  .as-listo__check { width: 28px; height: 28px; right: -8px; bottom: -8px; }
+  .as-listo__titulo { font-size: 27px; }
+  .as-listo__texto { margin: 4px 0 14px; font-size: 14.5px; }
+  .as-resumen { padding: 14px 18px; }
+  .as-resumen__cabecera { margin-bottom: 12px; padding-bottom: 12px; }
+  .as-resumen__icono { width: 36px; height: 36px; }
+  .as-resumen__negocio { font-size: 17px; }
+  .as-chip { padding: 5px 10px; font-size: 12.5px; }
+  .as-opciones { gap: 14px; margin-top: 16px; }
+  .as-opcion { padding: 16px 18px; }
+  .as-opcion__icono { width: 36px; height: 36px; }
+  .as-opcion__titulo { font-size: 16.5px; }
+  .as-opcion__texto { margin: 0; font-size: 13.5px; line-height: 1.45; }
+  .as-recuerda { margin-top: 14px; padding: 8px 14px; font-size: 12.5px; }
+}
+
+/* Laptops chicas (720 de alto) o con mucho zoom: un apretón más */
+@media (min-width: 761px) and (max-height: 760px) {
+  .as { gap: 10px; padding: 12px 20px 10px; }
+  .as-marca__logo { width: 36px; height: 36px; }
+  .as-marca__nombre { font-size: 20px; }
+  .as-marca__sub { font-size: 10px; }
+  .as-paso__circulo { width: 30px; height: 30px; font-size: 13px; }
+  .as-paso + .as-paso::before { top: 14px; }
+  .as-paso__nombre { font-size: 12px; }
+  .as-pie { display: none; }
+
+  .as-tarjeta { padding: 16px 24px; }
+  .as-seccion__cabecera { margin-bottom: 12px; padding-bottom: 10px; }
+  .as-titulo { font-size: 21px; }
+  .as-subtitulo { font-size: 13.5px; }
+  .as-campos { gap: 10px 18px; }
+  .as-input { height: 42px; }
+  .as-acciones { margin-top: 12px; padding-top: 12px; }
+  .as-boton { height: 40px; }
+
+  /* Paso 3: los ejemplos se quedan solo en la de correo (explica que no hay spam) */
+  .as-pregunta { padding: 7px 12px; }
+  .as-pregunta:not(.con-extra) .as-pregunta__ejemplo { display: none; }
+  .as-pregunta__icono { width: 32px; height: 32px; }
+  .as-pregunta__extra { padding-left: 46px; }
+
+  /* Paso 4 */
+  .as-listo__icono { display: none; }
+  .as-listo__titulo { font-size: 24px; }
+  .as-listo__texto { margin: 2px 0 10px; }
+  .as-resumen { padding: 12px 16px; }
+  .as-resumen__cabecera { margin-bottom: 10px; padding-bottom: 10px; }
+  .as-opciones { margin-top: 14px; }
+  .as-opcion { padding: 14px 16px; }
+  .as-recuerda { margin-top: 10px; }
+}
+
+@media (max-width: 760px) {
+  .as-pregunta__extra { padding-left: 0; }
+  .as-mini--correo { min-width: 0; }
+}
+
+/* ============ Tema oscuro de lo nuevo ============ */
+html:root[data-theme='dark'] .as-mini {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+html:root[data-theme='dark'] .as-mini:focus-within { border-color: var(--color-brand); }
+html:root[data-theme='dark'] .as-mini.is-error { border-color: #f0a0a0; }
+
+html:root[data-theme='dark'] .as-mini select,
+html:root[data-theme='dark'] .as-mini input {
+  background: transparent;
+  color: var(--color-text);
+}
+
+html:root[data-theme='dark'] .as-mini select option {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+html:root[data-theme='dark'] .as-prueba__ok { color: #4cc38a; }
+html:root[data-theme='dark'] .as-prueba__error { color: #f0a0a0; }

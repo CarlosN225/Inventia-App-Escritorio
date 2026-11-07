@@ -183,9 +183,10 @@ class ConfiguracionView(APIView):
         if "direccion" in datos_negocio:
             negocio.direccion = (datos_negocio.get("direccion") or "").strip()
         if "telefono" in datos_negocio:
+            # Opcional: no todas las dulcerías tienen teléfono; si lo escriben, 10 dígitos
             telefono = _solo_digitos(datos_negocio.get("telefono"))
-            if len(telefono) != 10:
-                errores["telefono"] = "El teléfono de la dulcería es obligatorio (10 dígitos)."
+            if telefono and len(telefono) != 10:
+                errores["telefono"] = "El teléfono de la dulcería debe tener 10 dígitos."
             else:
                 negocio.telefono = telefono
 
