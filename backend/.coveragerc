@@ -1,0 +1,22 @@
+# Configuración de Coverage.py para medir las pruebas de Inventia.
+# Se mide el código propio del backend: vistas (controladores), servicios,
+# serializadores, modelos, permisos y la lógica de los avisos por correo.
+[run]
+source = inventario, usuarios
+branch = False
+omit =
+    */migrations/*
+    */tests.py
+    */test_*.py
+    */management/commands/*
+    */admin.py
+    */apps.py
+
+[report]
+show_missing = True
+skip_covered = False
+precision = 1
+
+[html]
+directory = ../tests/cobertura_html
+title = Inventia · Reporte de cobertura

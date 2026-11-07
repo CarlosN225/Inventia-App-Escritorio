@@ -51,7 +51,7 @@ class Configuracion(models.Model):
     pin_bloqueado_hasta = models.DateTimeField(null=True, blank=True)
     hora_resumen = models.TimeField(default=time(20, 0))
     dias_aviso_caducidad = models.PositiveIntegerField(default=30)
-    
+
     class Meta:
         db_table = "Configuracion"
         verbose_name = "Configuracion"
@@ -114,7 +114,7 @@ class Producto(models.Model):
         ("bolsa", "Bolsa"),
         ("paquete", "Paquete"),
     ]
-    
+
     UNIDADES_CONTENIDO = [
         ("g", "g"),
         ("kg", "kg"),
@@ -149,7 +149,7 @@ class Producto(models.Model):
     stock_maximo = models.IntegerField(null=True, blank=True)
     activo = models.BooleanField(default=True)
     actualizado_en = models.DateTimeField(null=True, blank=True)  # alta o última edición desde el catálogo
-    
+
     class Meta:
         db_table = "Producto"
         verbose_name = "Producto"
@@ -247,10 +247,10 @@ class DetalleVenta(models.Model):
         blank=True,
         related_name="precios_autorizados",
     )
-    
+
     class Meta:
         db_table = "DetalleVenta"
-   
+
 
     def __str__(self):
         return f"Detalle {self.pk} (Venta {self.venta_id})"

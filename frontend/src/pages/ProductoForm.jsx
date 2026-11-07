@@ -24,7 +24,6 @@ import {
   Candy,
   AlertCircle,
   TrendingUp,
-  CheckCircle2,
   ArrowLeft,
   Loader2,
   Info,

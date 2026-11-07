@@ -68,7 +68,7 @@ class ProductoSerializer(serializers.ModelSerializer):
 
     def get_promocion_vigente(self, obj):
         return promocion_vigente(obj)
-    
+
 class MovimientoSerializer(serializers.ModelSerializer):
     """Movimientos de inventario, con los nombres del DER.
 
@@ -278,7 +278,7 @@ class CompraSerializer(serializers.ModelSerializer):
         detalles = DetalleCompra.objects.filter(compra=obj).select_related("producto")
         return DetalleCompraSerializer(detalles, many=True).data
 
-    
+
 
 # ============================================================
 #  PROMOCIONES

@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
-  ArrowLeftRight,
   Bell,
   // CAMBIO 1: aquí estaba "Settings,". Se borró porque ahora el icono lo pone AjustesMenu.
   ChevronsLeft,

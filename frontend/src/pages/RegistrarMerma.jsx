@@ -6,7 +6,6 @@ import {
   Plus,
   Minus,
   Check,
-  CheckCircle2,
   AlertCircle,
   Candy,
   CalendarX,

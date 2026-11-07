@@ -15,7 +15,6 @@ import {
   Bell,
   ShoppingCart,
   History,
-  X,
   Loader2,
 } from 'lucide-react'
 
@@ -197,7 +196,6 @@ export default function Dashboard() {
   const productosPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
 
   const stockBajo = useMemo(() => activos.filter((p) => p.stock < p.minimo), [activos])
-  const agotados = useMemo(() => activos.filter((p) => p.stock === 0).length, [activos])
 
   const porCaducar = useMemo(
     () =>

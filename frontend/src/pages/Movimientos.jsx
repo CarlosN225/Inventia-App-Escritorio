@@ -640,7 +640,8 @@ export default function Movimientos() {
   function alternar(clave) {
     setAbiertos((actual) => {
       const copia = new Set(actual)
-      copia.has(clave) ? copia.delete(clave) : copia.add(clave)
+      if (copia.has(clave)) copia.delete(clave)
+      else copia.add(clave)
       return copia
     })
   }

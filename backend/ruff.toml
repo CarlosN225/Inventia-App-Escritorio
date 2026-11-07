@@ -1,0 +1,16 @@
+# Linter del backend de Inventia (Ruff). Se corre con:  ruff check .
+line-length = 120
+target-version = "py312"
+extend-exclude = ["*/migrations/*", "venv", "venv313", "build", "dist"]
+
+[lint]
+# E/W: estilo (PEP 8)  ·  F: errores reales (variables o imports sin usar, nombres no definidos)
+select = ["E", "F", "W"]
+ignore = [
+    "E402",  # views.py y services.py importan por secciones (ventas, compras, configuración…) a propósito
+    "E731",  # una lambda corta para filtrar dígitos en el asistente inicial
+]
+
+[lint.per-file-ignores]
+# El correo en HTML lleva sus estilos en línea (así lo exigen Gmail y Outlook): las líneas largas son la plantilla
+"inventario/correo_html.py" = ["E501"]

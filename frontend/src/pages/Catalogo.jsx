@@ -352,7 +352,8 @@ export default function Catalogo() {
     setElegidas((actual) => {
       if (nombre === 'Todas') return new Set()
       const copia = new Set(actual)
-      copia.has(nombre) ? copia.delete(nombre) : copia.add(nombre)
+      if (copia.has(nombre)) copia.delete(nombre)
+      else copia.add(nombre)
       return copia
     })
     setPagina(1)

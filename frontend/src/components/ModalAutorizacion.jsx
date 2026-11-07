@@ -198,7 +198,8 @@ export default function ModalAutorizacion({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
-                      esPropietario ? confirmar() : pinRef.current?.focus()
+                      if (esPropietario) confirmar()
+                      else pinRef.current?.focus()
                     }
                   }}
                   placeholder="Escribe el motivo… (ej. El cliente compró la caja completa)"

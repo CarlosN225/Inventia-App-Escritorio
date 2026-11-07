@@ -67,7 +67,8 @@ def verificar_pin(config, pin):
     restantes = MAX_INTENTOS - config.pin_intentos_fallidos
     return (
         False,
-        f"PIN incorrecto. Te {'queda' if restantes == 1 else 'quedan'} {restantes} {'intento' if restantes == 1 else 'intentos'}.",
+        f"PIN incorrecto. Te {'queda' if restantes == 1 else 'quedan'} {restantes} "
+        f"{'intento' if restantes == 1 else 'intentos'}.",
         False,
     )
 

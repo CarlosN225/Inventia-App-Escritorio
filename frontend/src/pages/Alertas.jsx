@@ -550,7 +550,8 @@ export default function Alertas() {
     setPlegados((actual) => {
       const copia = new Set(actual)
       const k = clave(nombre)
-      copia.has(k) ? copia.delete(k) : copia.add(k)
+      if (copia.has(k)) copia.delete(k)
+      else copia.add(k)
       return copia
     })
   }

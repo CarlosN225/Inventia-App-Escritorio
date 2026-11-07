@@ -58,11 +58,15 @@ class EstadoAlertasView(APIView):
 
         ultimo = AlertaStock.objects.filter(enviada=True).order_by("-fecha_envio").first()
         # La revisión automática de hoy (los envíos con el botón no cuentan)
-        revision = AlertaStock.objects.filter(fecha_resumen=hoy).exclude(motivo=MANUAL).order_by("-fecha_generacion").first()
+        revision = (
+            AlertaStock.objects.filter(fecha_resumen=hoy).exclude(motivo=MANUAL).order_by("-fecha_generacion").first()
+        )
 
         proximo = None
         if config:
-            proximo_dt = ahora.replace(hour=config.hora_resumen.hour, minute=config.hora_resumen.minute, second=0, microsecond=0)
+            proximo_dt = ahora.replace(
+                hour=config.hora_resumen.hour, minute=config.hora_resumen.minute, second=0, microsecond=0
+            )
             if revision:
                 proximo_dt += timedelta(days=1)  # Hoy ya se revisó
             elif proximo_dt <= ahora:
