@@ -21,7 +21,9 @@ from .serializers import (
 )
 from .permissions import EsUsuarioAutenticado, EsPropietario
 
-from datetime import timedelta
+from datetime import time, timedelta
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.utils import timezone
 
 
@@ -453,6 +455,24 @@ def cambiar_mi_contrasena_view(request):
     })
 
 
+def leer_hora(texto, por_defecto=time(20, 0)):
+    """'20:00' -> time(20, 0). Si viene vacía o mal escrita, se usa la de por defecto."""
+    try:
+        horas, minutos = str(texto).split(':')[:2]
+        return time(int(horas), int(minutos))
+    except (TypeError, ValueError):
+        return por_defecto
+
+
+def leer_dias(valor, por_defecto=30):
+    """Días de anticipación para avisar de caducidad (entre 1 y 365)."""
+    try:
+        dias = int(valor)
+    except (TypeError, ValueError):
+        return por_defecto
+    return dias if 1 <= dias <= 365 else por_defecto
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def crear_primer_propietario_view(request):
@@ -499,18 +519,35 @@ def crear_primer_propietario_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    if nombre_negocio:
-        digitos = lambda t: ''.join(c for c in str(t or '') if c.isdigit())
-        if len(digitos(negocio.get('telefono'))) != 10:
-            return Response(
-                {'error': 'El teléfono de la dulcería es obligatorio (10 dígitos)'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if len(digitos(telefono_whatsapp)) != 10:
-            return Response(
-                {'error': 'El teléfono de contacto es obligatorio (10 dígitos)'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    digitos = lambda t: ''.join(c for c in str(t or '') if c.isdigit())
+
+    # Teléfono de la dulcería: opcional (no todas tienen); si lo escriben, 10 dígitos
+    telefono_negocio = digitos(negocio.get('telefono'))
+    if telefono_negocio and len(telefono_negocio) != 10:
+        return Response(
+            {'error': 'El teléfono de la dulcería debe tener 10 dígitos'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # El teléfono del dueño ya es opcional (antes era para WhatsApp); si lo escriben, 10 dígitos
+    if telefono_whatsapp and len(digitos(telefono_whatsapp)) != 10:
+        return Response(
+            {'error': 'El teléfono de contacto debe tener 10 dígitos'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Avisos por correo: a qué correo, a qué hora se revisa y con cuántos días avisar de caducidad
+    correo_alertas = (preferencias.get('correo_alertas') or '').strip().lower() or correo
+    try:
+        validate_email(correo_alertas)
+    except ValidationError:
+        return Response(
+            {'error': 'Revisa el correo para los avisos'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    hora_resumen = leer_hora(preferencias.get('hora_resumen'))
+    dias_aviso_caducidad = leer_dias(preferencias.get('dias_aviso_caducidad'))
 
     # Todo o nada: si algo falla, no queda un dueño sin negocio
     with transaction.atomic():
@@ -528,7 +565,7 @@ def crear_primer_propietario_view(request):
                 nombre=nombre_negocio,
                 propietario=nombre_completo,
                 direccion=(negocio.get('direccion') or '').strip(),
-                telefono=(negocio.get('telefono') or '').strip(),
+                telefono=telefono_negocio,
                 usuario_admin=usuario
             )
 
@@ -539,7 +576,9 @@ def crear_primer_propietario_view(request):
                 maneja_promociones=bool(preferencias.get('maneja_promociones', True)),
                 usa_codigo_barras=bool(preferencias.get('usa_codigo_barras', False)),
                 alertas_activas=bool(preferencias.get('alertas_activas', True)),
-                correo_alertas=correo
+                correo_alertas=correo_alertas,
+                hora_resumen=hora_resumen,
+                dias_aviso_caducidad=dias_aviso_caducidad
             )
 
     return Response(

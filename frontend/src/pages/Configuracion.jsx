@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Store,
   SlidersHorizontal,
@@ -84,31 +84,36 @@ const SECCIONES = [
   {
     id: 'negocio',
     titulo: 'Negocio',
-    sub: 'Nombre y datos de contacto',
+    sub: 'Nombre y datos de contacto', // en pantallas chicas
+    desc: 'Nombre, dirección y teléfono de tu dulcería. Así aparece arriba y en los correos.', // en compu, donde sobra espacio
     icono: Store,
   },
   {
     id: 'preferencias',
     titulo: 'Preferencias del negocio',
-    sub: 'Qué funciones usas',
+    sub: 'Qué funciones usas', // en pantallas chicas
+    desc: 'Caducidad, mayoreo, promociones y código de barras. Prende solo lo que usas.', // en compu, donde sobra espacio
     icono: SlidersHorizontal,
   },
   {
     id: 'usuarios',
     titulo: 'Usuarios',
-    sub: 'Encargados y permisos',
+    sub: 'Encargados y permisos', // en pantallas chicas
+    desc: 'Da de alta a tus encargados, corrige sus datos o desactívalos cuando ya no estén.', // en compu, donde sobra espacio
     icono: Users,
   },
   {
     id: 'email',
     titulo: 'Correo y alertas',
-    sub: 'Correo y horario',
+    sub: 'Correo y horario', // en pantallas chicas
+    desc: 'A qué correo y a qué hora te avisamos cuando algo se agota o va a caducar.', // en compu, donde sobra espacio
     icono: Mail,
   },
   {
     id: 'seguridad',
     titulo: 'Seguridad',
-    sub: 'PIN para autorizar precios',
+    sub: 'PIN para autorizar precios', // en pantallas chicas
+    desc: 'Tu PIN de dueño para autorizar cambios de precio al momento de vender.', // en compu, donde sobra espacio
     icono: ShieldCheck,
   },
 
@@ -155,7 +160,7 @@ const PREFERENCIAS = [
     id: 'alertas_activas',
     titulo: 'Alertas por correo',
     desc: () =>
-      'Un resumen diario con lo que se acaba y lo que está por caducar.',
+      'Te avisamos solo cuando algo se agota, baja o está por caducar.',
     icono: Bell,
   },
 ]
@@ -372,8 +377,11 @@ export default function Configuracion() {
   const [cargando, setCargando] =
     useState(true)
 
+  const location = useLocation()
+
+  // Si vienen de otra pantalla pidiendo una sección (ej. Alertas → "Correo y alertas"), se abre esa
   const [seccion, setSeccion] =
-    useState('preferencias')
+    useState(location.state?.seccion ?? 'preferencias')
 
   const [ajustes, setAjustes] =
     useState(AJUSTES_INICIALES)
@@ -390,6 +398,10 @@ export default function Configuracion() {
   const [usuarios, setUsuarios] =
     useState(USUARIOS_INICIALES)
 
+  // Ventanita con la tabla de qué puede hacer cada rol
+  const [verPermisos, setVerPermisos] = useState(false)
+
+  // Formulario de nuevo encargado: se despliega con el botón "Agregar encargado"
   const [nuevo, setNuevo] =
     useState(null)
 
@@ -452,6 +464,18 @@ export default function Configuracion() {
   const [intentoPin, setIntentoPin] = useState(false)
   const [erroresServidorPin, setErroresServidorPin] = useState({})
   const [guardandoPin, setGuardandoPin] = useState(false)
+
+  // Esc cierra la ventanita de "Qué puede hacer cada rol"
+  useEffect(() => {
+    if (!verPermisos) return undefined
+
+    function alPresionar(e) {
+      if (e.key === 'Escape') setVerPermisos(false)
+    }
+
+    document.addEventListener('keydown', alPresionar)
+    return () => document.removeEventListener('keydown', alPresionar)
+  }, [verPermisos])
 
   /* ============================================================
      GUARDAR PREFERENCIA DE INACTIVOS
@@ -658,10 +682,7 @@ export default function Configuracion() {
 
   const errores = {}
 
-  if (!cargandoAjustes && soloDigitos(ajustes.negocio.telefono).length !== 10) {
-    errores.telefono = 'Escribe el teléfono de la dulcería (10 dígitos)'
-  }
-
+ 
   if (
     ajustes.negocio.telefono &&
     soloDigitos(
@@ -1492,20 +1513,27 @@ export default function Configuracion() {
                 </span>
 
                 <span className="cf-menu__textos">
-                  <span className="cf-menu__titulo">
-                    {s.titulo}
+                  {/* Título y su contador en el mismo renglón: la descripción usa todo el ancho */}
+                  <span className="cf-menu__fila">
+                    <span className="cf-menu__titulo">
+                      {s.titulo}
+                    </span>
+
+                    {badge !== null && (
+                      <span className="cf-menu__badge">
+                        {badge}
+                      </span>
+                    )}
                   </span>
 
-                  <span className="cf-menu__sub">
+                  {/* Breve en pantallas chicas; más completa en compu */}
+                  <span className="cf-menu__sub cf-menu__sub--corta">
                     {s.sub}
                   </span>
-                </span>
-
-                {badge !== null && (
-                  <span className="cf-menu__badge">
-                    {badge}
+                  <span className="cf-menu__sub cf-menu__sub--larga">
+                    {s.desc}
                   </span>
-                )}
+                </span>
               </button>
             )
           })}
@@ -1607,9 +1635,8 @@ export default function Configuracion() {
                     className="cf-etiqueta"
                     htmlFor="cf-telefono"
                   >
-                  Teléfono de la dulcería{' '}
-                    <span className="cf-requerido">*</span>
-                   </label>
+                  Teléfono de la dulcería (opcional)
+                  </label>
 
                   <input
                     id="cf-telefono"
@@ -1797,22 +1824,40 @@ export default function Configuracion() {
                     </p>
                   </div>
 
-                  {!nuevo && (
+                  <div className="cf-seccion__acciones">
                     <button
                       type="button"
-                      className="cf-boton cf-boton--primario"
-                      onClick={abrirNuevo}
+                      className="cf-boton"
+                      onClick={() => setMostrarInactivos((actual) => !actual)}
                     >
-                      <UserPlus
-                        size={16}
-                        aria-hidden="true"
-                      />
-
-                      Agregar encargado
+                      {mostrarInactivos ? 'Ocultar inactivos' : 'Ver inactivos'}
                     </button>
-                  )}
+
+                    <button
+                      type="button"
+                      className="cf-boton"
+                      onClick={() => setVerPermisos(true)}
+                    >
+                      <Info size={15} aria-hidden="true" />
+                      Qué puede hacer cada rol
+                    </button>
+
+                    {!nuevo && (
+                      <button
+                        type="button"
+                        className="cf-boton cf-boton--primario"
+                        onClick={abrirNuevo}
+                      >
+                        <UserPlus size={16} aria-hidden="true" />
+                        Agregar encargado
+                      </button>
+                    )}
+                  </div>
 
                 </header>
+
+                {/* Lista a la izquierda y formulario de alta a la derecha */}
+                <div className="cf-usuarios">
 
                 {/* ==================================================
                     NUEVO ENCARGADO
@@ -1821,14 +1866,19 @@ export default function Configuracion() {
                 {nuevo && (
                   <div className="cf-nuevo">
 
-                    <p className="cf-nuevo__titulo">
-                      <UserPlus
-                        size={17}
-                        aria-hidden="true"
-                      />
+                    <div>
+                      <p className="cf-nuevo__titulo">
+                        <UserPlus
+                          size={17}
+                          aria-hidden="true"
+                        />
 
-                      Nuevo encargado
-                    </p>
+                        Nuevo encargado
+                      </p>
+                      <p className="cf-nuevo__sub">
+                        Entra con su correo y la contraseña temporal que le des.
+                      </p>
+                    </div>
 
                     <div className="cf-campos">
 
@@ -2118,6 +2168,7 @@ export default function Configuracion() {
                     LISTA DE USUARIOS
                     ================================================== */}
 
+                <div className="cf-usuarios__lista">
                 {usuarios.length === 0 ? (
 
                   <div className="cf-vacio-usuarios">
@@ -2425,134 +2476,14 @@ export default function Configuracion() {
                       </tbody>
                     </table>
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent:
-                          'flex-end',
-                        marginTop: '12px',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className="cf-boton"
-                        onClick={() => {
-                          setMostrarInactivos(
-                            (actual) =>
-                              !actual
-                          )
-                        }}
-                      >
-                        {mostrarInactivos
-                          ? 'Ocultar inactivos'
-                          : 'Mostrar inactivos'}
-                      </button>
-                    </div>
 
                   </div>
                 )}
-
-              </section>
-
-              {/* ==================================================
-                  PERMISOS
-                  ================================================== */}
-
-              <section className="cf-panel">
-
-                <h3 className="cf-permisos__titulo">
-
-                  <ShieldCheck
-                    size={17}
-                    aria-hidden="true"
-                  />
-
-                  Qué puede hacer cada rol
-
-                </h3>
-
-                <div className="cf-tabla-contenedor">
-
-                  <table className="cf-tabla">
-
-                    <thead>
-                      <tr>
-
-                        <th>
-                          Función
-                        </th>
-
-                        <th className="is-centro">
-                          Propietario
-                        </th>
-
-                        <th className="is-centro">
-                          Encargado
-                        </th>
-
-                      </tr>
-                    </thead>
-
-                    <tbody>
-
-                      {PERMISOS.map((p) => (
-                        <tr
-                          key={p.funcion}
-                        >
-
-                          <td>
-                            {p.funcion}
-                          </td>
-
-                          {[
-                            'propietario',
-                            'encargado',
-                          ].map((rol) => (
-
-                            <td
-                              key={rol}
-                              className="is-centro"
-                            >
-
-                              {p[rol] ? (
-
-                                <span
-                                  className="cf-si"
-                                  aria-label="Sí"
-                                >
-                                  <Check
-                                    size={13}
-                                    strokeWidth={3}
-                                  />
-                                </span>
-
-                              ) : (
-
-                                <span
-                                  className="cf-no"
-                                  aria-label="No"
-                                >
-                                  <X
-                                    size={13}
-                                    strokeWidth={3}
-                                  />
-                                </span>
-
-                              )}
-
-                            </td>
-
-                          ))}
-
-                        </tr>
-                      ))}
-
-                    </tbody>
-
-                  </table>
-
                 </div>
+                </div>
+
               </section>
+
 
             </>
           )}
@@ -2566,7 +2497,7 @@ export default function Configuracion() {
               <header className="cf-seccion__cabecera">
                 <div>
                   <h2 className="cf-seccion__titulo">Correo y alertas</h2>
-                  <p className="cf-seccion__sub">Recibe un resumen diario con lo que se acaba y lo que está por caducar.</p>
+<p className="cf-seccion__sub">Te avisamos por correo cuando algo se agota, baja de su mínimo o está por caducar. Sin correos de más.</p>
                 </div>
                 <Interruptor
                   encendido={ajustes.preferencias.alertas_activas}
@@ -2578,7 +2509,7 @@ export default function Configuracion() {
               {!ajustes.preferencias.alertas_activas && (
                 <p className="cf-info">
                   <Info size={16} aria-hidden="true" />
-                  <span>Las alertas están apagadas. Actívalas para recibir el resumen diario.</span>
+                  <span>Los avisos están apagados. Actívalos para que te avisemos por correo cuando algo haga falta.</span>
                 </p>
               )}
 
@@ -2605,7 +2536,7 @@ export default function Configuracion() {
                 </div>
 
                 <div className="cf-campo">
-                  <label className="cf-etiqueta" htmlFor="cf-hora">Hora del resumen</label>
+                <label className="cf-etiqueta" htmlFor="cf-hora">Hora de revisión</label>
                   <select
                     id="cf-hora"
                     className="cf-input"
@@ -2615,7 +2546,7 @@ export default function Configuracion() {
                   >
                     {HORAS.map((h) => <option key={h.valor} value={h.valor}>{h.texto}</option>)}
                   </select>
-                  <p className="cf-ayuda">El resumen se envía una vez al día a la hora elegida.</p>
+                <p className="cf-ayuda">A esta hora se revisa tu inventario. Solo llega correo si hay algo nuevo, y los lunes un recordatorio.</p>
                 </div>
 
                 <div className="cf-campo">
@@ -2629,9 +2560,11 @@ export default function Configuracion() {
                   >
                     {[15, 30, 45, 60].map((d) => <option key={d} value={d}>{d} días de anticipación</option>)}
                   </select>
-                  {!ajustes.preferencias.maneja_caducidad && (
-                    <p className="cf-ayuda">Activa “Fecha de caducidad” en Preferencias para usarlo.</p>
-                  )}
+                  <p className="cf-ayuda">
+                    {ajustes.preferencias.maneja_caducidad
+                      ? 'Se muestran en Alertas y en el correo. El aviso llega cuando faltan 7 días o menos.'
+                      : 'Activa “Fecha de caducidad” en Preferencias para usarlo.'}
+                  </p>
                 </div>
 
                 <div className="cf-campo">
@@ -2891,6 +2824,129 @@ export default function Configuracion() {
       {/* ========================================================
           MODAL EDITAR USUARIO
           ======================================================== */}
+
+
+      {/* ========================================================
+          QUÉ PUEDE HACER CADA ROL (ventanita)
+          ======================================================== */}
+
+      {verPermisos && (
+        <div
+          className="cf-modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setVerPermisos(false)
+          }}
+        >
+          <div
+            className="cf-modal cf-modal--permisos"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-permisos"
+          >
+            <div className="cf-modal__cabecera">
+              <div>
+                <h2 id="titulo-permisos" className="cf-seccion__titulo">
+                  Qué puede hacer cada rol
+                </h2>
+                <p className="cf-seccion__sub">
+                  El encargado vende y surte; lo de dinero y ajustes es solo tuyo.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="cf-boton"
+                onClick={() => setVerPermisos(false)}
+                aria-label="Cerrar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+                <div className="cf-tabla-contenedor">
+
+                  <table className="cf-tabla">
+
+                    <thead>
+                      <tr>
+
+                        <th>
+                          Función
+                        </th>
+
+                        <th className="is-centro">
+                          Propietario
+                        </th>
+
+                        <th className="is-centro">
+                          Encargado
+                        </th>
+
+                      </tr>
+                    </thead>
+
+                    <tbody>
+
+                      {PERMISOS.map((p) => (
+                        <tr
+                          key={p.funcion}
+                        >
+
+                          <td>
+                            {p.funcion}
+                          </td>
+
+                          {[
+                            'propietario',
+                            'encargado',
+                          ].map((rol) => (
+
+                            <td
+                              key={rol}
+                              className="is-centro"
+                            >
+
+                              {p[rol] ? (
+
+                                <span
+                                  className="cf-si"
+                                  aria-label="Sí"
+                                >
+                                  <Check
+                                    size={13}
+                                    strokeWidth={3}
+                                  />
+                                </span>
+
+                              ) : (
+
+                                <span
+                                  className="cf-no"
+                                  aria-label="No"
+                                >
+                                  <X
+                                    size={13}
+                                    strokeWidth={3}
+                                  />
+                                </span>
+
+                              )}
+
+                            </td>
+
+                          ))}
+
+                        </tr>
+                      ))}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+          </div>
+        </div>
+      )}
 
       {editar && (
         <div

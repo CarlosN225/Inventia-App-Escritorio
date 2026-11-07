@@ -459,12 +459,9 @@ export default function RegistrarCompra() {
 
   return (
     <div className="rv rv--compra">
-      {/* ============ ATAJOS ============ */}
-      <footer className="rv-atajos">
-        <span className="rv-atajos__titulo">
-          <span className="rv-punto" aria-hidden="true" />
-          Atajos rápidos
-        </span>
+      {/* ============ ATAJOS (chiquitos, solo para recordar) ============ */}
+      <div className="rv-atajos" aria-label="Atajos de teclado">
+        <span className="rv-atajos__titulo">Atajos</span>
         <ul className="rv-atajos__lista">
           <li>
             <kbd className="rv-tecla">F2</kbd> Buscar
@@ -479,7 +476,7 @@ export default function RegistrarCompra() {
             <kbd className="rv-tecla">Esc</kbd> Cancelar
           </li>
         </ul>
-      </footer>
+      </div>
 
       {cargando || errorCarga ? (
         /* ============ CARGANDO / ERROR ============ */
@@ -518,17 +515,7 @@ export default function RegistrarCompra() {
           {/* ============ IZQUIERDA ============ */}
           <div className="rv-izquierda">
             {/* Datos de la compra */}
-            <section className="rv-panel">
-              <header className="rv-seccion__cabecera">
-                <span className="rv-seccion__icono" aria-hidden="true">
-                  <Truck size={16} />
-                </span>
-                <div>
-                  <h2 className="rv-seccion__titulo">Datos de la compra</h2>
-                  <p className="rv-seccion__subtitulo">Quién te surtió y el ticket o nota que te dieron</p>
-                </div>
-              </header>
-
+            <section className="rv-panel" aria-label="Datos de la compra">
               <div className="rc-datos">
                 <div className="rc-campo">
                   <label className="rc-etiqueta" htmlFor="rc-proveedor">
@@ -651,18 +638,36 @@ export default function RegistrarCompra() {
                 </button>
               </div>
 
+              {!busqueda.trim() && compra.length === 0 && (
+                <p className="rc-tip">
+                  <Lightbulb size={15} aria-hidden="true" />
+                  <span>
+                    ¿Compraste por <strong>caja</strong> o <strong>bolsa</strong>? Elígelo en la lista de la derecha y
+                    las piezas se calculan solas.
+                  </span>
+                </p>
+              )}
+            </section>
+
+            {/* Abajo: los resultados mientras buscas; si no, lo que hay que surtir */}
+            <section className="rv-panel rv-abajo">
               {busqueda.trim() ? (
-                <div className="rv-resultados">
-                  <div className="rv-resultados__cabecera">
-                    <span className="rv-resultados__titulo">
-                      <span className="rv-punto" aria-hidden="true" />
-                      Resultados para "{busqueda.trim()}"
-                      <span className="rv-resultados__conteo">
-                        ({resultados.length} {resultados.length === 1 ? 'coincidencia' : 'coincidencias'})
-                      </span>
+                <>
+                  <header className="rv-seccion__cabecera">
+                    <span className="rv-seccion__icono" aria-hidden="true">
+                      <Search size={16} />
                     </span>
-                    <span className="rv-pista">Usa ↑ ↓ y Enter para elegir</span>
-                  </div>
+                    <div className="rv-seccion__textos">
+                      <h2 className="rv-seccion__titulo">
+                        Resultados para "{busqueda.trim()}"
+                        <span className="rv-resultados__conteo">
+                          {' '}
+                          ({resultados.length} {resultados.length === 1 ? 'coincidencia' : 'coincidencias'})
+                        </span>
+                      </h2>
+                      <p className="rv-seccion__subtitulo">Usa ↑ ↓ y Enter para elegir</p>
+                    </div>
+                  </header>
 
                   {resultados.length === 0 ? (
                     <p className="rv-vacio-texto">
@@ -680,12 +685,13 @@ export default function RegistrarCompra() {
                             onMouseEnter={() => setResaltado(i)}
                           >
                             <span className="rv-placeholder" aria-hidden="true">
-                              <Candy size={20} />
+                              <Candy size={18} />
                             </span>
 
                             <div className="rv-resultado__info">
                               <p className="rv-resultado__nombre">
-                                {p.nombre}{p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                                {p.nombre}
+                                {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                                 <PastillaHay producto={p} />
                               </p>
                               <p className="rv-resultado__marca">
@@ -715,71 +721,61 @@ export default function RegistrarCompra() {
                       })}
                     </ul>
                   )}
-                </div>
+                </>
               ) : (
-                compra.length === 0 && (
-                  <p className="rc-tip">
-                    <Lightbulb size={15} aria-hidden="true" />
-                    <span>
-                      ¿Compraste por caja o bolsa? En la lista de la derecha elige <strong>Caja</strong> o{' '}
-                      <strong>Bolsa</strong> y el sistema calcula las piezas solito.
+                <>
+                  <header className="rv-seccion__cabecera">
+                    <span className="rv-seccion__icono" aria-hidden="true">
+                      <ClipboardList size={16} />
                     </span>
-                  </p>
-                )
-              )}
-            </section>
+                    <div className="rv-seccion__textos">
+                      <h2 className="rv-seccion__titulo">
+                        Por surtir
+                        {porSurtir.length > 0 && <span className="rv-resultados__conteo"> ({porSurtir.length})</span>}
+                      </h2>
+                      <p className="rv-seccion__subtitulo">Se te están acabando. Un clic y se agrega lo sugerido</p>
+                    </div>
+                  </header>
 
-            {/* Por surtir */}
-            <section className="rv-panel">
-              <header className="rv-seccion__cabecera">
-                <span className="rv-seccion__icono" aria-hidden="true">
-                  <ClipboardList size={16} />
-                </span>
-                <div>
-                  <h2 className="rv-seccion__titulo">Por surtir</h2>
-                  <p className="rv-seccion__subtitulo">Se te están acabando. Clic para agregarlos con la cantidad sugerida</p>
-                </div>
-              </header>
-
-              {porSurtir.length === 0 ? (
-                <div className="rc-todo-surtido">
-                  <CheckCircle2 size={24} aria-hidden="true" />
-                  Todo tu inventario está surtido.
-                </div>
-              ) : (
-                <ul className="rc-surtir">
-                  {porSurtir.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        className="rc-surtir__item"
-                        onClick={() => agregar(p.id, p.sugerido)}
-                        title={`Agregar ${p.nombre} con la cantidad sugerida`}
-                      >
-                        <span className="rv-placeholder rc-placeholder-mini" aria-hidden="true">
-                          <Candy size={15} />
-                        </span>
-
-                        <span className="rc-surtir__info">
-                          <span className="rc-surtir__nombre">{p.nombre}</span>
-                          <span className="rc-surtir__detalle">
-                            <span
-                              className={'rc-sugerido__estado rc-sugerido__estado--' + (p.stock === 0 ? 'agotado' : 'bajo')}
-                            >
-                              {p.stock === 0 ? 'Agotado' : 'Stock bajo'}
+                  {porSurtir.length === 0 ? (
+                    <div className="rc-todo-surtido">
+                      <CheckCircle2 size={24} aria-hidden="true" />
+                      Todo tu inventario está surtido.
+                    </div>
+                  ) : (
+                    <ul className="rc-surtir">
+                      {porSurtir.map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            className="rc-surtir__item"
+                            onClick={() => agregar(p.id, p.sugerido)}
+                            title={`Agregar ${p.nombre} con la cantidad sugerida`}
+                          >
+                            <span className="rc-surtir__info">
+                              <span className="rc-surtir__nombre">{p.nombre}</span>
+                              <span className="rc-surtir__detalle">
+                                <span
+                                  className={
+                                    'rc-sugerido__estado rc-sugerido__estado--' + (p.stock === 0 ? 'agotado' : 'bajo')
+                                  }
+                                >
+                                  {p.stock === 0 ? 'Agotado' : 'Stock bajo'}
+                                </span>
+                                {' · '}Quedan {p.stock} · mín. {p.minimo}
+                              </span>
                             </span>
-                            {' · '}Quedan {p.stock} · mín. {p.minimo}
-                          </span>
-                        </span>
 
-                        <span className="rc-surtir__sugerido">
-                          +{p.sugerido} {textoUnidad(p.unidad, p.sugerido)}
-                        </span>
-                        <PlusCircle size={18} className="rc-surtir__mas" aria-hidden="true" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                            <span className="rc-surtir__sugerido">
+                              +{p.sugerido} {textoUnidad(p.unidad, p.sugerido)}
+                            </span>
+                            <PlusCircle size={16} className="rc-surtir__mas" aria-hidden="true" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </section>
           </div>

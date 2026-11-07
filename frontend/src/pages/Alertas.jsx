@@ -15,7 +15,9 @@ import {
   Loader2,
   Mail,
   PackageMinus,
+  PackageOpen,
   PackageX,
+  Plus,
   RotateCcw,
   Send,
   Settings,
@@ -483,6 +485,9 @@ export default function Alertas() {
 
   const activos = useMemo(() => productos.filter((p) => p.activo), [productos])
 
+  // Negocio recién creado: sin productos no hay nada que revisar todavía
+  const sinProductos = !cargando && !error && activos.length === 0
+
   /* ---------- Stock bajo ---------- */
 
   const stockBajo = useMemo(
@@ -651,7 +656,7 @@ export default function Alertas() {
       </header>
 
       {/* ============ NÚMEROS ============ */}
-      {!cargando && !error && (
+      {!cargando && !error && !sinProductos && (
         <section className={'alv-kpis' + (conCaducidad ? '' : ' alv-kpis--dos')} aria-label="Resumen de alertas">
           <Indicador
             tono="rojo"
@@ -685,6 +690,26 @@ export default function Alertas() {
         </section>
       )}
 
+      {/* ============ SIN PRODUCTOS ============ */}
+      {sinProductos ? (
+        <div className="alv-grid alv-grid--sola">
+          <section className="alv-tarjeta alv-sin-productos">
+            <span className="alv-sin-productos__icono" aria-hidden="true">
+              <PackageOpen size={28} />
+            </span>
+            <h2 className="alv-sin-productos__titulo">Aún no tienes productos</h2>
+            <p className="alv-sin-productos__texto">
+              Cuando registres tus productos, aquí verás lo que se está acabando
+              {conCaducidad ? ' y lo que está por caducar' : ''}.
+              {conCorreo && ' Y si algo hace falta, te avisamos por correo.'}
+            </p>
+            <button type="button" className="alv-boton alv-boton--primario alv-sin-productos__boton" onClick={() => navigate('/catalogo/nuevo')}>
+              <Plus size={16} aria-hidden="true" />
+              Nuevo producto
+            </button>
+          </section>
+        </div>
+      ) : (
       <div className={'alv-grid' + (conCorreo ? '' : ' alv-grid--sola')}>
         {/* ============ LISTAS ============ */}
         <section className="alv-tarjeta alv-listas">
@@ -970,6 +995,7 @@ export default function Alertas() {
           </aside>
         )}
       </div>
+      )}
 
       <ModalAvisos
         abierto={modalAbierto}
@@ -981,7 +1007,7 @@ export default function Alertas() {
         enLinea={enLinea}
         enviando={enviando}
         onEnviar={enviarAhora}
-        onConfigurar={() => navigate('/configuracion')}
+        onConfigurar={() => navigate('/configuracion', { state: { seccion: 'email' } })}
       />
     </div>
   )

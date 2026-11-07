@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
   Search,
@@ -21,6 +21,8 @@ import {
   AlertCircle,
   Receipt,
   ShieldCheck,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react'
 
 import { getUsuarioActual } from '../services/auth'
@@ -29,6 +31,9 @@ import { listarMovimientos } from '../services/movimientos'
 import { listarVentas } from '../services/ventas'
 import { listarCompras } from '../services/compras'
 import { textoUnidad } from '../utils/unidades'
+import { exportarExcel, exportarPDF } from '../utils/exportarHistorial'
+import useConfiguracion from '../hooks/useConfiguracion'
+import { notificar } from '../services/notificar'
 import '../styles/historial.css'
 
 const POR_PAGINA = 10
@@ -194,30 +199,14 @@ function textoBuscable(r) {
   return normalizar(`${r.productoNombreFinal} ${textoOrigen(r)} ${r.motivo}`)
 }
 
-/* ---------- Exportar a CSV (producto por producto, para Excel) ---------- */
+/* ---------- Lo que va en el Excel y el PDF (producto por producto) ---------- */
 
-function exportarCSV(renglones) {
-  const encabezado = [
-    'Fecha',
-    'Hora',
-    'Tipo',
-    'Folio',
-    'Producto',
-    'Cantidad',
-    'Unidad',
-    'Stock después',
-    'Usuario',
-    'Detalle',
-    'Precio unitario',
-    'Bitácora de precio',
-  ]
-
-  const filas = renglones.flatMap((r) => {
+function armarFilasExportacion(renglones) {
+  return renglones.flatMap((r) => {
     const movimientos = r.esGrupo ? r.movimientos : [r]
     const esVenta = r.esGrupo && r.tipo === 'salida'
 
     return movimientos.map((m) => {
-      const fecha = new Date(m.fecha)
       const d = esVenta ? (r.ticket?.detalles ?? []).find((x) => x.producto === m.productoId) : null
 
       let bitacora = ''
@@ -227,34 +216,50 @@ function exportarCSV(renglones) {
         bitacora = ETIQUETAS_PRECIO[d.tipo_precio]?.texto ?? ''
       }
 
-      return [
-        formatoDia.format(fecha),
-        formatoHora.format(fecha),
-        etiquetaTipo(r),
-        r.esGrupo ? `${etiquetaTipo(r)} #${r.folio}` : '',
-        m.productoNombreFinal,
-        cambioDeStock(m),
-        textoUnidad(m.unidad, m.cantidad, true),
-        m.stockResultante ?? '',
-        m.usuarioNombre ?? '',
-        r.esGrupo ? (r.tipo === 'entrada' ? r.ticket?.proveedor ?? '' : '') : textoOrigen(m),
-        d ? Number(d.precio_unitario).toFixed(2) : '',
+      return {
+        fecha: new Date(m.fecha),
+        tipo: etiquetaTipo(r),
+        clase: (TIPOS[r.tipo] ?? TIPOS.correccion).clase,
+        folio: r.esGrupo ? `${etiquetaTipo(r)} #${r.folio}` : '',
+        producto: m.productoNombreFinal,
+        cantidad: cambioDeStock(m),
+        unidad: textoUnidad(m.unidad, m.cantidad, true),
+        stock: m.stockResultante ?? '',
+        usuario: m.usuarioNombre ?? '',
+        detalle: r.esGrupo ? (r.tipo === 'entrada' ? r.ticket?.proveedor ?? '' : '') : textoOrigen(m),
+        precio: d ? Number(d.precio_unitario) : null,
         bitacora,
-      ]
+      }
     })
   })
+}
 
-  const csv = [encabezado, ...filas]
-    .map((fila) => fila.map((valor) => `"${String(valor ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\r\n')
+// Cuántos de cada tipo y cuánto sumaron (para la hoja "Resumen" y los cuadritos del PDF)
+function armarResumen(renglones) {
+  const conceptos = [
+    { clave: 'venta', concepto: 'Ventas', clase: 'venta', registros: 0, importe: 0 },
+    { clave: 'compra', concepto: 'Compras', clase: 'compra', registros: 0, importe: 0 },
+    { clave: 'entrada', concepto: 'Otras entradas', clase: 'compra', registros: 0, importe: null },
+    { clave: 'merma', concepto: 'Mermas', clase: 'merma', registros: 0, importe: null },
+    { clave: 'correccion', concepto: 'Correcciones', clase: 'correccion', registros: 0, importe: null },
+  ]
+  const porClave = new Map(conceptos.map((c) => [c.clave, c]))
 
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const enlace = document.createElement('a')
-  enlace.href = url
-  enlace.download = `historial-inventia-${new Date().toISOString().slice(0, 10)}.csv`
-  enlace.click()
-  URL.revokeObjectURL(url)
+  renglones.forEach((r) => {
+    if (r.esGrupo) {
+      const c = porClave.get(r.tipo === 'salida' ? 'venta' : 'compra')
+      c.registros += 1
+      c.importe += Number(r.ticket?.total ?? 0)
+    } else {
+      const c = porClave.get(r.tipo === 'salida' ? 'venta' : r.tipo)
+      if (c) c.registros += 1
+    }
+  })
+
+  return {
+    total: renglones.length,
+    conceptos: conceptos.map((c) => ({ ...c, importe: c.importe ? c.importe : null })),
+  }
 }
 
 /* ---------- Detalle de un ticket (venta o compra) ---------- */
@@ -389,7 +394,7 @@ function DetalleMovimiento({ m, puedeVerCostos }) {
     ]
     if (puedeVerCostos && m.costo !== null) {
       total = m.cantidad * m.costo
-      totalTexto = 'Pérdida estimada'
+      totalTexto = 'Lo que se perdió (aprox.)'
     }
   } else if (m.tipo === 'correccion') {
     datos = [
@@ -402,11 +407,11 @@ function DetalleMovimiento({ m, puedeVerCostos }) {
         dd: `${m.cantidad > 0 ? '+' : ''}${m.cantidad} ${textoUnidad(m.unidad, m.cantidad)}`,
         clase: m.cantidad < 0 ? 'is-rojo' : 'is-verde',
       },
-      { dt: 'Motivo / nota', dd: m.motivo || 'Sin nota', clase: m.motivo ? '' : 'is-tenue' },
+      { dt: 'Motivo', dd: m.motivo || 'Sin nota', clase: m.motivo ? '' : 'is-tenue' },
     ]
     if (puedeVerCostos && m.costo !== null) {
       total = m.cantidad * m.costo
-      totalTexto = 'Impacto'
+      totalTexto = 'Valor del ajuste'
     }
   } else {
     datos = [
@@ -469,6 +474,11 @@ export default function Movimientos() {
   const [pagina, setPagina] = useState(1)
   const [abiertos, setAbiertos] = useState(() => new Set()) // varios tickets abiertos a la vez
 
+  const configuracion = useConfiguracion()
+  const [menuExportar, setMenuExportar] = useState(false)
+  const [exportando, setExportando] = useState(null) // 'excel' | 'pdf' | null
+  const menuRef = useRef(null)
+
   async function cargar() {
     setCargando(true)
     setError(null)
@@ -509,6 +519,25 @@ export default function Movimientos() {
 
     cargar()
   }, [])
+
+  // Cierra el menú de exportar al dar clic fuera o con Esc
+  useEffect(() => {
+    if (!menuExportar) return undefined
+
+    function alClicFuera(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuExportar(false)
+    }
+    function alPresionarEsc(e) {
+      if (e.key === 'Escape') setMenuExportar(false)
+    }
+
+    document.addEventListener('mousedown', alClicFuera)
+    document.addEventListener('keydown', alPresionarEsc)
+    return () => {
+      document.removeEventListener('mousedown', alClicFuera)
+      document.removeEventListener('keydown', alPresionarEsc)
+    }
+  }, [menuExportar])
 
   const puedeVerCostos = usuarioActual?.rol === 'propietario'
 
@@ -551,6 +580,45 @@ export default function Movimientos() {
   const paginaActual = Math.min(pagina, totalPaginas)
   const inicio = (paginaActual - 1) * POR_PAGINA
   const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA)
+
+  /* ---------- Exportar lo que se está viendo ---------- */
+
+  async function exportar(formato) {
+    setMenuExportar(false)
+    setExportando(formato)
+
+    const nombreTipo =
+      tipo === FILTRO_PRECIOS
+        ? 'Precios editados'
+        : tipo === 'entrada'
+        ? 'Compras y entradas'
+        : tipo === 'salida'
+        ? 'Ventas'
+        : TIPOS[tipo]?.label
+
+    const contexto = {
+      negocio: configuracion?.negocio?.nombre ?? '',
+      periodo: rango.dias === null ? 'Todo el historial' : rango.dias === 0 ? 'Hoy' : `Últimos ${rango.dias} días`,
+      filtros: [
+        tipo !== 'todos' && `Tipo: ${nombreTipo}`,
+        usuario !== 'todos' && `Usuario: ${usuario}`,
+        busqueda.trim() && `Búsqueda: "${busqueda.trim()}"`,
+      ].filter(Boolean),
+      resumen: armarResumen(filtrados),
+    }
+
+    try {
+      const filas = armarFilasExportacion(filtrados)
+      if (formato === 'excel') await exportarExcel(filas, contexto)
+      else await exportarPDF(filas, contexto)
+      notificar({ texto: formato === 'excel' ? 'Listo, se descargó tu Excel.' : 'Listo, se descargó tu PDF.' })
+    } catch (e) {
+      console.error(e)
+      notificar({ tipo: 'error', texto: 'No se pudo crear el archivo. Inténtalo otra vez.' })
+    } finally {
+      setExportando(null)
+    }
+  }
 
   function filtrar(setter) {
     return (valor) => {
@@ -596,22 +664,56 @@ export default function Movimientos() {
           <h1 className="hi-titulo">Historial de movimientos</h1>
           <p className="hi-subtitulo">Todo lo que ha entrado y salido de tu inventario</p>
         </div>
-        <button
-          type="button"
-          className="hi-boton"
-          disabled={filtrados.length === 0}
-          onClick={() => exportarCSV(filtrados)}
-          title="Descarga lo que estás viendo, producto por producto, para abrirlo en Excel"
-        >
-          <Download size={16} aria-hidden="true" />
-          Exportar
-        </button>
+        {/* Exportar: Excel o PDF de lo que estás viendo */}
+        <div className="hi-exportar" ref={menuRef}>
+          <button
+            type="button"
+            className="hi-boton"
+            disabled={filtrados.length === 0 || exportando !== null}
+            onClick={() => setMenuExportar((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuExportar}
+            title="Descarga lo que estás viendo en pantalla"
+          >
+            {exportando ? (
+              <Loader2 size={16} className="hi-girando" aria-hidden="true" />
+            ) : (
+              <Download size={16} aria-hidden="true" />
+            )}
+            {exportando ? 'Preparando…' : 'Exportar'}
+            {!exportando && <ChevronDown size={14} aria-hidden="true" />}
+          </button>
+
+          {menuExportar && (
+            <div className="hi-exportar__menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => exportar('excel')}>
+                <span className="hi-exportar__icono hi-exportar__icono--excel" aria-hidden="true">
+                  <FileSpreadsheet size={17} />
+                </span>
+                <span>
+                  <strong>Excel</strong>
+                  <small>Para hacer cuentas o filtrar</small>
+                </span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => exportar('pdf')}>
+                <span className="hi-exportar__icono hi-exportar__icono--pdf" aria-hidden="true">
+                  <FileText size={17} />
+                </span>
+                <span>
+                  <strong>PDF</strong>
+                  <small>Para imprimir o guardar</small>
+                </span>
+              </button>
+              <p className="hi-exportar__nota">Se descarga solo lo que tienes filtrado.</p>
+            </div>
+          )}
+        </div>
       </header>
 
       <p className="hi-candado">
         <Lock size={16} aria-hidden="true" />
         <span>
-          Los movimientos no se pueden editar ni borrar. <strong>Así tu inventario siempre cuadra.</strong>
+          Aquí nada se puede editar ni borrar. <strong>Así tus cuentas siempre cuadran.</strong>
         </span>
       </p>
 
@@ -622,7 +724,7 @@ export default function Movimientos() {
             <Search size={16} className="hi-buscador__icono" aria-hidden="true" />
             <input
               type="text"
-              placeholder="Busca por producto, folio, proveedor o motivo…"
+              placeholder="Busca un producto, folio, proveedor o motivo…"
               value={busqueda}
               onChange={(e) => cambiarBusqueda(e.target.value)}
               aria-label="Buscar movimiento"
@@ -699,7 +801,7 @@ export default function Movimientos() {
             type="button"
             className={'hi-tipo-filtro hi-tipo-filtro--precios' + (tipo === FILTRO_PRECIOS ? ' is-activo' : '')}
             onClick={() => cambiarTipo(FILTRO_PRECIOS)}
-            title="Ventas en las que se cambió el precio de algún producto"
+            title="Ventas donde alguien le cambió el precio a un producto"
           >
             <ShieldCheck size={13} aria-hidden="true" />
             Precios editados
@@ -720,7 +822,7 @@ export default function Movimientos() {
         {cargando ? (
           <div className="hi-vacio">
             <Loader2 size={26} className="hi-girando" aria-hidden="true" />
-            Cargando movimientos…
+            Trayendo tu historial…
           </div>
         ) : error ? (
           <div className="hi-vacio">
@@ -735,10 +837,10 @@ export default function Movimientos() {
           <div className="hi-vacio">
             <SearchX size={26} aria-hidden="true" />
             {tipo === FILTRO_PRECIOS
-              ? 'No hay ventas con precios cambiados en este periodo.'
+              ? 'En estas fechas nadie cambió precios.'
               : rangoId === 'hoy' && !busqueda && tipo === 'todos'
-              ? 'Hoy todavía no hay movimientos.'
-              : 'No hay movimientos con esos filtros.'}
+              ? 'Hoy todavía no se ha movido nada.'
+              : 'No encontramos nada con esos filtros. Prueba con otras fechas o borra la búsqueda.'}
           </div>
         ) : (
           <>
@@ -785,7 +887,7 @@ export default function Movimientos() {
                           <span className="hi-producto__nombre">
                             {titulo}
                             {tieneEditado(r) && (
-                              <span className="hi-escudo" title="Incluye precios cambiados con autorización">
+                              <span className="hi-escudo" title="Aquí se cambió un precio con permiso">
                                 <ShieldCheck size={13} aria-label="Con precios autorizados" />
                               </span>
                             )}
@@ -904,11 +1006,11 @@ export default function Movimientos() {
             {/* ============ PAGINACIÓN ============ */}
             <div className="hi-paginacion">
               <span>
-                Mostrando{' '}
+                Viendo{' '}
                 <strong>
                   {inicio + 1}–{Math.min(inicio + POR_PAGINA, filtrados.length)}
                 </strong>{' '}
-                de <strong>{filtrados.length}</strong> registros
+                de <strong>{filtrados.length}</strong>
               </span>
 
               {totalPaginas > 1 && (

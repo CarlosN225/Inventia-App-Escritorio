@@ -174,8 +174,8 @@ const PREGUNTAS = [
 
 // TODO: poner los datos reales de soporte del equipo
 const SOPORTE = {
-  telefono: '55 0000 0000',
-  correo: 'soporte@inventia.mx',
+  telefono: '55 3394 0285',
+  correo: 'equipo.inventia@gmail.com',
   horario: 'Lunes a sábado, de 9:00 a 18:00',
 }
 

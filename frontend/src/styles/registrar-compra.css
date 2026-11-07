@@ -3,32 +3,105 @@
    ============================================================ */
 
 /* ============ DISTRIBUCIÓN ============ */
-/* La columna izquierda crece con su contenido (sin límite de altura) */
-.rv--compra .rv-izquierda {
-  max-height: none;
-  overflow: visible;
+/* Fuera de compu (ventana angosta) la columna crece con su contenido.
+   En compu, registrar-venta.css ajusta todo al alto de la ventana. */
+@media (max-width: 1099px), (max-height: 599px) {
+  .rv--compra .rv-izquierda {
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .rv--compra .rv-izquierda > .rv-panel {
   flex-shrink: 0;
 }
 
-/* Por surtir llena lo que sobre, para emparejarse con la compra */
+/* El panel de abajo (resultados o por surtir) se queda con lo que sobre */
 .rv--compra .rv-izquierda > .rv-panel:last-child {
-  flex: 1 0 auto;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
-/* La compra mide lo mismo que la columna izquierda:
-   su contenido no la estira y la lista hace scroll por dentro */
-.rv--compra .rv-ticket {
-  max-height: none;
-  contain: size;
+/* ============ ARRIBA MÁS COMPACTO (datos + buscador) ============
+   Para que la lista de abajo tenga más espacio */
+.rv--compra .rv-izquierda > .rv-panel:not(:last-child) {
+  padding: 10px 14px;
+}
+
+.rv--compra .rc-datos {
+  gap: 6px 10px;
+}
+
+.rv--compra .rc-campo {
+  gap: 3px;
+}
+
+.rv--compra .rc-etiqueta {
+  font-size: 11.5px;
+}
+
+.rv--compra .rc-input-grupo {
+  gap: 6px;
+  padding: 0 9px;
+}
+
+.rv--compra .rc-input-grupo svg {
+  width: 14px;
+  height: 14px;
+}
+
+.rv--compra .rc-input-grupo input {
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.rv--compra .rc-frecuentes,
+.rv--compra .rc-frecuente {
+  font-size: 11.5px;
+}
+
+.rv--compra .rc-frecuente {
+  padding: 2px 8px;
+}
+
+/* Buscador más bajito */
+.rv--compra .rv-buscador {
+  border-radius: 8px;
+}
+
+.rv--compra .rv-buscador__icono {
+  width: 16px;
+  height: 16px;
+  margin-left: 11px;
+}
+
+.rv--compra .rv-buscador input,
+.rv--compra .rv-buscador input:hover,
+.rv--compra .rv-buscador input:focus,
+.rv--compra .rv-buscador input:active {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.rv--compra .rv-buscador__boton {
+  width: 42px;
+}
+
+.rv--compra .rv-buscador__boton svg {
+  width: 17px;
+  height: 17px;
+}
+
+.rv--compra .rc-tip {
+  margin-top: 8px;
+  padding: 6px 9px;
+  font-size: 12px;
 }
 
 /* ============ DATOS DE LA COMPRA ============ */
 .rc-datos {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 1fr) minmax(0, 1fr);
   gap: 10px 12px;
 }
 
@@ -166,14 +239,15 @@
   color: var(--d-azul);
 }
 
-/* ============ POR SURTIR (hasta 5 visibles) ============ */
+/* ============ POR SURTIR (lista compacta, en dos columnas si cabe) ============ */
 .rc-surtir {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  /* 5 filas de ~48px + 4 espacios de 6px; desde la 6.ª hace scroll */
-  max-height: 270px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: min-content;
+  align-content: start;
+  gap: 6px 12px;
+  flex: 1;
+  min-height: 0;
   margin: 0;
   padding: 0 4px 0 0;
   overflow-y: auto;
@@ -181,12 +255,18 @@
   scrollbar-width: thin;
 }
 
+@container (min-width: 460px) {
+  .rc-surtir {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .rc-surtir__item {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 1px solid var(--d-borde);
   border-radius: 8px;
   background: #ffffff;
@@ -724,7 +804,6 @@
 /* ============ RESPONSIVE ============ */
 @media (max-width: 1100px) {
   .rc-datos { grid-template-columns: minmax(0, 1fr); }
-  .rv--compra .rv-ticket { contain: none; }
 }
 
 @media (max-width: 700px) {

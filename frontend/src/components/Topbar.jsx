@@ -18,6 +18,7 @@ import {
 
 import ConfirmDialog from './ConfirmDialog.jsx'
 import { getUsuarioActual, logout } from '../services/auth'
+import { hayGuardia, intentarSalir } from '../services/salidaSegura'
 import '../styles/topbar.css'
  
 
@@ -112,14 +113,18 @@ export default function Topbar({ onOpenSidebar }) {
     setOpen(false)
   }, [pathname])
 
+  // Si hay una venta a medias, primero pregunta (ver services/salidaSegura.js)
   function irA(ruta) {
     setOpen(false)
-    navigate(ruta)
+    if (ruta === pathname) return
+    intentarSalir(() => navigate(ruta))
   }
 
   function requestLogout() {
     setOpen(false)
-    setConfirmOpen(true)
+    // Con venta a medias ya se preguntó una vez; no hace falta un segundo "¿seguro?"
+    if (hayGuardia()) intentarSalir(confirmLogout)
+    else setConfirmOpen(true)
   }
 
   async function confirmLogout() {
