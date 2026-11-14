@@ -262,6 +262,8 @@ function armarResumen(renglones) {
   }
 }
 
+const METODOS_PAGO = { efectivo: 'efectivo', transferencia: 'transferencia', tarjeta: 'tarjeta' }
+
 /* ---------- Detalle de un ticket (venta o compra) ---------- */
 
 function DetalleTicket({ r, unidades }) {
@@ -282,6 +284,7 @@ function DetalleTicket({ r, unidades }) {
           </p>
           <p className="hi-detalle__sub">
             {formatoLargo.format(fecha)} · {formatoHora.format(fecha)} · {r.usuarioNombre ?? 'Sin usuario'}
+            {esVenta && t?.metodo_pago ? ` · Pagó con ${METODOS_PAGO[t.metodo_pago] ?? t.metodo_pago}` : ''}
             {!esVenta && t?.nota ? ` · ${t.nota}` : ''}
           </p>
         </div>

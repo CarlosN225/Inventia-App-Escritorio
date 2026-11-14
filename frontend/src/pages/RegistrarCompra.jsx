@@ -30,6 +30,7 @@ import {
   PackageOpen,
   Loader2,
   RotateCcw,
+  CalendarClock,
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
@@ -182,7 +183,9 @@ export default function RegistrarCompra() {
   const resultados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
     if (!texto) return []
-    return productos.filter((p) => normalizar(`${p.nombre} ${p.marca}`).includes(texto)).slice(0, MAX_RESULTADOS)
+    return productos
+      .filter((p) => normalizar(`${p.nombre} ${p.marca} ${p.codigoBarras ?? ''}`).includes(texto))
+      .slice(0, MAX_RESULTADOS)
   }, [busqueda, productos])
 
   const indiceResaltado = Math.min(resaltado, Math.max(resultados.length - 1, 0))
@@ -222,7 +225,7 @@ export default function RegistrarCompra() {
       cantidadPiezas === null ? 1 : porEmpaque ? Math.max(1, Math.ceil(cantidadPiezas / porEmpaque)) : cantidadPiezas
 
     const costo = producto?.costo ? String(producto.costo) : ''
-    return { id, modo, cantidad, costo, caducidad: '' }
+    return { id, modo, cantidad, costo, caducidad: '', sueltas: '', costoEmpaque: undefined }
   }
 
   function agregar(id, cantidadPiezas = null) {
@@ -266,9 +269,15 @@ export default function RegistrarCompra() {
       const producto = productosPorId.get(item.id)
       const porEmpaque = producto.piezasEmpaque ?? null
       const empaque = producto.empaque ?? 'caja'
-      const piezas = item.modo === 'empaque' && porEmpaque ? item.cantidad * porEmpaque : item.cantidad
+      const porCaja = item.modo === 'empaque' && !!porEmpaque
+      const sueltas = porCaja ? Math.max(0, parseInt(item.sueltas, 10) || 0) : 0
+      const piezas = porCaja ? item.cantidad * porEmpaque + sueltas : item.cantidad
       const unidad = producto.unidad
 
+      // En caja el costo se captura por caja; por dentro siempre se guarda por pieza
+      const costoEmpaqueTexto = porCaja
+        ? item.costoEmpaque ?? (item.costo !== '' ? String(redondear(Number(item.costo) * porEmpaque)) : '')
+        : ''
       const costo = Number(item.costo)
       const costoValido = item.costo !== '' && costo > 0
       const costoAnterior = producto.costo && producto.costo > 0 ? producto.costo : null
@@ -282,14 +291,14 @@ export default function RegistrarCompra() {
       // Costos sospechosos: casi siempre es el precio de la caja capturado como si fuera de la pieza (o al revés)
       const costoMayorPrecio = costoValido && producto.precio > 0 && costo >= producto.precio
       const costoMuyBajo = costoValido && costoAnterior !== null && costo < costoAnterior * 0.3
-      const costoSugerido = costoMayorPrecio && porEmpaque > 1 ? redondear(costo / porEmpaque) : null
+      const costoSugerido = costoMayorPrecio && porEmpaque > 1 && !porCaja ? redondear(costo / porEmpaque) : null
       const costoSospechoso = (costoMayorPrecio || costoMuyBajo) && !item.costoConfirmado
 
       const caducidadVencida = item.caducidad !== '' && diasHasta(item.caducidad) < 0
 
       const conversion =
-        item.modo === 'empaque' && porEmpaque
-          ? `${item.cantidad} ${textoUnidad(empaque, item.cantidad, true)} × ${porEmpaque} = ${piezas} ${textoUnidad(unidad, piezas)}`
+        porCaja
+          ? `${item.cantidad} ${textoUnidad(empaque, item.cantidad, true)} × ${porEmpaque}${sueltas ? ` + ${sueltas} ${sueltas === 1 ? 'suelta' : 'sueltas'}` : ''} = ${piezas} ${textoUnidad(unidad, piezas)}`
           : `${piezas} ${textoUnidad(unidad, piezas)}`
 
       return {
@@ -299,6 +308,8 @@ export default function RegistrarCompra() {
         empaque,
         unidad,
         piezas,
+        porCaja,
+        costoEmpaqueTexto,
         conversion,
         costoNum: costo,
         costoValido,
@@ -437,6 +448,25 @@ export default function RegistrarCompra() {
     return () => window.removeEventListener('keydown', alPresionar)
   }, [])
 
+  // Lector de código de barras: escribe el código y manda Enter.
+  // Si coincide exacto con un producto, se agrega 1 (o se suma 1 si ya estaba).
+  function escaneoDeCodigo() {
+    const codigo = busqueda.trim()
+    if (!codigo) return false
+    const producto = productos.find((p) => p.codigoBarras && p.codigoBarras === codigo)
+    if (producto) {
+      agregarDesdeBusqueda(producto.id)
+      return true
+    }
+    // Parece un código (solo números, 6 o más) pero no está registrado
+    if (/^\d{6,}$/.test(codigo) && resultados.length === 0) {
+      notificar({ texto: `El código ${codigo} no está registrado en tu catálogo`, tipo: 'aviso' })
+      cambiarBusqueda('')
+      return true
+    }
+    return false
+  }
+
   function teclaBuscador(event) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
@@ -446,6 +476,7 @@ export default function RegistrarCompra() {
       setResaltado((i) => Math.max(i - 1, 0))
     } else if (event.key === 'Enter') {
       event.preventDefault()
+      if (escaneoDeCodigo()) return
       const producto = resultados[indiceResaltado]
       if (producto) agregarDesdeBusqueda(producto.id)
     } else if (event.key === 'Escape' && busqueda) {
@@ -614,7 +645,7 @@ export default function RegistrarCompra() {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Busca el producto que te llegó… (ej. mazapán)"
+                  placeholder="Busca o escanea el producto que te llegó… (ej. mazapán)"
                   value={busqueda}
                   onChange={(e) => cambiarBusqueda(e.target.value)}
                   onKeyDown={teclaBuscador}
@@ -827,7 +858,7 @@ export default function RegistrarCompra() {
                               type="button"
                               aria-pressed={r.modo === 'pieza'}
                               className={r.modo === 'pieza' ? 'is-activo' : ''}
-                              onClick={() => actualizar(r.id, { modo: 'pieza' })}
+                              onClick={() => actualizar(r.id, { modo: 'pieza', sueltas: '', costoEmpaque: undefined })}
                             >
                               {capitalizar(textoUnidad(r.unidad, 1, true))}
                             </button>
@@ -835,7 +866,7 @@ export default function RegistrarCompra() {
                               type="button"
                               aria-pressed={r.modo === 'empaque'}
                               className={r.modo === 'empaque' ? 'is-activo' : ''}
-                              onClick={() => actualizar(r.id, { modo: 'empaque' })}
+                              onClick={() => actualizar(r.id, { modo: 'empaque', costoEmpaque: undefined })}
                             >
                               {capitalizar(r.empaque)}
                             </button>
@@ -866,6 +897,22 @@ export default function RegistrarCompra() {
                           </button>
                         </div>
 
+                        {r.porCaja && (
+                          <label className="rc-sueltas" title={`${capitalizar(textoUnidad(r.unidad, 2, true))} sueltas, aparte de las cajas`}>
+                            <span aria-hidden="true">+</span>
+                            <input
+                              type="number"
+                              min="0"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={r.sueltas}
+                              onChange={(e) => actualizar(r.id, { sueltas: e.target.value })}
+                              aria-label={`${capitalizar(textoUnidad(r.unidad, 2, true))} sueltas de ${r.producto.nombre}`}
+                            />
+                            <span>sueltas</span>
+                          </label>
+                        )}
+
                         <button
                           type="button"
                           className="rv-icono rv-icono--borrar rc-borrar"
@@ -877,36 +924,60 @@ export default function RegistrarCompra() {
                         </button>
                       </div>
 
-                      {/* Línea 3: costo + cambio + caducidad */}
-                      <div className="rc-linea rc-linea--envuelve">
-                        <span className={'rc-costo__grupo' + (!r.costoValido ? ' is-error' : '')}>
-                          <span>$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            value={r.costo}
-                            onChange={(e) => actualizar(r.id, { costo: e.target.value, costoConfirmado: false })}
-                            aria-label={`Costo por ${textoUnidad(r.unidad, 1, true)} de ${r.producto.nombre}`}
-                          />
-                          <span className="rc-sufijo">/{textoUnidad(r.unidad, 1)}</span>
-                        </span>
-
-                        {r.cambioCosto && (
-                          <span className={`rc-cambio rc-cambio--${r.cambioCosto}`}>
-                            {r.cambioCosto === 'sube' ? (
-                              <ArrowUp size={11} aria-hidden="true" />
-                            ) : (
-                              <ArrowDown size={11} aria-hidden="true" />
-                            )}
-                            antes {moneda.format(r.costoAnterior)}
+                      {/* Línea 3: costo (con su nota abajo) a la izquierda y caducidad a la derecha */}
+                      <div className="rc-linea rc-linea--costo">
+                        <div className="rc-costo-col">
+                          <span className={'rc-costo__grupo' + (!r.costoValido ? ' is-error' : '')}>
+                            <span>$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              value={r.porCaja ? r.costoEmpaqueTexto : r.costo}
+                              onChange={(e) => {
+                                const valor = e.target.value
+                                if (r.porCaja) {
+                                  actualizar(r.id, {
+                                    costoEmpaque: valor,
+                                    costo: valor === '' ? '' : (Number(valor) / r.porEmpaque).toFixed(2),
+                                    costoConfirmado: false,
+                                  })
+                                } else {
+                                  actualizar(r.id, { costo: valor, costoConfirmado: false })
+                                }
+                              }}
+                              aria-label={
+                                r.porCaja
+                                  ? `Costo por ${r.empaque} de ${r.producto.nombre}`
+                                  : `Costo por ${textoUnidad(r.unidad, 1, true)} de ${r.producto.nombre}`
+                              }
+                            />
+                            <span className="rc-sufijo">/{r.porCaja ? r.empaque : textoUnidad(r.unidad, 1)}</span>
                           </span>
-                        )}
+                          {((r.porCaja && r.costoValido) || r.cambioCosto) && (
+                            <span className="rc-costo-nota">
+                              {r.porCaja && r.costoValido && (
+                                <span>= {moneda.format(r.costoNum)} por {textoUnidad(r.unidad, 1, true)}</span>
+                              )}
+                              {r.cambioCosto && (
+                                <span className={`rc-cambio rc-cambio--${r.cambioCosto}`}>
+                                  {r.cambioCosto === 'sube' ? (
+                                    <ArrowUp size={11} aria-hidden="true" />
+                                  ) : (
+                                    <ArrowDown size={11} aria-hidden="true" />
+                                  )}
+                                  antes {moneda.format(r.costoAnterior)}
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
 
                         {CONFIG.maneja_caducidad && (
                           <label className={'rc-fecha' + (r.caducidadVencida ? ' is-error' : '')} title="Caducidad (opcional)">
-                          <CalendarDays size={14} aria-hidden="true" />
+                            <CalendarDays size={14} aria-hidden="true" />
+                            <span className="rc-fecha__texto">Caduca</span>
                             <input
                               type="date"
                               min={hoyISO()}
@@ -924,11 +995,29 @@ export default function RegistrarCompra() {
                         {' · '}Stock {r.stockActual} → <strong>{r.nuevoStock}</strong>
                       </p>
 
+                      {/* Lo más antiguo primero: aún hay piezas que caducan pronto */}
+                      {CONFIG.maneja_caducidad &&
+                        r.stockActual > 0 &&
+                        r.producto.diasCaducar !== null &&
+                        r.producto.diasCaducar !== undefined &&
+                        r.producto.diasCaducar <= (CONFIG.diasAviso ?? 30) && (
+                          <p className="rc-peps">
+                            <CalendarClock size={13} aria-hidden="true" />
+                            <span>
+                              Aún tienes <strong>{r.stockActual} {textoUnidad(r.unidad, r.stockActual)}</strong>{' '}
+                              {r.producto.diasCaducar < 0 ? 'que ya caducaron' : `que caducan el ${r.producto.caducidad}`}.
+                              {r.producto.diasCaducar < 0
+                                ? ' Regístralas como merma antes de acomodar lo nuevo.'
+                                : ' Al acomodar lo nuevo, ponlas al frente para venderlas primero.'}
+                            </span>
+                          </p>
+                        )}
+
                                             {(!r.costoValido || r.caducidadVencida) && (
                         <p className="rv-renglon__error">
                           <AlertTriangle size={12} aria-hidden="true" />
                           {!r.costoValido
-                            ? `Escribe el costo por ${textoUnidad(r.unidad, 1, true)}`
+                            ? `Escribe el costo por ${r.porCaja ? r.empaque : textoUnidad(r.unidad, 1, true)}`
                             : 'Esa fecha de caducidad ya pasó'}
                         </p>
                       )}

@@ -89,7 +89,11 @@ class VentaViewSet(mixins.CreateModelMixin,
     def create(self, request, *args, **kwargs):
         entrada = RegistrarVentaSerializer(data=request.data)
         entrada.is_valid(raise_exception=True)
-        venta = registrar_venta(request, entrada.validated_data["renglones"])
+        venta = registrar_venta(
+            request,
+            entrada.validated_data["renglones"],
+            metodo_pago=entrada.validated_data["metodo_pago"],
+        )
         return Response(VentaSerializer(venta).data, status=status.HTTP_201_CREATED)
 
 

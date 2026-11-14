@@ -1,0 +1,34 @@
+.caduca-pronto {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #fff4e0;
+  color: #9a5b00;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.caduca-pronto.is-rojo {
+  background: #fdecec;
+  color: #b91c1c;
+}
+
+:root[data-theme='dark'] .caduca-pronto {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+:root[data-theme='dark'] .caduca-pronto.is-rojo {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+/* En el ticket va en el renglón chiquito, junto al precio */
+.rv-renglon__detalle .caduca-pronto { margin-left: 0; }

@@ -205,6 +205,29 @@ class F04VentaTests(BaseInventia):
         self.entrar(self.encargado)
         self.assertEqual(self.vender(self.renglon(self.kinder, 1)).status_code, 400)
 
+    def test_producto_caducado_no_se_vende(self):
+        hoy = timezone.localdate()
+        self.kinder.fecha_caducidad = hoy - timedelta(days=1)
+        self.kinder.save()
+        self.entrar(self.encargado)
+        r = self.vender(self.renglon(self.kinder, 1))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("caducado", str(r.data))
+        self.recargar(self.kinder)
+        self.assertEqual(self.kinder.stock_actual, 9)
+        # Caduca hoy: todavía se puede vender
+        self.kinder.fecha_caducidad = hoy
+        self.kinder.save()
+        self.assertEqual(self.vender(self.renglon(self.kinder, 1)).status_code, 201)
+
+    def test_sin_manejar_caducidad_no_se_bloquea(self):
+        self.config.maneja_caducidad = False
+        self.config.save()
+        self.kinder.fecha_caducidad = timezone.localdate() - timedelta(days=3)
+        self.kinder.save()
+        self.entrar(self.encargado)
+        self.assertEqual(self.vender(self.renglon(self.kinder, 1)).status_code, 201)
+
     def test_venta_vacia_o_sin_sesion(self):
         self.assertIn(self.vender(self.renglon(self.kinder, 1)).status_code, (401, 403))
         self.entrar(self.encargado)
@@ -214,6 +237,23 @@ class F04VentaTests(BaseInventia):
 # ===========================================================================
 # F-05 · Registrar compra
 # ===========================================================================
+
+    def test_metodo_de_pago_se_guarda_y_por_defecto_es_efectivo(self):
+        self.entrar(self.encargado)
+        r = self.vender(self.renglon(self.kinder, 1))
+        self.assertEqual(r.data["metodo_pago"], "efectivo")
+        r = self.client.post("/api/ventas/", {"renglones": [self.renglon(self.kinder, 1)],
+                                              "metodo_pago": "transferencia"}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(Venta.objects.get(pk=r.data["id"]).metodo_pago, "transferencia")
+
+    def test_metodo_de_pago_desconocido_se_rechaza(self):
+        self.entrar(self.encargado)
+        r = self.client.post("/api/ventas/", {"renglones": [self.renglon(self.kinder, 1)],
+                                              "metodo_pago": "vales"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Venta.objects.exists())
+
 
 class F05CompraTests(BaseInventia):
     def comprar(self, **datos):

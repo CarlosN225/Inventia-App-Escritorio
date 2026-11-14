@@ -8,9 +8,10 @@ export async function listarVentas() {
   return Array.isArray(response.data) ? response.data : response.data.results ?? []
 }
 
-/* renglones: [{ producto, cantidad, precio_unitario, tipo_precio }] */
-export async function registrarVenta(renglones) {
-  const response = await axios.post(`${API_URL}/ventas/`, { renglones }, CON_SESION)
+/* renglones: [{ producto, cantidad, precio_unitario, tipo_precio }]
+   metodoPago: 'efectivo' (por defecto) · 'transferencia' · 'tarjeta' */
+export async function registrarVenta(renglones, metodoPago = 'efectivo') {
+  const response = await axios.post(`${API_URL}/ventas/`, { renglones, metodo_pago: metodoPago }, CON_SESION)
   return response.data
 }
 

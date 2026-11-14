@@ -26,6 +26,7 @@ import {
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ModalAutorizacion from '../components/ModalAutorizacion.jsx'
 import { useAjustes } from '../hooks/useConfiguracion'
+import CaducaPronto from '../components/CaducaPronto'
 import { getUsuarioActual } from '../services/auth'
 import { listarProductos, mensajeDeError } from '../services/productos'
 import { listarVentas, registrarVenta } from '../services/ventas'
@@ -37,6 +38,16 @@ import '../styles/registrar-venta.css'
 
 const MAX_RESULTADOS = 6
 const MAX_RAPIDOS = 10
+
+// Cómo pagó el cliente ("Otro" abre Tarjeta)
+const METODOS_PAGO = [
+  { id: 'efectivo', label: 'Efectivo' },
+  { id: 'transferencia', label: 'Transferencia' },
+  { id: 'tarjeta', label: 'Tarjeta' },
+]
+
+// Billetes comunes para el atajo de "Recibí"
+const BILLETES = [20, 50, 100, 200, 500, 1000]
 
 const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 
@@ -116,7 +127,20 @@ function PastillaStock({ producto }) {
 export default function RegistrarVenta() {
   const navigate = useNavigate()
   const inputRef = useRef(null)
-  const { vende_mayoreo: conMayoreo, maneja_promociones: conPromos, pinConfigurado } = useAjustes()
+  const {
+    vende_mayoreo: conMayoreo,
+    maneja_promociones: conPromos,
+    maneja_caducidad: conCaducidad,
+    diasAviso,
+    pinConfigurado,
+  } = useAjustes()
+
+  // Por qué no se puede vender (o null si sí se puede). Lo caducado va a merma, no al ticket.
+  function noSeVende(p) {
+    if (p.stock === 0) return 'Agotado'
+    if (conCaducidad && p.diasCaducar !== null && p.diasCaducar !== undefined && p.diasCaducar < 0) return 'Caducado'
+    return null
+  }
 
   // Datos del backend
   const [productos, setProductos] = useState([])
@@ -135,6 +159,8 @@ export default function RegistrarVenta() {
   const [guardando, setGuardando] = useState(false)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
   const [salida, setSalida] = useState(null) // { continuar } cuando quieren irse con la venta a medias
+  const [metodoPago, setMetodoPago] = useState('efectivo') // efectivo · transferencia · tarjeta
+  const [recibido, setRecibido] = useState('') // solo en efectivo, para calcular el cambio
 
   const esPropietario = usuarioActual?.rol === 'propietario'
 
@@ -200,7 +226,9 @@ export default function RegistrarVenta() {
   const resultados = useMemo(() => {
     const texto = normalizar(busqueda.trim())
     if (!texto) return []
-    return productos.filter((p) => normalizar(`${p.nombre} ${p.marca}`).includes(texto)).slice(0, MAX_RESULTADOS)
+    return productos
+      .filter((p) => normalizar(`${p.nombre} ${p.marca} ${p.codigoBarras ?? ''}`).includes(texto))
+      .slice(0, MAX_RESULTADOS)
   }, [busqueda, productos])
 
   const indiceResaltado = Math.min(resaltado, Math.max(resultados.length - 1, 0))
@@ -219,7 +247,7 @@ export default function RegistrarVenta() {
 
   function agregar(id) {
     const producto = productosPorId.get(id)
-    if (!producto || producto.stock === 0) return
+    if (!producto || noSeVende(producto)) return
 
     setTicket((t) => {
       const existe = t.find((item) => item.id === id)
@@ -351,6 +379,11 @@ export default function RegistrarVenta() {
   const conError = renglones.filter((r) => r.faltan)
   const hayErrores = conError.length > 0
   const total = redondear(renglones.filter((r) => !r.faltan).reduce((suma, r) => suma + r.subtotal, 0))
+
+  // Cobro en efectivo: con cuánto pagó y cuánto se le regresa
+  const recibidoNum = Number(recibido)
+  const cambio = metodoPago === 'efectivo' && recibido !== '' && total > 0 ? redondear(recibidoNum - total) : null
+  const billetesSugeridos = BILLETES.filter((b) => b > total).slice(0, 3)
   const piezas = renglones.reduce((suma, r) => suma + r.cantidad, 0)
   const puedeConfirmar = renglones.length > 0 && !hayErrores && !guardando && !pendientePrecio
 
@@ -376,7 +409,8 @@ export default function RegistrarVenta() {
             autorizacion: r.autorizacion ?? '',
             motivo_precio: r.motivoPrecio,
           }),
-        }))
+        })),
+        metodoPago
       )
 
       // El backend ya descontó el stock; aquí lo reflejamos al instante
@@ -385,8 +419,13 @@ export default function RegistrarVenta() {
         lista.map((p) => (vendidas.has(p.id) ? { ...p, stock: p.stock - vendidas.get(p.id) } : p))
       )
 
-      notificar({ texto: `Venta #${venta.id} registrada · ${moneda.format(Number(venta.total))}` })
+      const textoCambio = cambio !== null && cambio > 0 ? ` · Cambio: ${moneda.format(cambio)}` : ''
+      notificar({
+        texto: `Venta #${venta.id} registrada · ${moneda.format(Number(venta.total))} en ${METODOS_PAGO.find((m) => m.id === metodoPago)?.label.toLowerCase()}${textoCambio}`,
+      })
       setTicket([])
+      setMetodoPago('efectivo')
+      setRecibido('')
       setEditando(null)
       enfocarBuscador()
 
@@ -511,6 +550,36 @@ export default function RegistrarVenta() {
     continuar?.()
   }
 
+  // Lector de código de barras: escribe el código y manda Enter.
+  // Si coincide exacto con un producto, se agrega 1 (o se suma 1 si ya estaba).
+  function escaneoDeCodigo() {
+    const codigo = busqueda.trim()
+    if (!codigo) return false
+    const producto = productos.find((p) => p.codigoBarras && p.codigoBarras === codigo)
+    if (producto) {
+      if (noSeVende(producto)) {
+        notificar({
+          texto:
+            noSeVende(producto) === 'Caducado'
+              ? `${producto.nombre} está caducado: no se vende, regístralo como merma`
+              : `${producto.nombre} está agotado`,
+          tipo: 'aviso',
+        })
+        cambiarBusqueda('')
+        return true
+      }
+      agregarDesdeBusqueda(producto.id)
+      return true
+    }
+    // Parece un código (solo números, 6 o más) pero no está registrado
+    if (/^\d{6,}$/.test(codigo) && resultados.length === 0) {
+      notificar({ texto: `El código ${codigo} no está registrado en tu catálogo`, tipo: 'aviso' })
+      cambiarBusqueda('')
+      return true
+    }
+    return false
+  }
+
   function teclaBuscador(event) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
@@ -520,8 +589,11 @@ export default function RegistrarVenta() {
       setResaltado((i) => Math.max(i - 1, 0))
     } else if (event.key === 'Enter') {
       event.preventDefault()
+      if (escaneoDeCodigo()) return
       const producto = resultados[indiceResaltado]
-      if (producto) agregarDesdeBusqueda(producto.id)
+      if (producto && noSeVende(producto) === 'Caducado') {
+        notificar({ texto: `${producto.nombre} está caducado: no se vende, regístralo como merma`, tipo: 'aviso' })
+      } else if (producto) agregarDesdeBusqueda(producto.id)
     } else if (event.key === 'Escape' && busqueda) {
       event.preventDefault()
       event.stopPropagation()
@@ -593,7 +665,7 @@ export default function RegistrarVenta() {
                   ref={inputRef}
                   autoFocus
                   type="text"
-                  placeholder="Busca un producto… (ej. cheto, paleta)"
+                  placeholder="Busca o escanea un producto… (ej. cheto, paleta)"
                   value={busqueda}
                   onChange={(e) => cambiarBusqueda(e.target.value)}
                   onKeyDown={teclaBuscador}
@@ -644,7 +716,8 @@ export default function RegistrarVenta() {
                   ) : (
                     <ul className="rv-lista">
                       {resultados.map((p, i) => {
-                        const agotado = p.stock === 0
+                        const bloqueo = noSeVende(p)
+                        const agotado = !!bloqueo
                         const activo = i === indiceResaltado
 
                         return (
@@ -662,6 +735,7 @@ export default function RegistrarVenta() {
                                 {p.nombre}
                                 {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
                                 <PastillaStock producto={p} />
+                                {conCaducidad && <CaducaPronto producto={p} diasAviso={diasAviso} />}
                               </p>
                               <p className="rv-resultado__marca">
                                 {[p.marca, p.categoria, p.descripcion].filter(Boolean).join(' · ')}
@@ -677,6 +751,7 @@ export default function RegistrarVenta() {
                               type="button"
                               className={'rv-agregar' + (activo && !agotado ? ' is-principal' : '')}
                               disabled={agotado}
+                              title={bloqueo === 'Caducado' ? 'Caducado: no se vende, va a merma' : undefined}
                               onClick={() => agregarDesdeBusqueda(p.id)}
                             >
                               {activo && !agotado ? (
@@ -711,7 +786,8 @@ export default function RegistrarVenta() {
                   {/* Lista numerada: hasta 10, en dos columnas si cabe */}
                   <ol className="rv-top">
                     {masVendidos.map((p, i) => {
-                      const agotado = p.stock === 0
+                      const bloqueo = noSeVende(p)
+                      const agotado = !!bloqueo
 
                       return (
                         <li key={p.id}>
@@ -720,15 +796,22 @@ export default function RegistrarVenta() {
                             className="rv-top__item"
                             disabled={agotado}
                             onClick={() => agregar(p.id)}
-                            title={agotado ? 'Agotado' : `Agregar ${p.nombre}${p.marca ? ` (${p.marca})` : ''}`}
+                            title={
+                              bloqueo === 'Caducado'
+                                ? 'Caducado: no se vende, regístralo como merma'
+                                : agotado
+                                  ? 'Agotado'
+                                  : `Agregar ${p.nombre}${p.marca ? ` (${p.marca})` : ''}`
+                            }
                           >
                             <span className="rv-top__num">{i + 1}</span>
                             <span className="rv-top__nombre">
                               {p.nombre}
                               {p.gramaje && <span className="gramaje">{p.gramaje}</span>}
+                              {conCaducidad && !bloqueo && <CaducaPronto producto={p} diasAviso={diasAviso} />}
                             </span>
                             {agotado ? (
-                              <span className="rv-stock rv-stock--agotado">Agotado</span>
+                              <span className="rv-stock rv-stock--agotado">{bloqueo}</span>
                             ) : (
                               <span className="rv-top__precio">{moneda.format(p.precio)}</span>
                             )}
@@ -756,6 +839,11 @@ export default function RegistrarVenta() {
                   {piezas === 1 ? 'pieza' : 'piezas'}
                 </span>
               </div>
+              {cambio !== null && (
+                <span className={'rv-cobro__cambio' + (cambio < 0 ? ' is-falta' : '')} role="status">
+                  {cambio < 0 ? `Faltan ${moneda.format(-cambio)}` : `Cambio: ${moneda.format(cambio)}`}
+                </span>
+              )}
               <button type="button" className="rv-enlace" disabled={ticket.length === 0} onClick={pedirCancelar}>
                 Limpiar
               </button>
@@ -879,6 +967,8 @@ export default function RegistrarVenta() {
                         </button>
                       )}
 
+                      {conCaducidad && <CaducaPronto producto={r.producto} diasAviso={diasAviso} />}
+
                       {/* La caja o bolsa completa en un clic (el stock sigue en piezas) */}
                       {r.producto.piezasEmpaque > 1 && (
                         <button
@@ -919,6 +1009,66 @@ export default function RegistrarVenta() {
                 <div className="rv-resumen__fila">
                   <span>Subtotal de productos válidos</span>
                   <span>{moneda.format(total)}</span>
+                </div>
+              )}
+
+              {ticket.length > 0 && (
+                <div className="rv-cobro">
+                  <div className="rv-cobro__fila">
+                    <span className="rv-cobro__etiqueta">Pago</span>
+                    <div className="rv-cobro__metodos" role="group" aria-label="Método de pago">
+                      {METODOS_PAGO.filter((m) => m.id !== 'tarjeta').map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          aria-pressed={metodoPago === m.id}
+                          className={metodoPago === m.id ? 'is-activo' : ''}
+                          onClick={() => setMetodoPago(m.id)}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        aria-pressed={metodoPago === 'tarjeta'}
+                        className={metodoPago === 'tarjeta' ? 'is-activo' : ''}
+                        onClick={() => setMetodoPago('tarjeta')}
+                      >
+                        {metodoPago === 'tarjeta' ? 'Otro: Tarjeta' : 'Otro'}
+                      </button>
+                    </div>
+
+                    {metodoPago === 'efectivo' && (
+                      <>
+                        <label className="rv-cobro__etiqueta" htmlFor="rv-recibido">
+                          Recibí
+                        </label>
+                        <div className="rv-cobro__recibido">
+                          <span aria-hidden="true">$</span>
+                          <input
+                            id="rv-recibido"
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            inputMode="decimal"
+                            placeholder={total.toFixed(2)}
+                            value={recibido}
+                            onChange={(e) => setRecibido(e.target.value)}
+                          />
+                        </div>
+                        <div className="rv-cobro__billetes">
+                          <button type="button" onClick={() => setRecibido(total.toFixed(2))}>
+                            Exacto
+                          </button>
+                          {billetesSugeridos.map((b) => (
+                            <button key={b} type="button" onClick={() => setRecibido(String(b))}>
+                              ${b}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 

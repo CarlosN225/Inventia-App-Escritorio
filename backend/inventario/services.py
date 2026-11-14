@@ -1,7 +1,7 @@
 from django.db import transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from .models import MovimientoInventario, Producto
+from .models import Configuracion, MovimientoInventario, Producto
 from usuarios.models import Usuario
 
 
@@ -139,11 +139,18 @@ def _usuario_de_sesion(request):
 
 
 @transaction.atomic
-def registrar_venta(request, renglones):
+def registrar_venta(request, renglones, metodo_pago=Venta.PAGO_EFECTIVO):
     """Crea la venta con su detalle, descuenta el stock y deja un movimiento de salida por renglón."""
     usuario = _usuario_de_sesion(request)
-    venta = Venta.objects.create(usuario=usuario, total=Decimal("0"), fecha_venta=timezone.now())
+    venta = Venta.objects.create(
+        usuario=usuario, total=Decimal("0"), fecha_venta=timezone.now(), metodo_pago=metodo_pago
+    )
     total = Decimal("0")
+
+    # Si el negocio maneja caducidad, lo caducado no se puede vender (va a merma)
+    config = Configuracion.objects.order_by("id").first()
+    revisar_caducidad = bool(config and config.maneja_caducidad)
+    hoy = timezone.localdate()
 
     for r in renglones:
         # Se vuelve a leer en cada renglón, por si el mismo producto viene dos veces
@@ -151,6 +158,12 @@ def registrar_venta(request, renglones):
 
         if not producto.activo:
             raise ValidationError({"renglones": f"{producto.nombre} está desactivado."})
+
+        if revisar_caducidad and producto.fecha_caducidad and producto.fecha_caducidad < hoy:
+            raise ValidationError({
+                "renglones": f"{producto.nombre} está caducado y no se puede vender. Regístralo como merma "
+                "o, si ya llegaron nuevos, actualiza su caducidad."
+            })
 
         if r["cantidad"] > producto.stock_actual:
             raise ValidationError({

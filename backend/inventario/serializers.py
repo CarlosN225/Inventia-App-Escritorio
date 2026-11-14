@@ -208,6 +208,7 @@ class RenglonVentaSerializer(serializers.Serializer):
 
 class RegistrarVentaSerializer(serializers.Serializer):
     renglones = RenglonVentaSerializer(many=True, allow_empty=False)
+    metodo_pago = serializers.ChoiceField(choices=Venta.METODO_PAGO_CHOICES, default=Venta.PAGO_EFECTIVO)
 
 
 class RenglonCompraSerializer(serializers.Serializer):
@@ -252,7 +253,7 @@ class VentaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Venta
-        fields = ["id", "fecha_venta", "usuario", "usuario_nombre", "total", "detalles"]
+        fields = ["id", "fecha_venta", "usuario", "usuario_nombre", "total", "metodo_pago", "detalles"]
 
     def get_detalles(self, obj):
         # Usa lo que ya se trajo con prefetch_related (sin consultar otra vez)

@@ -51,6 +51,9 @@ class Configuracion(models.Model):
     pin_bloqueado_hasta = models.DateTimeField(null=True, blank=True)
     hora_resumen = models.TimeField(default=time(20, 0))
     dias_aviso_caducidad = models.PositiveIntegerField(default=30)
+    # Respaldos: carpeta elegida (vacía = Documentos\Inventia Respaldos) y último envío por correo
+    carpeta_respaldo = models.CharField(max_length=500, blank=True, default="")
+    ultimo_respaldo_correo = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "Configuracion"
@@ -103,11 +106,13 @@ class Producto(models.Model):
     UNIDAD_BOLSA = "bolsa"
     UNIDAD_CAJA = "caja"
     UNIDAD_PAQUETE = "paquete"
+    UNIDAD_BOTELLA = "botella"
     UNIDAD_CHOICES = [
         (UNIDAD_PIEZA, "Pieza"),
         (UNIDAD_BOLSA, "Bolsa"),
         (UNIDAD_CAJA, "Caja"),
         (UNIDAD_PAQUETE, "Paquete"),
+        (UNIDAD_BOTELLA, "Botella"),
     ]
     TIPO_EMPAQUE_CHOICES = [
         ("caja", "Caja"),
@@ -191,6 +196,15 @@ class Promocion(models.Model):
 
 
 class Venta(models.Model):
+    PAGO_EFECTIVO = "efectivo"
+    PAGO_TRANSFERENCIA = "transferencia"
+    PAGO_TARJETA = "tarjeta"
+    METODO_PAGO_CHOICES = [
+        (PAGO_EFECTIVO, "Efectivo"),
+        (PAGO_TRANSFERENCIA, "Transferencia"),
+        (PAGO_TARJETA, "Tarjeta"),
+    ]
+
     id = models.AutoField(primary_key=True, db_column="id_venta")
     fecha_venta = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(
@@ -200,6 +214,7 @@ class Venta(models.Model):
         related_name="ventas",
     )
     total = models.DecimalField(max_digits=10, decimal_places=2)
+    metodo_pago = models.CharField(max_length=15, choices=METODO_PAGO_CHOICES, default=PAGO_EFECTIVO)
 
     class Meta:
         db_table = "Venta"

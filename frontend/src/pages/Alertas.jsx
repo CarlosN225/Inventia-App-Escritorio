@@ -98,6 +98,21 @@ function plural(n, uno, varios) {
   return `${n} ${n === 1 ? uno : varios}`
 }
 
+// Por caducar: se agrupa por qué tan pronto caduca (lo que caduca antes, arriba) para vender primero lo más antiguo
+function agruparPorCaducidad(lista) {
+  const grupos = [
+    { nombre: 'Ya caducaron', items: [] },
+    { nombre: `Vende primero · ${DIAS_URGENTE} días o menos`, items: [] },
+    { nombre: 'En las próximas semanas', items: [] },
+  ]
+  lista.forEach((p) => {
+    if (p.diasCaducar < 0) grupos[0].items.push(p)
+    else if (p.diasCaducar <= DIAS_URGENTE) grupos[1].items.push(p)
+    else grupos[2].items.push(p)
+  })
+  return grupos.filter((g) => g.items.length > 0)
+}
+
 // Agrupa por categoría respetando el orden de la lista (la más urgente primero)
 function agruparPorCategoria(lista) {
   const grupos = new Map()
@@ -534,7 +549,10 @@ export default function Alertas() {
     return filtro === 'urgentes' ? porCaducar.filter((p) => p.urgente) : porCaducar
   }, [pestana, filtro, stockBajo, porCaducar])
 
-  const gruposVisibles = useMemo(() => agruparPorCategoria(listaVisible), [listaVisible])
+  const gruposVisibles = useMemo(
+    () => (pestana === 'caducar' ? agruparPorCaducidad(listaVisible) : agruparPorCategoria(listaVisible)),
+    [pestana, listaVisible]
+  )
 
   function verLista(nuevaPestana, nuevoFiltro = 'todos') {
     setPestana(nuevaPestana)
@@ -963,8 +981,11 @@ export default function Alertas() {
 
                     <p className="alv-consejo">
                       <Lightbulb size={14} aria-hidden="true" />
-                      Lo que caduca en {DIAS_URGENTE} días o menos sale en rojo: ponlo en promoción, y si ya no se puede
-                      vender, regístralo como merma.
+                      <span>
+                        Vende primero lo que caduca antes: acomódalo <strong>al frente del anaquel</strong> y, si le
+                        quedan {DIAS_URGENTE} días o menos, ponlo en <strong>promoción</strong>. Si ya no se puede
+                        vender, regístralo como <strong>merma</strong>.
+                      </span>
                     </p>
                   </div>
                 )}

@@ -1373,3 +1373,134 @@ html:root[data-theme='dark'] .rv-renglones--compacto .rv-renglon.is-error {
   border-color: transparent;
   background: rgba(248, 113, 113, 0.08);
 }
+
+/* ============ Cobro: método de pago y cambio (compacto, una línea) ============ */
+
+.rv-cobro__fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rv-cobro__etiqueta {
+  color: var(--d-gris);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.rv-cobro__metodos {
+  display: inline-flex;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #eef1f5;
+}
+
+.rv-cobro__metodos button {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rv-cobro__metodos button.is-activo {
+  background: #fff;
+  color: var(--d-azul);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.rv-cobro__recibido {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: 78px;
+  padding: 0 6px;
+  border: 1px solid var(--d-borde);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--d-gris);
+  font-size: 12px;
+}
+
+.rv-cobro__recibido input {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--d-marino);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.rv-cobro__recibido:focus-within {
+  border-color: var(--d-azul);
+}
+
+.rv-cobro__billetes {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.rv-cobro__billetes button {
+  padding: 3px 6px;
+  border: 1px solid var(--d-borde);
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rv-cobro__billetes button:hover {
+  border-color: var(--d-azul);
+  color: var(--d-azul);
+}
+
+/* El cambio va arriba, junto a "Venta actual", para que se vea de inmediato */
+.rv-cobro__cambio {
+  margin-left: auto;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: #e4f7ef;
+  color: #047857;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rv-cobro__cambio.is-falta {
+  background: #fdecec;
+  color: #b91c1c;
+}
+
+.rv-cobro__cambio + .rv-enlace {
+  margin-left: 6px;
+}
+
+:root[data-theme='dark'] .rv-cobro__metodos {
+  background: var(--color-surface-2, #1e293b);
+}
+
+:root[data-theme='dark'] .rv-cobro__metodos button {
+  color: var(--color-text-muted, #94a3b8);
+}
+
+:root[data-theme='dark'] .rv-cobro__metodos button.is-activo,
+:root[data-theme='dark'] .rv-cobro__recibido,
+:root[data-theme='dark'] .rv-cobro__billetes button {
+  background: var(--color-surface, #0f172a);
+  color: var(--color-text, #e2e8f0);
+  border-color: var(--color-border, #334155);
+}
+
+:root[data-theme='dark'] .rv-cobro__recibido input {
+  color: var(--color-text, #e2e8f0);
+}

@@ -891,3 +891,96 @@
 .rc-alerta-costo__boton.is-principal:hover {
   background: #b45309;
 }
+/* ============ Sueltas aparte de las cajas y costo por pieza ============ */
+
+.rc-sueltas {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--d-gris, #64748b);
+  font-size: 12px;
+}
+
+.rc-sueltas input {
+  width: 52px;
+  padding: 5px 6px;
+  border: 1px solid var(--d-borde, #e2e8f0);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--d-marino, #0b1220);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.rc-sueltas input:focus {
+  border-color: var(--d-azul, #1668e3);
+  outline: none;
+}
+
+.rc-por-pieza {
+  color: var(--d-gris, #64748b);
+  font-size: 12px;
+}
+
+:root[data-theme='dark'] .rc-sueltas input {
+  background: var(--color-surface, #0f172a);
+  color: var(--color-text, #e2e8f0);
+  border-color: var(--color-border, #334155);
+}
+
+/* Costo a la izquierda (con su nota abajo) y caducidad a la derecha, en una sola línea */
+.rc-linea--costo {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rc-costo-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rc-costo-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--d-gris);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.rc-fecha__texto {
+  color: var(--d-gris);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rc-linea--costo .rc-fecha input {
+  width: 108px;
+}
+
+/* Recordatorio "lo más antiguo primero" */
+.rc-peps {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #fff4e0;
+  color: #7a4b00;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.rc-peps svg { flex-shrink: 0; margin-top: 1px; }
+
+:root[data-theme='dark'] .rc-peps {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
