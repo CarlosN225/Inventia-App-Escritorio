@@ -30,3 +30,14 @@ urlpatterns += [
     path('alertas/enviar-ahora/', EnviarAhoraView.as_view(), name='alertas-enviar-ahora'),
     path('alertas/prueba/', PruebaCorreoView.as_view(), name='alertas-prueba'),
 ]
+
+from .respaldos_api import (
+    EstadoRespaldosView, CarpetaRespaldoView, CrearRespaldoView, CorreoRespaldoView, RestaurarRespaldoView,
+)
+urlpatterns += [
+    path('respaldos/', EstadoRespaldosView.as_view(), name='respaldos-estado'),
+    path('respaldos/carpeta/', CarpetaRespaldoView.as_view(), name='respaldos-carpeta'),
+    path('respaldos/crear/', CrearRespaldoView.as_view(), name='respaldos-crear'),
+    path('respaldos/correo/', CorreoRespaldoView.as_view(), name='respaldos-correo'),
+    path('respaldos/restaurar/', RestaurarRespaldoView.as_view(), name='respaldos-restaurar'),
+]

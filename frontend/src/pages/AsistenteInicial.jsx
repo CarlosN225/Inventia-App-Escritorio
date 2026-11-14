@@ -32,6 +32,8 @@ import {
 
 import logo from '../assets/logo-inventia-sf.png'
 import { estadoInicial, crearPrimerPropietario, login } from '../services/auth'
+import CodigoRecuperacion from '../components/CodigoRecuperacion'
+import RestaurarInicial from '../components/RestaurarInicial'
 import { probarCorreo } from '../services/alertas'
 import '../styles/asistente.css'
 
@@ -231,6 +233,9 @@ export default function AsistenteInicial() {
   const [guardando, setGuardando] = useState(false)
   const [errorGeneral, setErrorGeneral] = useState(null) // { texto, yaConfigurada }
   const [prueba, setPrueba] = useState({ estado: 'nada', texto: '' }) // correo de prueba del paso 4
+  const [codigo, setCodigo] = useState('') // código de recuperación (se muestra una sola vez)
+  const [codigoAnotado, setCodigoAnotado] = useState(false)
+  const [restaurando, setRestaurando] = useState(false) // compu nueva: recuperar desde un respaldo
 
   // Si la app ya tiene dueño, no se puede volver a configurar (salvo en modo demo)
   useEffect(() => {
@@ -292,6 +297,7 @@ export default function AsistenteInicial() {
     setErrorGeneral(null)
 
     if (demo) {
+      setCodigo('K7P2-M9QX-4TRW')
       irA(4)
       return
     }
@@ -307,7 +313,7 @@ export default function AsistenteInicial() {
 
     try {
       // Va de las dos formas: suelto (como lo lee hoy el endpoint) y agrupado (como lo leerá con el cambio de Bryan)
-      await crearPrimerPropietario({
+      const creado = await crearPrimerPropietario({
         ...cuenta,
         propietario: cuenta,
         negocio: {
@@ -320,6 +326,8 @@ export default function AsistenteInicial() {
           correo_alertas: correoDeAvisos(preferencias, propietario),
         },
       })
+
+      setCodigo(creado?.codigo_recuperacion ?? '')
 
       // Entra solito, para que no tenga que volver a escribir su contraseña
       await login(cuenta.correo, cuenta.contrasena)
@@ -437,6 +445,12 @@ export default function AsistenteInicial() {
               <div>
                 <h1 className="as-titulo">1. Cuéntanos de tu dulcería</h1>
                 <p className="as-subtitulo">Así aparecerá en la barra de arriba y en tus avisos por correo.</p>
+                {!demo && (
+                  <button type="button" className="as-restaurar" onClick={() => setRestaurando(true)}>
+                    <span>¿Ya usabas Inventia en otra computadora?</span>
+                    Restaurar un respaldo
+                  </button>
+                )}
               </div>
               <span className="as-insignia">
                 <Zap size={13} aria-hidden="true" />
@@ -721,6 +735,12 @@ export default function AsistenteInicial() {
             <h1 className="as-listo__titulo">¡Todo listo, {primerNombre(propietario.nombre_completo) || 'bienvenido'}!</h1>
             <p className="as-listo__texto">Inventia ya está configurado a la medida de tu mostrador.</p>
 
+            {codigo && !codigoAnotado && (
+              <CodigoRecuperacion codigo={codigo} onConfirmar={() => setCodigoAnotado(true)} />
+            )}
+
+            {(!codigo || codigoAnotado) && (
+            <>
             <div className="as-resumen">
               <div className="as-resumen__cabecera">
                 <span className="as-resumen__icono" aria-hidden="true">
@@ -831,6 +851,8 @@ export default function AsistenteInicial() {
                 <strong>Configuración</strong> cuando quieras.
               </span>
             </p>
+            </>
+            )}
           </section>
         )}
 
@@ -862,6 +884,10 @@ export default function AsistenteInicial() {
           </footer>
         )}
       </main>
+
+      {restaurando && (
+        <RestaurarInicial onCerrar={() => setRestaurando(false)} onListo={() => navigate('/', { replace: true })} />
+      )}
 
       <p className="as-pie">
         <ShieldCheck size={14} aria-hidden="true" />

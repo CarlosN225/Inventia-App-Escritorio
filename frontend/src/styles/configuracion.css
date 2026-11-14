@@ -1524,3 +1524,154 @@
   .cf-menu__sub--corta { display: none; }
   .cf-menu__sub--larga { display: block; }
 }
+
+/* ============ Rol del nuevo usuario (encargado o 2.º propietario) ============ */
+
+.cf-rol-elegir {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.cf-rol-elegir button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--d-borde, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cf-rol-elegir button strong {
+  font-size: 13.5px;
+}
+
+.cf-rol-elegir button span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cf-rol-elegir button.is-activo {
+  border-color: #1668e3;
+  background: #eef6fd;
+  color: #0b3a66;
+}
+
+:root[data-theme='dark'] .cf-rol-elegir button {
+  background: var(--color-surface, #0f172a);
+  border-color: var(--color-border, #334155);
+  color: var(--color-text, #e2e8f0);
+}
+
+:root[data-theme='dark'] .cf-rol-elegir button.is-activo {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.14);
+}
+
+
+/* ============ Aviso con contraseña: legible y con botón de copiar ============ */
+
+.cf-aviso__codigo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cf-aviso .cf-aviso__codigo code {
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #064e3b;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  user-select: all;
+}
+
+.cf-aviso .cf-aviso__copiar {
+  display: inline-flex;
+  width: auto;
+  height: 30px;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cf-aviso .cf-aviso__copiar:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* Botones solo con icono (copiar / generar otra) junto a la contraseña temporal */
+.cf-boton.cf-boton--icono {
+  flex-shrink: 0;
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+}
+
+/* Con contraseña: el texto no se estira, la contraseña va pegada y la X se queda a la derecha */
+.cf-aviso:has(.cf-aviso__codigo) > span {
+  flex: 0 1 auto;
+}
+
+.cf-aviso:has(.cf-aviso__codigo) > button:last-child {
+  margin-left: auto;
+}
+
+/* ============ Compacto: 6 opciones en el menú y Preferencias sin scroll ============ */
+@media (min-width: 1001px) and (min-height: 600px) {
+  .cf-menu {
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 10px 8px;
+  }
+
+  .cf-menu__item {
+    flex: 0 0 auto;
+    max-height: none;
+    padding: 9px 12px;
+    overflow: hidden;
+  }
+
+  /* La descripción nunca pasa de 2 renglones, así nada se encima */
+  .cf-menu__sub--larga {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.4;
+  }
+
+  .cf-grid > .cf-seccion > .cf-panel { padding: 22px 28px; }
+  .cf-seccion { gap: 14px; }
+
+  .cf-prefs { gap: 7px; }
+  .cf-pref { padding: 9px 14px; gap: 12px; }
+  .cf-pref__icono { width: 34px; height: 34px; }
+  .cf-pref__titulo { font-size: 14px; }
+  .cf-pref__desc { margin-top: 2px; font-size: 12.5px; }
+}
+
+@media (min-width: 1001px) and (max-height: 780px) {
+  .cf-menu__item { padding: 7px 10px; }
+  .cf-grid > .cf-seccion > .cf-panel { padding: 16px 22px; }
+  .cf-seccion { gap: 10px; }
+  .cf-pref { padding: 6px 12px; }
+  .cf-pref__icono { width: 30px; height: 30px; }
+  .cf-pref__desc { font-size: 12px; }
+}

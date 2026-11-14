@@ -1,7 +1,12 @@
 import os
+import sys as _sys
 from pathlib import Path
 from dotenv import load_dotenv
 
+# El .env (claves de Brevo) va junto al .exe cuando está empaquetado; en desarrollo, en backend/.
+# Dentro del .exe __file__ apunta a la carpeta temporal de PyInstaller, por eso no basta con él.
+if getattr(_sys, 'frozen', False):
+    load_dotenv(Path(_sys.executable).resolve().parent / ".env")
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 """
 Django settings for inventia_backend project.

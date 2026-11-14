@@ -1,0 +1,361 @@
+/* ============ Configuración › Respaldos ============ */
+
+.rs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rs-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rs-estado.is-ok { background: #e4f7ef; color: #047857; }
+.rs-estado.is-falta { background: #fff7e6; color: #92400e; }
+
+.rs-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rs-info { margin: 0; }
+
+.rs-carpeta {
+  display: flex;
+  gap: 8px;
+}
+
+.rs-carpeta__input {
+  position: relative;
+  flex: 1;
+}
+
+.rs-carpeta__input svg {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  transform: translateY(-50%);
+  color: #64748b;
+}
+
+.rs-carpeta__input .cf-input {
+  width: 100%;
+  padding-left: 34px;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.rs-sugeridas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.rs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rs-chip em {
+  color: #1668e3;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.rs-chip.is-activo {
+  border-color: #1668e3;
+  background: #eef6fd;
+  color: #0b3a66;
+}
+
+.rs-lista {
+  border: 1px solid #e8edf3;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rs-lista__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.rs-lista ul {
+  max-height: 210px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.rs-lista li {
+  display: grid;
+  grid-template-columns: 1fr auto 70px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid #eef1f5;
+  font-size: 13px;
+}
+
+.rs-lista__fecha { color: #0b1220; font-weight: 600; }
+.rs-lista__tam { color: #94a3b8; font-size: 12px; text-align: right; }
+
+.rs-tipo {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eef1f5;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.rs-tipo--auto { background: #eef6fd; color: #1668e3; }
+.rs-tipo--manual { background: #e4f7ef; color: #047857; }
+.rs-tipo--usb { background: #f3e8ff; color: #7e22ce; }
+.rs-tipo--previo { background: #fff7e6; color: #92400e; }
+
+.rs-enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1668e3;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.rs-vacio {
+  margin: 0;
+  padding: 14px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.rs-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+/* Diálogo de restaurar */
+.rs-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.rs-dialogo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, 100%);
+  padding: 20px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.rs-dialogo header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rs-dialogo h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+}
+
+.rs-dialogo p {
+  margin: 0;
+  color: #475569;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.rs-dialogo__icono {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: #eef6fd;
+  color: #1668e3;
+}
+
+.rs-cerrar {
+  border: 0;
+  background: none;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.rs-pass {
+  position: relative;
+}
+
+.rs-pass .cf-input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.rs-pass button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.rs-dialogo footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Modo oscuro */
+:root[data-theme='dark'] .rs-lista { border-color: var(--color-border); }
+:root[data-theme='dark'] .rs-lista__cabecera { background: var(--color-surface-2, #1e293b); color: var(--color-text-muted); }
+:root[data-theme='dark'] .rs-lista li { border-top-color: var(--color-border); }
+:root[data-theme='dark'] .rs-lista__fecha { color: var(--color-text); }
+:root[data-theme='dark'] .rs-chip,
+:root[data-theme='dark'] .rs-dialogo { background: var(--color-surface, #0f172a); color: var(--color-text); border-color: var(--color-border); }
+:root[data-theme='dark'] .rs-dialogo p { color: var(--color-text-muted); }
+
+/* Restaurar en una instalación nueva (asistente) */
+.ri-elegir {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1.5px dashed #9cc3f2;
+  border-radius: 10px;
+  background: #f5f9fe;
+  color: #1668e3;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.ri-listo {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #e4f7ef;
+}
+
+.ri-listo svg { flex-shrink: 0; color: #047857; }
+
+.ri-girando { animation: ri-girar 0.9s linear infinite; }
+@keyframes ri-girar { to { transform: rotate(360deg); } }
+
+.as-restaurar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1668e3;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.as-restaurar span { color: #64748b; font-weight: 500; }
+
+/* Botones del diálogo (también fuera de Configuración, ej. en el asistente) */
+.rs-dialogo footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+  color: #0b1220;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rs-dialogo footer button.cf-boton--primario {
+  border-color: #1668e3;
+  background: #1668e3;
+  color: #fff;
+}
+
+.rs-dialogo footer button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* En compu: la lista ocupa lo que sobra y se desplaza por dentro (la página nunca scrollea) */
+@media (min-width: 1001px) and (min-height: 600px) {
+  .rs-lista {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 110px;
+  }
+
+  .rs-lista ul {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+  }
+}

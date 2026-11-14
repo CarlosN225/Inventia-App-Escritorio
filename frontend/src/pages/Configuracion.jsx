@@ -24,6 +24,8 @@ import {
   Clock,
   ShieldCheck,
   RefreshCw,
+  Copy,
+  DatabaseBackup,
   ArrowLeft,
   Edit,
   Trash2,
@@ -31,6 +33,7 @@ import {
 } from 'lucide-react'
 
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import SeccionRespaldos from '../components/SeccionRespaldos.jsx'
 
 import {
   getUsuarioActual,
@@ -85,38 +88,44 @@ const SECCIONES = [
     id: 'negocio',
     titulo: 'Negocio',
     sub: 'Nombre y datos de contacto', // en pantallas chicas
-    desc: 'Nombre, dirección y teléfono de tu dulcería. Así aparece arriba y en los correos.', // en compu, donde sobra espacio
+    desc: 'Nombre, dirección y teléfono de tu dulcería.', // en compu, donde sobra espacio
     icono: Store,
   },
   {
     id: 'preferencias',
     titulo: 'Preferencias del negocio',
     sub: 'Qué funciones usas', // en pantallas chicas
-    desc: 'Caducidad, mayoreo, promociones y código de barras. Prende solo lo que usas.', // en compu, donde sobra espacio
+    desc: 'Caducidad, mayoreo, promociones y código de barras.', // en compu, donde sobra espacio
     icono: SlidersHorizontal,
   },
   {
     id: 'usuarios',
     titulo: 'Usuarios',
     sub: 'Encargados y permisos', // en pantallas chicas
-    desc: 'Da de alta a tus encargados, corrige sus datos o desactívalos cuando ya no estén.', // en compu, donde sobra espacio
+    desc: 'Encargados y propietarios: altas, cambios y bajas.', // en compu, donde sobra espacio
     icono: Users,
   },
   {
     id: 'email',
     titulo: 'Correo y alertas',
     sub: 'Correo y horario', // en pantallas chicas
-    desc: 'A qué correo y a qué hora te avisamos cuando algo se agota o va a caducar.', // en compu, donde sobra espacio
+    desc: 'A qué correo y a qué hora te avisamos.', // en compu, donde sobra espacio
     icono: Mail,
   },
   {
     id: 'seguridad',
     titulo: 'Seguridad',
     sub: 'PIN para autorizar precios', // en pantallas chicas
-    desc: 'Tu PIN de dueño para autorizar cambios de precio al momento de vender.', // en compu, donde sobra espacio
+    desc: 'Tu PIN para autorizar cambios de precio.', // en compu, donde sobra espacio
     icono: ShieldCheck,
   },
-
+  {
+    id: 'respaldos',
+    titulo: 'Respaldos',
+    sub: 'Copias de tu información', // en pantallas chicas
+    desc: 'Copias automáticas, por correo o USB, y restaurar.', // en compu
+    icono: DatabaseBackup,
+  },
 ]
 
 const PREFERENCIAS = [
@@ -411,6 +420,19 @@ export default function Configuracion() {
   const [restablecer, setRestablecer] =
     useState(null)
 
+  // Qué se acaba de copiar ('form' o 'aviso'), para mostrar la palomita
+  const [copiado, setCopiado] = useState(null)
+
+  async function copiarTexto(texto, donde) {
+    try {
+      await navigator.clipboard.writeText(texto)
+      setCopiado(donde)
+      setTimeout(() => setCopiado(null), 1600)
+    } catch {
+      setCopiado(null)
+    }
+  }
+
   const [editar, setEditar] =
     useState(null)
 
@@ -552,6 +574,8 @@ export default function Configuracion() {
                 correo: u.correo,
                 rol: u.rol,
                 activo: u.activo,
+                // Quien registró el negocio: solo él puede dar de baja al otro propietario
+                esPrincipal: !!u.es_principal,
                 telefono_whatsapp:
                   u.telefono_whatsapp ?? '',
               }))
@@ -813,6 +837,7 @@ export default function Configuracion() {
       nombre: '',
       correo: '',
       telefono_whatsapp: '',
+      rol: 'encargado',
       contrasena:
         generarContrasena(),
     })
@@ -915,6 +940,8 @@ export default function Configuracion() {
 
           telefono_whatsapp:
             telefono,
+
+          rol: nuevo.rol ?? 'encargado',
         })
 
       setUsuarios((lista) => [
@@ -1186,6 +1213,7 @@ export default function Configuracion() {
       setAviso({
         tipo: 'error',
         texto:
+          error?.response?.data?.error ??
           'No se pudo cambiar el estado del usuario',
       })
     }
@@ -1229,6 +1257,7 @@ export default function Configuracion() {
       setAviso({
         tipo: 'error',
         texto:
+          error?.response?.data?.error ??
           'No se pudo reactivar el usuario',
       })
     }
@@ -1442,14 +1471,26 @@ export default function Configuracion() {
           )}
 
           <span>
-            {aviso.texto}{' '}
-
-            {aviso.codigo && (
-              <code>
-                {aviso.codigo}
-              </code>
-            )}
+            {aviso.texto}
           </span>
+
+          {aviso.codigo && (
+            <span className="cf-aviso__codigo">
+              <code>{aviso.codigo}</code>
+              <button
+                type="button"
+                className="cf-aviso__copiar"
+                onClick={() => copiarTexto(aviso.codigo, 'aviso')}
+              >
+                {copiado === 'aviso' ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : (
+                  <Copy size={14} aria-hidden="true" />
+                )}
+                {copiado === 'aviso' ? 'Copiada' : 'Copiar'}
+              </button>
+            </span>
+          )}
 
           <button
             type="button"
@@ -1698,8 +1739,8 @@ export default function Configuracion() {
                   </h2>
 
                   <p className="cf-seccion__sub">
-                    Activa solo lo que usas.
-                    Puedes cambiarlo cuando quieras.
+                    Activa solo lo que usas. Lo que apagues solo se esconde:{' '}
+                    <strong>no se borra ningún dato</strong>.
                   </p>
                 </div>
 
@@ -1712,26 +1753,6 @@ export default function Configuracion() {
                   {activas} de 5 activas
                 </span>
               </header>
-
-              <p className="cf-info">
-                <Info
-                  size={16}
-                  aria-hidden="true"
-                />
-
-                <span>
-                  Lo que apagues se esconde de
-                  las pantallas para que todo se
-                  vea más sencillo.{' '}
-
-                  <strong>
-                    No se borra ningún dato:
-                  </strong>{' '}
-
-                  si lo vuelves a prender, todo
-                  sigue ahí.
-                </span>
-              </p>
 
               <ul className="cf-prefs">
                 {PREFERENCIAS.map((p) => {
@@ -1849,7 +1870,7 @@ export default function Configuracion() {
                         onClick={abrirNuevo}
                       >
                         <UserPlus size={16} aria-hidden="true" />
-                        Agregar encargado
+                        Agregar usuario
                       </button>
                     )}
                   </div>
@@ -1873,11 +1894,33 @@ export default function Configuracion() {
                           aria-hidden="true"
                         />
 
-                        Nuevo encargado
+                        Nuevo usuario
                       </p>
                       <p className="cf-nuevo__sub">
                         Entra con su correo y la contraseña temporal que le des.
                       </p>
+                    </div>
+
+                    <div className="cf-rol-elegir" role="group" aria-label="Rol del nuevo usuario">
+                      {[
+                        { id: 'encargado', texto: 'Encargado', ayuda: 'Vende, compra y registra mermas.' },
+                        {
+                          id: 'propietario',
+                          texto: 'Propietario',
+                          ayuda: 'Tu socio o pareja: acceso a todo. Máximo 2 propietarios.',
+                        },
+                      ].map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          aria-pressed={nuevo.rol === r.id}
+                          className={nuevo.rol === r.id ? 'is-activo' : ''}
+                          onClick={() => setNuevo({ ...nuevo, rol: r.id })}
+                        >
+                          <strong>{r.texto}</strong>
+                          <span>{r.ayuda}</span>
+                        </button>
+                      ))}
                     </div>
 
                     <div className="cf-campos">
@@ -2090,7 +2133,21 @@ export default function Configuracion() {
 
                           <button
                             type="button"
-                            className="cf-boton"
+                            className="cf-boton cf-boton--icono"
+                            onClick={() => copiarTexto(nuevo.contrasena, 'form')}
+                            aria-label="Copiar contraseña"
+                            title={copiado === 'form' ? 'Copiada' : 'Copiar contraseña'}
+                          >
+                            {copiado === 'form' ? (
+                              <Check size={15} aria-hidden="true" />
+                            ) : (
+                              <Copy size={15} aria-hidden="true" />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="cf-boton cf-boton--icono"
                             onClick={() =>
                               setNuevo({
                                 ...nuevo,
@@ -2098,13 +2155,13 @@ export default function Configuracion() {
                                   generarContrasena(),
                               })
                             }
+                            aria-label="Generar otra contraseña"
+                            title="Generar otra"
                           >
                             <RefreshCw
-                              size={14}
+                              size={15}
                               aria-hidden="true"
                             />
-
-                            Generar otra
                           </button>
 
                         </div>
@@ -2236,6 +2293,14 @@ export default function Configuracion() {
                               u.correo ===
                               correoActual
 
+                            // Al segundo propietario solo lo da de baja el principal
+                            const puedoDarDeBaja =
+                              !esPropietario ||
+                              (!u.esPrincipal &&
+                                usuarios.some(
+                                  (x) => x.esPrincipal && x.correo === correoActual
+                                ))
+
                             const menuAbierto =
                               menuUsuarioAbierto ===
                               u.id
@@ -2275,6 +2340,15 @@ export default function Configuracion() {
                                         {esYo && (
                                           <span className="cf-tu">
                                             Tú
+                                          </span>
+                                        )}
+
+                                        {u.esPrincipal && (
+                                          <span
+                                            className="cf-tu"
+                                            title="Registró el negocio. Es el único que puede dar de baja al otro propietario."
+                                          >
+                                            Principal
                                           </span>
                                         )}
 
@@ -2328,7 +2402,7 @@ export default function Configuracion() {
 
                                 <td className="is-centro">
 
-                                  {esPropietario ? (
+                                  {esPropietario && esYo ? (
 
                                     <span
                                       aria-hidden="true"
@@ -2375,6 +2449,7 @@ export default function Configuracion() {
                                       {menuAbierto && (
                                         <div className="cf-menu-acciones-usuario__dropdown">
 
+                                          {!esPropietario && (
                                           <button
                                             type="button"
                                             onClick={() =>
@@ -2390,6 +2465,7 @@ export default function Configuracion() {
                                               Editar usuario
                                             </span>
                                           </button>
+                                          )}
 
                                           <button
                                             type="button"
@@ -2408,6 +2484,8 @@ export default function Configuracion() {
                                             </span>
                                           </button>
 
+                                          {puedoDarDeBaja && (
+                                          <>
                                           <div className="cf-menu-acciones-usuario__separador" />
 
                                           {u.activo ? (
@@ -2444,6 +2522,7 @@ export default function Configuracion() {
                                             </button>
                                           )}
 
+                                          {!esPropietario && (
                                           <button
                                             type="button"
                                             className="is-danger"
@@ -2460,6 +2539,9 @@ export default function Configuracion() {
                                               Eliminar definitivamente
                                             </span>
                                           </button>
+                                          )}
+                                          </>
+                                          )}
 
                                         </div>
                                       )}
@@ -2711,7 +2793,9 @@ export default function Configuracion() {
               BARRA DE GUARDAR
               ==================================================== */}
 
-          {seccion !== 'usuarios' && seccion !== 'seguridad' && (
+          {seccion === 'respaldos' && <SeccionRespaldos />}
+
+          {seccion !== 'usuarios' && seccion !== 'seguridad' && seccion !== 'respaldos' && (
             <footer className="cf-barra">
 
               {hayCambios ? (
@@ -3251,10 +3335,16 @@ export default function Configuracion() {
         open={
           confirmarBaja !== null
         }
-        title="¿Dar de baja al usuario?"
+        title={
+          confirmarBaja?.rol === 'propietario'
+            ? '¿Dar de baja al otro propietario?'
+            : '¿Dar de baja al usuario?'
+        }
         message={
           confirmarBaja
-            ? `${confirmarBaja.nombre} ya no podrá iniciar sesión en INVENTIA. Sus registros anteriores se conservarán.`
+            ? confirmarBaja.rol === 'propietario'
+              ? `${confirmarBaja.nombre} ya no podrá entrar a INVENTIA y se libera su lugar de propietario. Sus registros se conservan y el cambio queda en la bitácora de seguridad.`
+              : `${confirmarBaja.nombre} ya no podrá iniciar sesión en INVENTIA. Sus registros anteriores se conservarán.`
             : ''
         }
         confirmText="Sí, dar de baja"
