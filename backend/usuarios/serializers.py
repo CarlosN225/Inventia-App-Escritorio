@@ -1,8 +1,13 @@
 from rest_framework import serializers
-from .models import Usuario
+from .models import Usuario, propietario_principal
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    # Solo dice SI tiene código; el código nunca se manda
+    tiene_codigo_recuperacion = serializers.SerializerMethodField()
+    # El principal es quien registró el negocio: solo él puede dar de baja al segundo propietario
+    es_principal = serializers.SerializerMethodField()
+
     class Meta:
         model = Usuario
         fields = [
@@ -13,13 +18,26 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'rol',
             'activo',
             'debe_cambiar_contrasena',
+            'tiene_codigo_recuperacion',
+            'es_principal',
         ]
+
+    def get_tiene_codigo_recuperacion(self, obj):
+        return bool(obj.codigo_recuperacion_hash)
+
+    def get_es_principal(self, obj):
+        if obj.rol != Usuario.ROL_PROPIETARIO:
+            return False
+        if 'principal_id' not in self.context:
+            principal = propietario_principal()
+            self.context['principal_id'] = principal.id if principal else None
+        return obj.id == self.context['principal_id']
 
 
 class UsuarioRegistroSerializer(serializers.ModelSerializer):
     """
-    Serializer utilizado por el propietario para crear encargados.
-    El rol NO se recibe desde el frontend: siempre será encargado.
+    Serializer utilizado por el propietario para crear encargados (o un segundo propietario).
+    El rol lo valida la vista; por defecto es encargado.
     """
 
     contrasena = serializers.CharField(write_only=True)
@@ -42,10 +60,11 @@ class UsuarioRegistroSerializer(serializers.ModelSerializer):
         from django.contrib.auth.hashers import make_password
 
         contrasena = validated_data.pop('contrasena')
+        rol = validated_data.pop('rol', 'encargado')  # lo decide la vista, no el frontend
 
         usuario = Usuario(
             **validated_data,
-            rol='encargado',
+            rol=rol,
             activo=True,
             debe_cambiar_contrasena=True  # la que le da el dueño es temporal
         )

@@ -184,3 +184,31 @@ export async function cambiarContrasenaTemporal(actual, nueva) {
   )
   return response.data
 }
+
+/* ---------- Recuperación de contraseña del propietario ---------- */
+
+// Desde el login, sin sesión: correo + código + contraseña nueva. Regresa un código NUEVO.
+export async function recuperarContrasena(correo, codigo, nuevaContrasena) {
+  const response = await axios.post(
+    `${API_URL}/usuarios/recuperar-contrasena/`,
+    { correo: correo.trim().toLowerCase(), codigo, nueva_contrasena: nuevaContrasena },
+    { withCredentials: true }
+  )
+  return response.data
+}
+
+// Desde Mi perfil: confirma su contraseña y obtiene un código nuevo
+export async function generarCodigoRecuperacion(contrasena) {
+  const response = await axios.post(
+    `${API_URL}/usuarios/codigo-recuperacion/`,
+    { contrasena },
+    { withCredentials: true }
+  )
+  return response.data.codigo_recuperacion
+}
+
+// Bitácora: quién restableció qué y cuándo
+export async function listarEventosSeguridad() {
+  const response = await axios.get(`${API_URL}/usuarios/eventos-seguridad/`, { withCredentials: true })
+  return response.data
+}

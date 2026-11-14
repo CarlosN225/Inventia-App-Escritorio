@@ -17,9 +17,18 @@ import {
   ArrowUpRight,
   Lock,
   Loader2,
+  LifeBuoy,
+  ShieldAlert,
 } from 'lucide-react'
 
-import { getUsuarioActual, actualizarMiPerfil, cambiarMiContrasena } from '../services/auth'
+import {
+  getUsuarioActual,
+  actualizarMiPerfil,
+  cambiarMiContrasena,
+  generarCodigoRecuperacion,
+  listarEventosSeguridad,
+} from '../services/auth'
+import CodigoRecuperacion from '../components/CodigoRecuperacion'
 import { listarProductos, mensajeDeError } from '../services/productos'
 import { listarMovimientos } from '../services/movimientos'
 import { textoUnidad } from '../utils/unidades'
@@ -124,10 +133,16 @@ export default function MiPerfil() {
   const [actividad, setActividad] = useState([]) // mis movimientos
   const [unidades, setUnidades] = useState(new Map()) // idProducto -> unidad
 
+  // Código de recuperación (solo propietario)
+  const [codigoForm, setCodigoForm] = useState(null) // { contrasena, error, guardando } mientras confirma
+  const [codigoNuevo, setCodigoNuevo] = useState('')
+  const [eventos, setEventos] = useState([])
+
   useEffect(() => {
     getUsuarioActual()
       .then((u) => {
         setUsuario(u)
+        if (u.rol === 'propietario') listarEventosSeguridad().then(setEventos).catch(() => {})
         const iniciales = { nombre: u.nombre_completo ?? '', telefono: u.telefono_whatsapp ?? '' }
         setDatos(iniciales)
         setDatosGuardados(iniciales)
@@ -153,6 +168,25 @@ export default function MiPerfil() {
   if (cargando || !usuario) return null
 
   const esPropietario = usuario.rol === 'propietario'
+
+  /* ---------- Código de recuperación ---------- */
+
+  async function confirmarCodigo() {
+    if (!codigoForm?.contrasena) {
+      setCodigoForm((f) => ({ ...f, error: 'Escribe tu contraseña actual' }))
+      return
+    }
+    setCodigoForm((f) => ({ ...f, guardando: true, error: '' }))
+    try {
+      const codigo = await generarCodigoRecuperacion(codigoForm.contrasena)
+      setCodigoNuevo(codigo)
+      setCodigoForm(null)
+      setUsuario((u) => ({ ...u, tiene_codigo_recuperacion: true }))
+      listarEventosSeguridad().then(setEventos).catch(() => {})
+    } catch (e) {
+      setCodigoForm((f) => ({ ...f, guardando: false, error: e.response?.data?.error ?? 'No se pudo generar' }))
+    }
+  }
 
   /* ---------- Tus datos ---------- */
 
@@ -504,6 +538,110 @@ export default function MiPerfil() {
               </button>
             </div>
           </section>
+          {/* Código de recuperación (solo propietario) */}
+          {esPropietario && (
+            <section className="mp-panel">
+              <header className="mp-cabecera">
+                <span className="mp-cabecera__icono" aria-hidden="true">
+                  <LifeBuoy size={16} />
+                </span>
+                <h2 className="mp-cabecera__titulo">Código de recuperación</h2>
+                <span className="mp-cabecera__extra">Para cambiar tu contraseña si la olvidas</span>
+              </header>
+
+              {codigoNuevo ? (
+                <CodigoRecuperacion codigo={codigoNuevo} onConfirmar={() => setCodigoNuevo('')} textoBoton="Listo" />
+              ) : (
+                <>
+                  {usuario.tiene_codigo_recuperacion ? (
+                    <p className="mp-codigo-estado mp-codigo-estado--ok">
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                      Ya tienes un código guardado. Si lo perdiste, genera uno nuevo: el anterior deja de servir.
+                    </p>
+                  ) : (
+                    <p className="mp-codigo-estado mp-codigo-estado--falta">
+                      <ShieldAlert size={16} aria-hidden="true" />
+                      Aún no tienes código de recuperación. Genéralo y anótalo: sin él, si olvidas tu contraseña
+                      necesitarás una visita de soporte.
+                    </p>
+                  )}
+
+                  {codigoForm ? (
+                    <div className="mp-codigo-confirmar">
+                      <div className={'mp-input-grupo' + (codigoForm.error ? ' is-error' : '')}>
+                        <KeyRound size={16} aria-hidden="true" />
+                        <input
+                          type={codigoForm.ver ? 'text' : 'password'}
+                          autoFocus
+                          autoComplete="current-password"
+                          placeholder="Confirma tu contraseña actual"
+                          value={codigoForm.contrasena}
+                          onChange={(e) => setCodigoForm({ ...codigoForm, contrasena: e.target.value, error: '' })}
+                          onKeyDown={(e) => e.key === 'Enter' && confirmarCodigo()}
+                          aria-label="Contraseña actual"
+                        />
+                        <button
+                          type="button"
+                          className="mp-ojo"
+                          onClick={() => setCodigoForm({ ...codigoForm, ver: !codigoForm.ver })}
+                          aria-label={codigoForm.ver ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        >
+                          {codigoForm.ver ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <button type="button" className="mp-boton" onClick={() => setCodigoForm(null)}>
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="mp-boton mp-boton--primario"
+                        onClick={confirmarCodigo}
+                        disabled={codigoForm.guardando}
+                      >
+                        {codigoForm.guardando ? 'Generando…' : 'Generar'}
+                      </button>
+                      {codigoForm.error && (
+                        <p className="mp-error-linea">
+                          <AlertCircle size={13} aria-hidden="true" />
+                          {codigoForm.error}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mp-acciones">
+                      <button
+                        type="button"
+                        className="mp-boton mp-boton--primario"
+                        onClick={() => setCodigoForm({ contrasena: '', error: '', guardando: false })}
+                      >
+                        <LifeBuoy size={15} aria-hidden="true" />
+                        {usuario.tiene_codigo_recuperacion ? 'Generar código nuevo' : 'Generar mi código'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {eventos.length > 0 && (
+                <div className="mp-eventos">
+                  <p className="mp-eventos__titulo">Cambios recientes en las cuentas</p>
+                  <ul>
+                    {eventos.slice(0, 4).map((e) => (
+                      <li key={e.id}>
+                        <span>
+                          {e.texto} · <strong>{e.usuario}</strong>
+                          {e.realizado_por !== e.usuario ? ` (por ${e.realizado_por})` : ''}
+                        </span>
+                        <span className="mp-eventos__fecha">
+                          {formatoFecha.format(new Date(e.fecha))} · {formatoHora.format(new Date(e.fecha))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
         {/* ============ DERECHA ============ */}

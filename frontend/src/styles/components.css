@@ -1153,3 +1153,98 @@ td.muted,
   vertical-align: middle;
   white-space: nowrap;
 }
+/* ============ Recuperar contraseña con código (login) ============ */
+
+.login-ayuda__botones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.login-ayuda__botones .login-ayuda__ok {
+  margin-left: 0;
+}
+
+.login-ayuda__ok--principal {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.login-ayuda__ok--principal:hover {
+  background: #1d4ed8;
+}
+
+.login-codigo {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  letter-spacing: 2px;
+}
+
+.login-volver {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-volver:hover {
+  color: #2563eb;
+}
+
+/* Recuperar contraseña: más compacto para que todo quepa sin scroll */
+.login-form--compacto {
+  gap: 14px;
+}
+
+.login-form--compacto .login-form__header {
+  margin-bottom: 0;
+}
+
+.login-recuperar__titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  color: #0b1220;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.login-recuperar__titulo svg {
+  color: #1668e3;
+}
+
+.login-form--compacto .login-field {
+  gap: 6px;
+}
+
+.login-form--compacto .login-field input {
+  min-height: 48px;
+}
+
+.login-fila-doble {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.login-fila-doble .login-field input {
+  padding-right: 46px;
+}
+
+@media (max-width: 520px) {
+  .login-fila-doble {
+    grid-template-columns: 1fr;
+  }
+}
+
+:root[data-theme='dark'] .login-recuperar__titulo {
+  color: var(--color-text);
+}

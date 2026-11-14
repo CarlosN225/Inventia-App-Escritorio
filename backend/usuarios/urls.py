@@ -14,6 +14,9 @@ from .views import (
     cambiar_mi_contrasena_view,
     crear_primer_propietario_view,
     estado_inicial_view,
+    recuperar_contrasena_view,
+    generar_codigo_recuperacion_view,
+    eventos_seguridad_view,
 )
 
 
@@ -37,4 +40,9 @@ urlpatterns = [
     # Configuración inicial (sin sesión: se usa antes del primer login)
     path('primer-propietario/', crear_primer_propietario_view, name='crear_primer_propietario'),
     path('estado-inicial/', estado_inicial_view, name='estado_inicial'),
+
+    # Recuperación de contraseña del propietario
+    path('recuperar-contrasena/', recuperar_contrasena_view, name='recuperar_contrasena'),
+    path('codigo-recuperacion/', generar_codigo_recuperacion_view, name='generar_codigo_recuperacion'),
+    path('eventos-seguridad/', eventos_seguridad_view, name='eventos_seguridad'),
 ]

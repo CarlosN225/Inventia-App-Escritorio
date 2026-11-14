@@ -10,10 +10,12 @@ import {
   Store,
   KeyRound,
   ArrowBigUp,
+  ArrowLeft,
 } from 'lucide-react'
 
 import logoInventia from '../assets/logo-inventia-sf.png'
-import { login, getUsuarioActual } from '../services/auth'
+import { login, getUsuarioActual, recuperarContrasena } from '../services/auth'
+import CodigoRecuperacion from '../components/CodigoRecuperacion'
 
 const features = [
   { icon: WifiOff, text: 'Funciona sin conexión a internet' },
@@ -28,13 +30,65 @@ export default function Login({ nombreNegocio }) {
   const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [mantenerSesion, setMantenerSesion] = useState(false)
+  const [mantenerSesion, setMantenerSesion] = useState(() => { try { return localStorage.getItem('inventia_mantener_sesion') !== 'no' } catch { return true } })
   const [bloqMayus, setBloqMayus] = useState(false)
   const [ayudaAbierta, setAyudaAbierta] = useState(false)
   const [status, setStatus] = useState('idle')
   const [verificando, setVerificando] = useState(true)
 
   const ayudaRef = useRef(null)
+
+  // Recuperar contraseña con el código (solo propietarios)
+  const [modo, setModo] = useState('login') // login · recuperar · codigo-nuevo
+  const [rec, setRec] = useState({ correo: '', codigo: '', nueva: '', confirmar: '' })
+  const [recError, setRecError] = useState('')
+  const [recGuardando, setRecGuardando] = useState(false)
+  const [codigoNuevo, setCodigoNuevo] = useState('')
+  const [verRec, setVerRec] = useState({ nueva: false, confirmar: false })
+
+  function abrirRecuperar() {
+    setAyudaAbierta(false)
+    setRec({ correo: correo.trim(), codigo: '', nueva: '', confirmar: '' })
+    setRecError('')
+    setModo('recuperar')
+  }
+
+  async function enviarRecuperacion(event) {
+    event.preventDefault()
+    if (recGuardando) return
+
+    if (!rec.correo.trim() || !rec.codigo.trim() || !rec.nueva) {
+      setRecError('Llena tu correo, tu código y la contraseña nueva')
+      return
+    }
+    if (rec.nueva.length < 8) {
+      setRecError('La contraseña nueva debe tener al menos 8 caracteres')
+      return
+    }
+    if (rec.nueva !== rec.confirmar) {
+      setRecError('Las contraseñas no coinciden')
+      return
+    }
+
+    setRecGuardando(true)
+    setRecError('')
+    try {
+      const data = await recuperarContrasena(rec.correo, rec.codigo, rec.nueva)
+      setCodigoNuevo(data.codigo_recuperacion)
+      setModo('codigo-nuevo')
+    } catch (e) {
+      setRecError(e.response?.data?.error ?? 'No se pudo conectar. Intenta de nuevo.')
+    } finally {
+      setRecGuardando(false)
+    }
+  }
+
+  function volverAlLogin() {
+    setCorreo(rec.correo.trim())
+    setPassword('')
+    setCodigoNuevo('')
+    setModo('login')
+  }
 
   // Si ya hay sesión activa, se va directo al panel
   useEffect(() => {
@@ -140,6 +194,104 @@ export default function Login({ nombreNegocio }) {
           {nombreNegocio || 'Tu negocio'}
         </div>
 
+        {modo === 'recuperar' && (
+          <form className="login-form login-form--compacto" onSubmit={enviarRecuperacion} noValidate>
+            <header className="login-form__header">
+              <h2 className="login-recuperar__titulo">
+                <KeyRound size={22} strokeWidth={2.2} aria-hidden="true" />
+                Recuperar contraseña
+              </h2>
+              <p className="login-form__subtitle">
+                Escribe tu correo de propietario, tu código de recuperación y una contraseña nueva.
+              </p>
+            </header>
+
+            <div className="login-field">
+              <label htmlFor="rec-correo">Correo</label>
+              <div className="login-field__control">
+                <input
+                  id="rec-correo"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="nombre@negocio.com"
+                  value={rec.correo}
+                  onChange={(e) => setRec({ ...rec, correo: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="rec-codigo">Código de recuperación</label>
+              <div className="login-field__control">
+                <input
+                  id="rec-codigo"
+                  autoComplete="off"
+                  placeholder="XXXX-XXXX-XXXX"
+                  className="login-codigo"
+                  value={rec.codigo}
+                  onChange={(e) => setRec({ ...rec, codigo: e.target.value.toUpperCase() })}
+                />
+              </div>
+            </div>
+
+            <div className="login-fila-doble">
+              {[
+                { campo: 'nueva', id: 'rec-nueva', texto: 'Contraseña nueva', placeholder: 'Mínimo 8 caracteres' },
+                { campo: 'confirmar', id: 'rec-confirmar', texto: 'Confírmala', placeholder: 'Repítela' },
+              ].map((c) => (
+                <div className="login-field login-field--password" key={c.campo}>
+                  <label htmlFor={c.id}>{c.texto}</label>
+                  <div className="login-field__control">
+                    <input
+                      id={c.id}
+                      type={verRec[c.campo] ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      placeholder={c.placeholder}
+                      value={rec[c.campo]}
+                      onChange={(e) => setRec({ ...rec, [c.campo]: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      className="login-field__toggle"
+                      onClick={() => setVerRec((v) => ({ ...v, [c.campo]: !v[c.campo] }))}
+                      aria-label={verRec[c.campo] ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-pressed={verRec[c.campo]}
+                    >
+                      {verRec[c.campo] ? <EyeOff size={19} strokeWidth={2} /> : <Eye size={19} strokeWidth={2} />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {recError && <p className="login-error">{recError}</p>}
+
+            <button type="submit" className="login-submit" disabled={recGuardando}>
+              <span className="login-submit__content">
+                {recGuardando ? 'Cambiando…' : 'Cambiar contraseña'}
+              </span>
+            </button>
+
+            <button type="button" className="login-volver" onClick={() => setModo('login')}>
+              <ArrowLeft size={16} aria-hidden="true" />
+              Volver a iniciar sesión
+            </button>
+          </form>
+        )}
+
+        {modo === 'codigo-nuevo' && (
+          <div className="login-form">
+            <header className="login-form__header">
+              <h2 className="login-form__brand">¡Listo!</h2>
+              <p className="login-form__subtitle">
+                Tu contraseña ya cambió. Tu código anterior ya no sirve: anota el nuevo.
+              </p>
+            </header>
+            <CodigoRecuperacion codigo={codigoNuevo} onConfirmar={volverAlLogin} textoBoton="Iniciar sesión" />
+          </div>
+        )}
+
+        {modo === 'login' && (
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <header className="login-form__header">
             <h2 className="login-form__brand">INVENTIA</h2>
@@ -212,8 +364,8 @@ export default function Login({ nombreNegocio }) {
               <input
                 type="checkbox"
                 checked={mantenerSesion}
-                onChange={(e) => setMantenerSesion(e.target.checked)}
-              />
+                onChange={(e) => { setMantenerSesion(e.target.checked); try { localStorage.setItem('inventia_mantener_sesion', e.target.checked ? 'si' : 'no') } catch { /* sin almacenamiento: solo esta vez */ } }}
+                />
               Mantener sesión iniciada
             </label>
 
@@ -243,17 +395,31 @@ export default function Login({ nombreNegocio }) {
                   </div>
 
                   <p className="login-ayuda__texto">
-                    Pídele al <strong>propietario del negocio</strong> que la
+                    <strong>¿Eres encargado?</strong> Pídele al propietario que la
                     restablezca desde <strong>Configuración › Usuarios</strong>.
                   </p>
 
-                  <button
-                    type="button"
-                    className="login-ayuda__ok"
-                    onClick={() => setAyudaAbierta(false)}
-                  >
-                    Entendido
-                  </button>
+                  <p className="login-ayuda__texto">
+                    <strong>¿Eres el propietario?</strong> Cámbiala tú mismo con tu
+                    código de recuperación.
+                  </p>
+
+                  <div className="login-ayuda__botones">
+                    <button
+                      type="button"
+                      className="login-ayuda__ok"
+                      onClick={() => setAyudaAbierta(false)}
+                    >
+                      Entendido
+                    </button>
+                    <button
+                      type="button"
+                      className="login-ayuda__ok login-ayuda__ok--principal"
+                      onClick={abrirRecuperar}
+                    >
+                      Usar mi código
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -281,6 +447,7 @@ export default function Login({ nombreNegocio }) {
             </span>
           </button>
         </form>
+        )}
       </section>
     </div>
   )

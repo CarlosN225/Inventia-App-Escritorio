@@ -11,7 +11,8 @@ from rest_framework.permissions import AllowAny
 
 from inventario.models import Negocio, Configuracion
 
-from .models import Usuario
+from .models import Usuario, EventoSeguridad, propietario_principal
+from . import recuperacion
 from .serializers import (
     UsuarioSerializer,
     UsuarioRegistroSerializer,
@@ -25,6 +26,9 @@ from datetime import time, timedelta
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.utils import timezone
+
+
+MAX_PROPIETARIOS = 2
 
 
 def proximo_lunes():
@@ -123,16 +127,39 @@ def me_view(request):
 @permission_classes([EsPropietario])
 def registrar_usuario_view(request):
     """
-    El propietario puede crear encargados.
-    Nunca se permite crear otro propietario desde este endpoint.
+    El propietario puede crear encargados y, si lo necesita, un segundo propietario
+    (ej. su pareja o socio). Máximo 2 propietarios activos.
     """
+
+    rol = request.data.get('rol') or Usuario.ROL_ENCARGADO
+
+    if rol not in (Usuario.ROL_ENCARGADO, Usuario.ROL_PROPIETARIO):
+        return Response(
+            {'error': 'Rol no válido'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if rol == Usuario.ROL_PROPIETARIO and Usuario.objects.filter(
+        rol=Usuario.ROL_PROPIETARIO, activo=True
+    ).count() >= MAX_PROPIETARIOS:
+        return Response(
+            {'error': f'Solo puede haber {MAX_PROPIETARIOS} propietarios'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     serializer = UsuarioRegistroSerializer(
         data=request.data
     )
 
     if serializer.is_valid():
-        usuario = serializer.save()
+        usuario = serializer.save(rol=rol)
+
+        if rol == Usuario.ROL_PROPIETARIO:
+            EventoSeguridad.objects.create(
+                usuario=usuario,
+                realizado_por=obtener_usuario_sesion(request),
+                tipo=EventoSeguridad.TIPO_PROPIETARIO_AGREGADO,
+            )
 
         return Response(
             UsuarioSerializer(usuario).data,
@@ -239,7 +266,8 @@ def cambiar_estado_usuario_view(request, usuario_id):
     """
     Activa o da de baja un encargado.
 
-    El propietario nunca puede ser dado de baja.
+    Al segundo propietario solo lo puede dar de baja (o reactivar) el propietario
+    principal, el que registró el negocio. Al principal nadie lo puede dar de baja.
     """
 
     try:
@@ -250,16 +278,6 @@ def cambiar_estado_usuario_view(request, usuario_id):
         return Response(
             {'error': 'Usuario no encontrado'},
             status=status.HTTP_404_NOT_FOUND
-        )
-
-    if usuario.rol != 'encargado':
-        return Response(
-            {
-                'error':
-                    'El propietario no puede ser dado de baja '
-                    'ni reactivado desde aquí'
-            },
-            status=status.HTTP_400_BAD_REQUEST
         )
 
     activo = request.data.get('activo')
@@ -273,11 +291,48 @@ def cambiar_estado_usuario_view(request, usuario_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    es_propietario = usuario.rol == Usuario.ROL_PROPIETARIO
+
+    if es_propietario:
+        quien = obtener_usuario_sesion(request)
+        principal = propietario_principal()
+
+        if principal and usuario.id == principal.id:
+            return Response(
+                {'error': 'El propietario principal no puede ser dado de baja'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not quien or not principal or quien.id != principal.id:
+            return Response(
+                {'error': 'Solo el propietario principal puede dar de baja o reactivar al otro propietario'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if activo and not usuario.activo and Usuario.objects.filter(
+            rol=Usuario.ROL_PROPIETARIO, activo=True
+        ).count() >= MAX_PROPIETARIOS:
+            return Response(
+                {'error': f'Solo puede haber {MAX_PROPIETARIOS} propietarios activos'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    cambio = usuario.activo != activo
     usuario.activo = activo
 
     usuario.save(
         update_fields=['activo']
     )
+
+    if es_propietario and cambio:
+        EventoSeguridad.objects.create(
+            usuario=usuario,
+            realizado_por=quien,
+            tipo=(
+                EventoSeguridad.TIPO_PROPIETARIO_REACTIVADO if activo
+                else EventoSeguridad.TIPO_PROPIETARIO_DESACTIVADO
+            ),
+        )
 
     if activo:
         mensaje = 'Usuario reactivado correctamente'
@@ -294,10 +349,11 @@ def cambiar_estado_usuario_view(request, usuario_id):
 @permission_classes([EsPropietario])
 def restablecer_contrasena_view(request, usuario_id):
     """
-    El propietario puede restablecer la contraseña de un encargado.
+    El propietario puede restablecer la contraseña de un encargado
+    o la del otro propietario (nunca la suya: para eso está Mi perfil).
 
     Se genera una contraseña temporal: al entrar con ella,
-    la app le pide al encargado crear la suya.
+    la app le pide crear la suya.
     """
 
     try:
@@ -310,12 +366,13 @@ def restablecer_contrasena_view(request, usuario_id):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    if usuario.rol != 'encargado':
+    quien = obtener_usuario_sesion(request)
+
+    if quien and usuario.id == quien.id:
         return Response(
             {
                 'error':
-                    'Solo se puede restablecer la contraseña '
-                    'de un encargado'
+                    'Tu propia contraseña se cambia desde Mi perfil'
             },
             status=status.HTTP_400_BAD_REQUEST
         )
@@ -332,6 +389,13 @@ def restablecer_contrasena_view(request, usuario_id):
     usuario.save(
         update_fields=['contrasena_hash', 'debe_cambiar_contrasena']
     )
+
+    if usuario.rol == Usuario.ROL_PROPIETARIO:
+        EventoSeguridad.objects.create(
+            usuario=usuario,
+            realizado_por=quien,
+            tipo=EventoSeguridad.TIPO_RESTABLECIDA_POR_PROPIETARIO,
+        )
 
     return Response({
         'mensaje': 'Contraseña restablecida correctamente',
@@ -551,7 +615,7 @@ def crear_primer_propietario_view(request):
 
     # Todo o nada: si algo falla, no queda un dueño sin negocio
     with transaction.atomic():
-        usuario = Usuario.objects.create(
+        usuario = Usuario(
             nombre_completo=nombre_completo,
             correo=correo,
             telefono_whatsapp=telefono_whatsapp,
@@ -559,6 +623,8 @@ def crear_primer_propietario_view(request):
             activo=True,
             contrasena_hash=make_password(contrasena)
         )
+        codigo_recuperacion = recuperacion.asignar_codigo_nuevo(usuario)
+        usuario.save()
 
         if nombre_negocio:
             negocio_creado = Negocio.objects.create(
@@ -584,7 +650,9 @@ def crear_primer_propietario_view(request):
     return Response(
         {
             'mensaje': 'Configuración inicial creada correctamente',
-            'usuario': UsuarioSerializer(usuario).data
+            'usuario': UsuarioSerializer(usuario).data,
+            # Se muestra una sola vez en el asistente; no se puede volver a consultar
+            'codigo_recuperacion': codigo_recuperacion,
         },
         status=status.HTTP_201_CREATED
     )
@@ -687,3 +755,102 @@ def estado_inicial_view(request):
         'necesita_configuracion': not Usuario.objects.exists(),
         'nombre_negocio': negocio.nombre if negocio else None,
     })
+
+
+# ============================================================
+#  RECUPERACIÓN DE CONTRASEÑA DEL PROPIETARIO
+# ============================================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def recuperar_contrasena_view(request):
+    """
+    Desde el login, sin sesión: el propietario escribe su correo, su código
+    de recuperación y una contraseña nueva. Si todo cuadra, se cambia la
+    contraseña y se le da un código NUEVO (el anterior deja de servir).
+    """
+    correo = (request.data.get('correo') or '').strip().lower()
+    codigo = request.data.get('codigo') or ''
+    nueva = request.data.get('nueva_contrasena') or ''
+
+    if recuperacion.bloqueado(correo):
+        return Response(
+            {'error': f'Demasiados intentos. Espera {recuperacion.MINUTOS_BLOQUEO} minutos e intenta de nuevo.'},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    if len(nueva) < 8:
+        return Response(
+            {'error': 'La contraseña nueva debe tener al menos 8 caracteres'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    usuario = Usuario.objects.filter(
+        correo=correo, rol=Usuario.ROL_PROPIETARIO, activo=True
+    ).first()
+
+    if not usuario or not recuperacion.coincide(codigo, usuario.codigo_recuperacion_hash):
+        recuperacion.registrar_fallo(correo)
+        return Response(
+            {'error': 'El correo o el código de recuperación no coinciden'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    recuperacion.limpiar_fallos(correo)
+    usuario.contrasena_hash = make_password(nueva)
+    usuario.debe_cambiar_contrasena = False
+    codigo_nuevo = recuperacion.asignar_codigo_nuevo(usuario)
+    usuario.save(update_fields=['contrasena_hash', 'debe_cambiar_contrasena', 'codigo_recuperacion_hash'])
+
+    EventoSeguridad.objects.create(
+        usuario=usuario, realizado_por=usuario, tipo=EventoSeguridad.TIPO_RECUPERO_CON_CODIGO
+    )
+
+    return Response({
+        'mensaje': 'Contraseña cambiada. Ya puedes iniciar sesión.',
+        'codigo_recuperacion': codigo_nuevo,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([EsPropietario])
+def generar_codigo_recuperacion_view(request):
+    """
+    Desde Mi perfil: el propietario confirma su contraseña y obtiene un código
+    nuevo (sirve también para las cuentas creadas antes de que existiera).
+    """
+    usuario = obtener_usuario_sesion(request)
+
+    if not usuario:
+        return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not check_password(request.data.get('contrasena') or '', usuario.contrasena_hash):
+        return Response({'error': 'La contraseña no es correcta'}, status=status.HTTP_400_BAD_REQUEST)
+
+    codigo = recuperacion.asignar_codigo_nuevo(usuario)
+    usuario.save(update_fields=['codigo_recuperacion_hash'])
+
+    EventoSeguridad.objects.create(
+        usuario=usuario, realizado_por=usuario, tipo=EventoSeguridad.TIPO_CODIGO_GENERADO
+    )
+
+    return Response({'codigo_recuperacion': codigo})
+
+
+@api_view(['GET'])
+@permission_classes([EsPropietario])
+def eventos_seguridad_view(request):
+    """Los últimos cambios sensibles en las cuentas (para que el dueño vea todo lo que pasó)."""
+    eventos = EventoSeguridad.objects.select_related('usuario', 'realizado_por')[:20]
+    return Response([
+        {
+            'id': e.id,
+            'tipo': e.tipo,
+            'texto': e.get_tipo_display(),
+            'usuario': e.usuario.nombre_completo,
+            'realizado_por': e.realizado_por.nombre_completo if e.realizado_por else 'Soporte de Inventia',
+            'detalle': e.detalle,
+            'fecha': e.fecha,
+        }
+        for e in eventos
+    ])

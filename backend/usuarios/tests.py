@@ -203,7 +203,7 @@ class F11UsuariosTests(BaseUsuarios):
 
     def test_cp_11_01_propietario_da_de_alta_encargado(self):
         self.entrar(self.duena)
-        r = self.nuevo(rol="propietario")  # el rol que manden se ignora
+        r = self.nuevo()  # sin rol: siempre es encargado (el 2.º propietario se prueba en DosPropietariosTests)
         self.assertEqual(r.status_code, 201, r.data)
         kenia = Usuario.objects.get(correo="kenia@querubines.com")
         self.assertEqual(kenia.rol, "encargado")
@@ -318,3 +318,159 @@ class MiPerfilTests(BaseUsuarios):
         # El negocio siempre queda ligado a su propietario
         negocio = Negocio.objects.create(nombre="X", propietario="Ana", direccion="", usuario_admin=self.duena)
         self.assertEqual(negocio.usuario_admin, self.duena)
+
+
+# ===========================================================================
+# Recuperación de contraseña del propietario y segundo propietario
+# ===========================================================================
+
+from django.core.cache import cache  # noqa: E402
+from django.core.management import call_command  # noqa: E402
+
+from .models import EventoSeguridad  # noqa: E402
+from . import recuperacion  # noqa: E402
+
+
+@RAPIDO
+class RecuperacionTests(BaseUsuarios):
+    URL = "/api/usuarios/recuperar-contrasena/"
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.codigo = recuperacion.asignar_codigo_nuevo(self.duena)
+        self.duena.save()
+
+    def recuperar(self, codigo, nueva="NuevaClave99", correo="ana@querubines.com"):
+        return self.client.post(self.URL, {"correo": correo, "codigo": codigo, "nueva_contrasena": nueva},
+                                format="json")
+
+    def test_asistente_entrega_codigo_una_sola_vez(self):
+        Usuario.objects.all().delete()
+        r = self.client.post("/api/usuarios/primer-propietario/", datos_asistente(), format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertRegex(r.data["codigo_recuperacion"], r"^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$")
+        self.assertTrue(r.data["usuario"]["tiene_codigo_recuperacion"])
+        duena = Usuario.objects.get(rol="propietario")
+        self.assertNotIn(r.data["codigo_recuperacion"], duena.codigo_recuperacion_hash)  # se guarda cifrado
+
+    def test_codigo_correcto_cambia_contrasena_y_da_codigo_nuevo(self):
+        r = self.recuperar(self.codigo.lower().replace("-", " "))  # acepta minúsculas y espacios
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertNotEqual(r.data["codigo_recuperacion"], self.codigo)
+        self.assertEqual(self.entrar(self.duena, "NuevaClave99").status_code, 200)
+        # El código viejo ya no sirve
+        self.assertEqual(self.recuperar(self.codigo).status_code, 400)
+        self.assertTrue(EventoSeguridad.objects.filter(tipo="recupero_con_codigo").exists())
+
+    def test_codigo_incorrecto_no_cambia_nada(self):
+        r = self.recuperar("AAAA-BBBB-CCCC")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.entrar(self.duena).status_code, 200)  # sigue entrando con la de antes
+
+    def test_encargado_no_puede_usar_recuperacion(self):
+        codigo = recuperacion.asignar_codigo_nuevo(self.encargado)
+        self.encargado.save()
+        self.assertEqual(self.recuperar(codigo, correo="luis@querubines.com").status_code, 400)
+
+    def test_demasiados_intentos_se_bloquea(self):
+        for _ in range(recuperacion.MAX_INTENTOS):
+            self.recuperar("AAAA-BBBB-CCCC")
+        self.assertEqual(self.recuperar(self.codigo).status_code, 429)
+
+    def test_generar_codigo_pide_contrasena(self):
+        self.entrar(self.duena)
+        url = "/api/usuarios/codigo-recuperacion/"
+        self.assertEqual(self.client.post(url, {"contrasena": "otra"}, format="json").status_code, 400)
+        r = self.client.post(url, {"contrasena": CLAVE}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.recuperar(r.data["codigo_recuperacion"]).status_code, 200)
+
+    def test_encargado_no_genera_codigo(self):
+        self.entrar(self.encargado)
+        r = self.client.post("/api/usuarios/codigo-recuperacion/", {"contrasena": CLAVE}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+
+@RAPIDO
+class DosPropietariosTests(BaseUsuarios):
+    def alta(self, correo, rol):
+        return self.client.post("/api/usuarios/registrar/", {
+            "nombre_completo": "Socio", "correo": correo, "contrasena": "Temporal1", "telefono_whatsapp": "",
+            "rol": rol}, format="json")
+
+    def test_segundo_propietario_si_tercero_no(self):
+        self.entrar(self.duena)
+        r = self.alta("beto@querubines.com", "propietario")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["rol"], "propietario")
+        self.assertTrue(EventoSeguridad.objects.filter(tipo="propietario_agregado").exists())
+        self.assertEqual(self.alta("carla@querubines.com", "propietario").status_code, 400)
+
+    def test_rol_desconocido_se_rechaza(self):
+        self.entrar(self.duena)
+        self.assertEqual(self.alta("x@querubines.com", "admin").status_code, 400)
+
+    def test_un_propietario_restablece_al_otro_y_queda_registro(self):
+        socio = crear_usuario("beto@querubines.com", "propietario", nombre="Beto")
+        self.entrar(self.duena)
+        r = self.client.post(f"/api/usuarios/{socio.id}/reset-password/")
+        self.assertEqual(r.status_code, 200, r.data)
+        socio.refresh_from_db()
+        self.assertTrue(socio.debe_cambiar_contrasena)
+        evento = EventoSeguridad.objects.get(tipo="restablecida_por_propietario")
+        self.assertEqual(evento.realizado_por, self.duena)
+        # La suya no: para eso está Mi perfil
+        self.assertEqual(self.client.post(f"/api/usuarios/{self.duena.id}/reset-password/").status_code, 400)
+        self.assertEqual(len(self.client.get("/api/usuarios/eventos-seguridad/").data), 1)
+
+    def test_solo_el_principal_da_de_baja_al_segundo(self):
+        socio = crear_usuario("beto@querubines.com", "propietario", nombre="Beto")
+        url_socio = f"/api/usuarios/{socio.id}/estado/"
+        url_duena = f"/api/usuarios/{self.duena.id}/estado/"
+
+        # El segundo no puede dar de baja al principal
+        self.entrar(socio)
+        self.assertEqual(self.client.patch(url_duena, {"activo": False}, format="json").status_code, 400)
+        self.client.post("/api/usuarios/logout/")
+
+        # El principal sí puede dar de baja al segundo, y queda en la bitácora
+        self.entrar(self.duena)
+        lista = {u["correo"]: u for u in self.client.get("/api/usuarios/lista/").data}
+        self.assertTrue(lista["ana@querubines.com"]["es_principal"])
+        self.assertFalse(lista["beto@querubines.com"]["es_principal"])
+
+        self.assertEqual(self.client.patch(url_socio, {"activo": False}, format="json").status_code, 200)
+        socio.refresh_from_db()
+        self.assertFalse(socio.activo)
+        evento = EventoSeguridad.objects.get(tipo="propietario_desactivado")
+        self.assertEqual(evento.realizado_por, self.duena)
+
+        # Con el lugar libre se puede dar de alta otro; entonces ya no se puede reactivar a Beto
+        r = self.client.post("/api/usuarios/registrar/", {
+            "nombre_completo": "Carla", "correo": "carla@querubines.com", "contrasena": "Temporal1",
+            "telefono_whatsapp": "", "rol": "propietario"}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(self.client.patch(url_socio, {"activo": True}, format="json").status_code, 400)
+
+    def test_segundo_propietario_no_puede_dar_de_baja_a_nadie_propietario(self):
+        socio = crear_usuario("beto@querubines.com", "propietario", nombre="Beto")
+        otro = crear_usuario("carla@querubines.com", "propietario", nombre="Carla")
+        otro.activo = False
+        otro.save()
+        self.entrar(socio)
+        r = self.client.patch(f"/api/usuarios/{otro.id}/estado/", {"activo": True}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+
+@RAPIDO
+class SoporteTests(BaseUsuarios):
+    def test_comando_de_soporte_pone_temporal_y_deja_registro(self):
+        recuperacion.asignar_codigo_nuevo(self.duena)
+        self.duena.save()
+        call_command("restablecer_propietario", correo="ana@querubines.com", stdout=open("/dev/null", "w"))
+        self.duena.refresh_from_db()
+        self.assertTrue(self.duena.debe_cambiar_contrasena)
+        self.assertEqual(self.duena.codigo_recuperacion_hash, "")
+        self.assertFalse(check_password(CLAVE, self.duena.contrasena_hash))
+        self.assertTrue(EventoSeguridad.objects.filter(tipo="restablecida_por_soporte").exists())
