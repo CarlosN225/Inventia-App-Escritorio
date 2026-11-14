@@ -19,6 +19,8 @@ import {
   Phone,
   Mail,
   SearchX,
+  DatabaseBackup,
+  KeyRound,
 } from 'lucide-react'
 
 import '../styles/ayuda.css'
@@ -33,11 +35,11 @@ const GUIAS = [
     icono: ShoppingCart,
     ruta: '/registrar-venta',
     pasos: [
-      'Busca el producto escribiendo 2 o 3 letras, o tócalo en "Más vendidos".',
-      'Presiona Enter o "Agregar" para sumarlo a la venta.',
-      'Ajusta la cantidad con − y +. El mayoreo y las promociones se aplican solos.',
-      'Si necesitas hacer un descuento en el momento, toca el lápiz y cambia el precio.',
-      'Revisa el total y presiona "Confirmar". El inventario se descuenta solo.',
+      'Busca el producto con 2 o 3 letras, tócalo en "Más vendidos" o pásalo por el lector: cada escaneo suma 1.',
+      'Ajusta la cantidad con − y +. Si se lleva la caja o bolsa completa, usa el botón "+ Caja" o "+ Bolsa".',
+      'El mayoreo y las promociones se aplican solos. Si ves "Caduca en X días", ofrécelo primero.',
+      'Elige cómo pagó: Efectivo, Transferencia u Otro (tarjeta). En efectivo, escribe con cuánto pagó y te dice el cambio.',
+      'Presiona "Confirmar" (o F12). El inventario se descuenta solo. Lo agotado o caducado no se puede vender.',
     ],
   },
   {
@@ -48,9 +50,10 @@ const GUIAS = [
     ruta: '/registrar-compra',
     pasos: [
       'Escribe o elige el proveedor, y revisa la fecha.',
-      'Busca cada producto que te llegó, o agrégalo desde "Por surtir".',
-      'Elige si lo compraste por pieza o por caja: el sistema calcula las piezas.',
-      'Revisa el costo por pieza y, si aplica, la fecha de caducidad.',
+      'Busca cada producto que te llegó (o escanéalo), o agrégalo desde "Por surtir".',
+      'Si llegó en caja o bolsa, captura cuántas cajas cerradas y cuántas sueltas: el sistema suma las piezas.',
+      'Pon el costo de la caja: el sistema calcula el costo por pieza. Si caduca, pon su fecha de caducidad.',
+      'Acomoda lo nuevo atrás y lo que ya tenías adelante, para vender primero lo que caduca antes.',
       'Presiona "Registrar", revisa el resumen contra tu nota y confirma.',
     ],
   },
@@ -64,7 +67,7 @@ const GUIAS = [
       'Busca el producto que se perdió.',
       'Indica cuántas piezas fueron.',
       'Elige el motivo: caducado, dañado, consumo propio, devolución u otro.',
-      'Presiona "Registrar merma" y confirma.',
+      'Presiona "Registrar merma" y confirma. Lo caducado siempre va aquí, porque no se puede vender.',
     ],
   },
   {
@@ -75,10 +78,10 @@ const GUIAS = [
     ruta: '/catalogo/nuevo',
     soloPropietario: true,
     pasos: [
-      'En Catálogo, presiona "Nuevo producto".',
-      'Escribe el nombre, la marca y elige la categoría.',
-      'Pon el precio de venta y cómo lo vendes: pieza, bolsa, caja o paquete.',
-      'Si te llega en caja o bolsa, indica cuántas piezas trae.',
+      'En Catálogo, presiona "Nuevo producto". Escribe nombre, marca, gramaje y categoría.',
+      'Elige cómo lo vendes: pieza, bolsa, caja, paquete o botella (no se vende a granel).',
+      'Si te llega en caja, bolsa o paquete, indícalo y escribe cuántas trae (ej. bolsa de 25).',
+      'Pon el precio de venta y, si vendes por mayoreo, su precio (por unidad) y desde cuántas aplica.',
       'Pon el stock inicial y el mínimo para recibir alertas, y guarda.',
     ],
   },
@@ -91,9 +94,9 @@ const GUIAS = [
     soloPropietario: true,
     pasos: [
       'Cuenta con la tienda cerrada, para que nada se venda mientras cuentas.',
-      'Escribe lo que contaste y presiona Enter para pasar al siguiente producto.',
-      'Si tienes cajas o bolsas cerradas, usa "Contar por caja": no hace falta abrirlas.',
-      'Lo que no cuentes no cambia. Puedes contar por categoría, un día a la vez.',
+      'Escribe lo que contaste y presiona Enter para pasar al siguiente. La palomita ✓ es "coincide con el sistema".',
+      'Si tienes cajas o bolsas cerradas, usa "Contar por caja / bolsa": no hace falta abrirlas.',
+      'Lo que dejes en blanco no cambia. Si algo va a quedar en 0, el sistema te pregunta antes.',
       'Elige el motivo y presiona "Aplicar corrección".',
     ],
   },
@@ -104,10 +107,39 @@ const GUIAS = [
     icono: Bell,
     ruta: '/alertas',
     pasos: [
-      'En Alertas ves lo que está debajo del mínimo y lo que caduca pronto.',
+      'En Alertas ves lo que está debajo del mínimo y lo que caduca, ordenado por urgencia.',
+      '"Ya caducaron" va a merma; "Vende primero" caduca en 7 días o menos; luego lo de las próximas semanas.',
       'Desde ahí registras la compra o la merma con un clic.',
-      'Cada día te llega un resumen por correo a la hora que elijas.',
-      'Si falla la conexión, el sistema conserva el resumen y vuelve a intentar enviarlo.',
+      'Cada día te llega un resumen por correo; si no hay internet, se manda en cuanto regrese.',
+    ],
+  },
+  {
+    id: 'respaldos',
+    titulo: 'Respaldar tu información',
+    desc: 'Por si la computadora falla',
+    icono: DatabaseBackup,
+    ruta: '/configuracion',
+    estado: { seccion: 'respaldos' },
+    soloPropietario: true,
+    pasos: [
+      'Diario se hace un respaldo automático en la carpeta "C:\\Inventia Respaldos" (se guardan los últimos 10).',
+      'Cada viernes en la noche se manda un respaldo a tu correo.',
+      'En Configuración › Respaldos puedes hacer uno al momento, mandarlo al correo o guardarlo en una USB.',
+      'Para recuperar, elige un respaldo y "Restaurar". Antes, el sistema guarda una copia de cómo estaba.',
+    ],
+  },
+  {
+    id: 'cuenta',
+    titulo: 'Si olvidas tu contraseña',
+    desc: 'Código de recuperación',
+    icono: KeyRound,
+    ruta: '/perfil',
+    pasos: [
+      'Propietario: en Mi perfil genera tu código de recuperación y guárdalo en papel, fuera de la computadora.',
+      'Si olvidas tu contraseña, en la pantalla de entrada toca "¿Olvidaste tu contraseña?" y escribe tu código.',
+      'Al usarlo te da uno nuevo: guárdalo otra vez.',
+      'Encargado: pídele al propietario que te la restablezca en Configuración › Usuarios.',
+      'Puede haber hasta 2 propietarios: uno le restablece la contraseña al otro. Solo el principal puede dar de baja al segundo.',
     ],
   },
 ]
@@ -116,20 +148,56 @@ const ATAJOS = [
   { teclas: ['F2'], texto: 'Ir al buscador de productos' },
   { teclas: ['↑', '↓'], texto: 'Moverte entre los resultados' },
   { teclas: ['Enter'], texto: 'Agregar el producto resaltado' },
+  { teclas: ['Lector'], texto: 'Escanear el código de barras: suma 1 cada vez' },
   { teclas: ['F12'], texto: 'Confirmar la venta o registrar la compra' },
   { teclas: ['Esc'], texto: 'Cancelar o cerrar una ventana' },
 ]
 
 const PREGUNTAS = [
   {
-    pregunta: '¿Qué pasa si se va el internet?',
+    pregunta: '¿Qué hago si se descompone o me roban la computadora?',
     respuesta:
-      'Puedes seguir usando INVENTIA normal. Toda tu información se guarda en tu computadora, así que no necesitas internet para trabajar. Lo único que espera es el resumen por correo, que se envía en cuanto regresa la conexión.',
+      'Tu información no se pierde si tienes respaldo. Instala INVENTIA en la computadora nueva y, en la primera pantalla, elige "Restaurar un respaldo": usa el último que te llegó al correo o el de tu USB. Quedará todo como estaba el día de ese respaldo.',
   },
   {
-    pregunta: '¿Por qué no puedo editar ni borrar un movimiento?',
+    pregunta: 'Olvidé mi contraseña, ¿qué hago?',
     respuesta:
-      'Para que tu inventario siempre cuadre y sepas quién hizo cada cosa. Si algo quedó mal, el propietario lo arregla con una corrección de inventario, que también queda registrada.',
+      'Si eres encargado, pídele al propietario que te la restablezca en Configuración › Usuarios; te dará una temporal que cambiarás al entrar. Si eres propietario, usa tu código de recuperación en "¿Olvidaste tu contraseña?". Si no tienes código, el otro propietario te la puede restablecer, o escríbele al equipo de INVENTIA.',
+  },
+  {
+    pregunta: '¿Por qué no me deja vender un producto?',
+    respuesta:
+      'Porque está agotado o caducado. Si está caducado, regístralo como merma. Si ya te llegaron nuevos, registra la compra con su nueva fecha de caducidad y se desbloquea solo.',
+  },
+  {
+    pregunta: '¿Qué significa "Caduca en X días"?',
+    respuesta:
+      'Que ese producto caduca pronto y conviene venderlo primero. En rojo son 7 días o menos. Al acomodar mercancía nueva, pon lo nuevo atrás y lo que ya tenías adelante.',
+  },
+  {
+    pregunta: '¿Cómo registro un pago con transferencia o tarjeta?',
+    respuesta:
+      'Antes de confirmar la venta, elige "Transferencia", o "Otro" para tarjeta. Queda guardado y lo ves en el Historial como "Pagó con". En efectivo, escribe con cuánto te pagaron y el sistema te dice el cambio.',
+  },
+  {
+    pregunta: '¿Puedo usar un lector de código de barras?',
+    respuesta:
+      'Sí. Con el cursor en el buscador, pasa el producto por el lector: cada escaneo suma 1 al ticket. El código se captura al dar de alta el producto.',
+  },
+  {
+    pregunta: '¿Qué pasa si se va el internet?',
+    respuesta:
+      'Puedes seguir usando INVENTIA normal: toda tu información se guarda en tu computadora. Lo único que espera es lo que se manda por correo (el resumen y el respaldo del viernes), que se envía en cuanto regresa la conexión.',
+  },
+  {
+    pregunta: '¿Cómo cuento lo que está en caja o bolsa cerrada?',
+    respuesta:
+      'En Corrección de inventario usa "Contar por caja / bolsa": escribes cuántas cerradas tienes y cuántas sueltas, y el sistema hace la cuenta. No hace falta abrirlas.',
+  },
+  {
+    pregunta: '¿Puedo vender a granel o por kilo?',
+    respuesta:
+      'No. INVENTIA solo registra productos cerrados y sellados de fábrica: por pieza, bolsa, caja, paquete o botella. Lo que se vende a granel no se registra.',
   },
   {
     pregunta: '¿Cuál es la diferencia entre merma y corrección?',
@@ -137,24 +205,14 @@ const PREGUNTAS = [
       'La merma es cuando sabes qué pasó: se caducó, se rompió o se usó en el negocio. La corrección es cuando el conteo no cuadra y no sabes por qué; solo la hace el propietario.',
   },
   {
-    pregunta: '¿Cuándo conviene contar el inventario?',
+    pregunta: '¿Por qué no puedo editar ni borrar un movimiento?',
     respuesta:
-      'Antes de abrir o después de cerrar. Si alguien vende un producto mientras lo cuentas, la diferencia sale mal.',
-  },
-  {
-    pregunta: '¿Cómo cuento lo que está en caja o bolsa cerrada?',
-    respuesta:
-      'En Corrección de inventario usa "Contar por caja": escribes cuántas cajas cerradas tienes y cuántas piezas sueltas, y el sistema hace la cuenta. No hace falta abrirlas.',
+      'Para que tu inventario siempre cuadre y sepas quién hizo cada cosa. Si algo quedó mal, el propietario lo arregla con una corrección de inventario, que también queda registrada.',
   },
   {
     pregunta: '¿Por qué no veo "Corrección de inventario" o "Configuración"?',
     respuesta:
       'Esas opciones son solo para el propietario. Si eres encargado y crees que el inventario no cuadra, avísale al dueño.',
-  },
-  {
-    pregunta: 'Olvidé mi contraseña, ¿qué hago?',
-    respuesta:
-      'Pídele al propietario que te la restablezca en Configuración › Usuarios. Te dará una contraseña temporal; entra con ella y cámbiala en Mi perfil.',
   },
   {
     pregunta: '¿Cómo cambio mi contraseña?',
@@ -168,7 +226,7 @@ const PREGUNTAS = [
   {
     pregunta: '¿Mis productos necesitan foto?',
     respuesta:
-      'No. Sin foto se muestra un dulce como ícono y todo funciona igual. Si quieres, súbeles foto solo a tus más vendidos para encontrarlos más rápido.',
+      'No. Sin foto se muestra un dulce como ícono y todo funciona igual.',
   },
 ]
 
@@ -301,7 +359,7 @@ export default function Ayuda() {
                       <button type="button" className="ay-boton ay-boton--secundario" onClick={() => setGuiaAbierta(null)}>
                         Cerrar
                       </button>
-                      <button type="button" className="ay-boton" onClick={() => navigate(guia.ruta)}>
+                      <button type="button" className="ay-boton" onClick={() => navigate(guia.ruta, guia.estado ? { state: guia.estado } : undefined)}>
                         Ir a la pantalla
                         <ArrowRight size={15} aria-hidden="true" />
                       </button>
@@ -372,7 +430,7 @@ export default function Ayuda() {
                   </li>
                 </ul>
 
-                <p className="ay-version">INVENTIA v1.0</p>
+                <p className="ay-version">INVENTIA v1.1.0</p>
               </section>
             </div>
           )}

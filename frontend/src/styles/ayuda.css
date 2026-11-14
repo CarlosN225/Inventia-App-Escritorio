@@ -128,7 +128,7 @@
 /* ============ GUÍAS ============ */
 .ay-guias {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -492,4 +492,15 @@
 
 @media (max-width: 700px) {
   .ay-guias { grid-template-columns: minmax(0, 1fr); }
+}
+/* Preguntas en dos columnas para que la página no se haga eterna */
+@media (min-width: 1101px) {
+  .ay-faq {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 32px;
+    align-items: start;
+  }
+
+  .ay-faq li:nth-last-child(2):nth-child(odd) { border-bottom: none; }
 }
