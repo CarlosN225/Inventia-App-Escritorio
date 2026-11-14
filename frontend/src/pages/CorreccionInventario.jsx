@@ -158,8 +158,9 @@ export default function CorreccionInventario() {
       contado,
       fisico,
       diferencia,
-      porEmpaque: p.piezasEmpaque ?? null,
-      empaqueNombre: p.empaque ?? 'caja',
+      // Solo si de verdad llega en empaque (caja de 20, bolsa de 50…)
+      porEmpaque: p.piezasEmpaque > 1 ? p.piezasEmpaque : null,
+      empaqueNombre: p.empaque || 'caja',
     }
   })
 
@@ -180,6 +181,8 @@ export default function CorreccionInventario() {
   const contadas = filas.filter((f) => f.contado)
   const conDiferencia = filas.filter((f) => f.diferencia) // distinto de 0 y de null
   const conFaltante = conDiferencia.filter((f) => f.diferencia < 0).length
+  // Los que se van a quedar en 0 teniendo existencia: casi siempre es un dedazo
+  const quedanEnCero = conDiferencia.filter((f) => f.fisico === 0 && f.sistema > 0)
   const conSobrante = conDiferencia.filter((f) => f.diferencia > 0).length
   const impacto = redondear(conDiferencia.reduce((suma, f) => suma + f.diferencia * (f.costo ?? 0), 0))
 
@@ -396,7 +399,7 @@ export default function CorreccionInventario() {
         <Info size={17} aria-hidden="true" />
         <span>
           Captura lo que contaste físicamente, en la unidad en que vendes cada producto. Si te llegó en caja o bolsa y la
-          tienes cerrada, usa <strong>"Contar por caja"</strong>: no hace falta abrirla. Lo que dejes en blanco{' '}
+          tienes cerrada, usa <strong style={{ whiteSpace: 'nowrap' }}>"Contar por caja / bolsa"</strong>: no hace falta abrirla. Lo que dejes en blanco{' '}
           <strong>no cambia</strong>.
         </span>
       </p>
@@ -629,7 +632,8 @@ export default function CorreccionInventario() {
                               ) : (
                                 <>
                                   <Package size={12} aria-hidden="true" />
-                                  Contar por {f.empaqueNombre}
+                                  Contar por {f.empaqueNombre} de {f.porEmpaque}
+                                  {f.unidad !== f.empaqueNombre && ` ${textoUnidad(f.unidad, f.porEmpaque)}`}
                                 </>
                               )}
                             </button>
@@ -797,7 +801,13 @@ export default function CorreccionInventario() {
         title="¿Aplicar la corrección?"
         message={`Se ajustará el stock de ${conDiferencia.length} ${
           conDiferencia.length === 1 ? 'producto' : 'productos'
-        } (${conFaltante} con faltante, ${conSobrante} con sobrante). Quedará registrado en el historial a tu nombre y ya no se podrá borrar.`}
+        } (${conFaltante} con faltante, ${conSobrante} con sobrante).${
+          quedanEnCero.length
+            ? ` Ojo: ${quedanEnCero.length === 1 ? 'quedará' : 'quedarán'} en 0 → ${quedanEnCero
+                .map((f) => f.nombre)
+                .join(', ')}. ¿De verdad no queda ninguna?`
+            : ''
+        } Quedará registrado en el historial a tu nombre y ya no se podrá borrar.`}
         confirmText="Sí, aplicar"
         cancelText="Revisar"
         tone="danger"

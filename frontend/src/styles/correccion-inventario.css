@@ -888,3 +888,8 @@
   .ci-motivo { padding-left: 0; border-left: none; }
   .ci-interruptor { margin-left: 0; }
 }
+/* Vacío ≠ cero: el 0 de muestra va clarito para que no parezca capturado */
+.ci-empaque__input::placeholder {
+  color: #b8c2d1;
+  font-weight: 500;
+}
