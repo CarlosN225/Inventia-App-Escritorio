@@ -18,10 +18,16 @@ export default function CodigoRecuperacion({ codigo, onConfirmar, textoBoton = '
     }
   }
 
+  // Se imprime desde un iframe oculto en la misma ventana: en el .exe (pywebview)
+  // window.open abre "about:blank" fuera del programa y Windows no sabe con qué abrirlo.
   function imprimir() {
-    const ventana = window.open('', '_blank', 'width=480,height=360')
-    if (!ventana) return
-    ventana.document.write(
+    const marco = document.createElement('iframe')
+    marco.setAttribute('aria-hidden', 'true')
+    marco.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
+    document.body.appendChild(marco)
+    const doc = marco.contentWindow.document
+    doc.open()
+    doc.write(
       `<html><head><title>Código de recuperación · Inventia</title></head>
        <body style="font-family:Arial,sans-serif;padding:32px">
        <h2 style="margin:0 0 8px">Inventia · Código de recuperación</h2>
@@ -29,9 +35,16 @@ export default function CodigoRecuperacion({ codigo, onConfirmar, textoBoton = '
        <p style="font-size:30px;font-weight:700;letter-spacing:4px;font-family:monospace">${codigo}</p>
        </body></html>`
     )
-    ventana.document.close()
-    ventana.focus()
-    ventana.print()
+    doc.close()
+    setTimeout(() => {
+      try {
+        marco.contentWindow.focus()
+        marco.contentWindow.print()
+      } finally {
+        // se quita después de que cierre el cuadro de impresión
+        setTimeout(() => marco.remove(), 1000)
+      }
+    }, 100)
   }
 
   return (
