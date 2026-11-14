@@ -140,6 +140,9 @@ def main():
             from usuarios.management.commands.restablecer_propietario import Command as Restablecer
             call_command(Restablecer(), correo=correo, stdout=salida)
             texto = salida.getvalue().strip() or "Listo."
+            # El comando de Django habla de --correo; en el .exe el correo va directo después de la opción
+            texto = texto.replace("Vuelve a correrlo con --correo <correo>.",
+                                  "Vuelve a ejecutar: Inventia.exe --restablecer-propietario correo@ejemplo.com")
         except Exception as e:  # CommandError: sin propietario, correo no encontrado…
             texto = f"No se pudo restablecer: {e}"
         aviso("INVENTIA · Soporte", texto)
