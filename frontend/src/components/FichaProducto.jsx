@@ -247,7 +247,7 @@ export default function FichaProducto({
               <Dato etiqueta="Te llega en">
                 {p.piezasEmpaque > 1
                   ? `${capitalizar(empaqueTexto)} de ${p.piezasEmpaque} ${textoUnidad(p.unidad, p.piezasEmpaque)}`
-                  : 'Suelto'}
+                  : `Por ${unidad1}`}
               </Dato>
               {conCaducidad && (
                 <Dato

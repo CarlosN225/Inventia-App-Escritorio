@@ -56,13 +56,79 @@ POPULARIDAD = {
     0: 3, 1: 4, 2: 4, 3: 2, 4: 3, 5: 2, 6: 4, 7: 2, 8: 4, 9: 1, 10: 0.3, 11: 1, 12: 1, 13: 1, 14: 0.8, 15: 0.5,
 }
 
+# En qué le llega cada producto a la dulcería, como en la vida real:
+#   (tipo, cuántas trae) -> llega en caja / bolsa / paquete
+#   None                 -> llega suelto (lo surte el camión por pieza, o se compra de a uno)
+EMPAQUES = {
+    # Chocolates: casi todos vienen en su exhibidor de cartón
+    "Chocolate Carlos V": ("caja", 20),
+    "Chocolate Kinder Bueno": ("caja", 24),
+    "Chocolate Ferrero Rocher 3pz": ("caja", 16),
+    "Chocolate Snickers": ("caja", 24),
+    "Chocolate Hershey's barra": ("caja", 24),
+    "Chocolate M&M's bolsa": None,
+    "Chocolate Turín oblea": ("bolsa", 30),
+    "Chocolate Abuelita tableta": ("caja", 6),
+    "Chocolate Lindt trufa": ("bolsa", 12),
+    # Galletas
+    "Galletas Emperador": None,
+    "Obleas rellenas": ("paquete", 20),
+    # Gomitas
+    "Gomitas Trululu bolsa": ("paquete", 10),
+    "Gomitas osito Haribo": None,
+    "Gomitas ácidas Sonric's": None,
+    # Paletas
+    "Paleta Payaso": ("caja", 10),
+    "Paleta Hot Wheels": ("bolsa", 20),
+    "Paleta Vero Mango": ("bolsa", 40),
+    # Dulces
+    "Pulparindo": ("bolsa", 20),
+    "Dulce de tamarindo enchilado": ("bolsa", 40),
+    "Mazapán De la Rosa": ("caja", 30),
+    "Caramelos macizos surtidos": None,
+    # Chicles
+    "Chicle Trident sin azúcar": ("caja", 12),
+    # Botanas: las surte el camión de la marca bolsa por bolsa
+    "Papas Sabritas original": None,
+    "Cacahuate japonés": None,
+    "Chicharrón de cerdo": None,
+    "Doritos queso": None,
+    "Cheetos Flamin' Hot": None,
+    "Palomitas para microondas": None,
+    "Cacahuate garapiñado": None,
+    "Takis Fuego": None,
+    # Salsas y chamoy
+    "Salsa Valentina 370ml": ("caja", 24),
+    "Chamoy Miguelito 250ml": ("caja", 12),
+    # Bebidas
+    "Coca-Cola 600ml": ("paquete", 12),
+    "Agua Bonafont 600ml": ("paquete", 12),
+    "Jugo Boing 500ml": ("paquete", 12),
+    "Gatorade 600ml": None,
+    "Electrolit 625ml": None,
+    # Fiesta: casi todo se compra suelto
+    "Globo número metálico": None,
+    "Globo látex #9": ("bolsa", 50),
+    "Piñata estrella mediana": None,
+    "Piñata personaje infantil": None,
+    "Velas de cumpleaños paq. 24": None,
+    "Vela número dorada": None,
+    "Platos desechables paq. 20": None,
+    "Vasos desechables paq. 25": None,
+    "Confeti bolsa": None,
+    "Serpentina rollo": None,
+    "Gorro de fiesta paq. 10": None,
+    "Pelota saltarina": ("bolsa", 24),
+    "Bolsa de regalo mediana": ("paquete", 12),
+}
+
 # (nombre, categoría (índice), unidad_medida, precio_venta, precio_mayoreo,
 #  cantidad_minima_mayoreo, piezas_por_empaque, maneja_caducidad)
 PRODUCTOS = [
     # Chocolates
     ("Chocolate Carlos V", 1, "pieza", 12.0, 10.0, 12, 20, True),
     ("Chocolate Kinder Bueno", 1, "pieza", 22.0, 19.0, 10, 24, True),
-    ("Chocolate Ferrero Rocher 3pz", 1, "caja", 45.0, 40.0, 6, 16, True),
+    ("Chocolate Ferrero Rocher 3pz", 1, "pieza", 45.0, 40.0, 6, 16, True),
     ("Chocolate Snickers", 1, "pieza", 16.0, 14.0, 12, 24, True),
     ("Chocolate Hershey's barra", 1, "pieza", 18.0, None, None, 24, True),
     ("Chocolate M&M's bolsa", 1, "bolsa", 20.0, 17.0, 10, 24, True),
@@ -201,9 +267,17 @@ class Command(BaseCommand):
             default=30,
             help='Cuántos días de ventas generar con --con-ventas (por defecto 30).',
         )
+        parser.add_argument(
+            '--solo-empaques',
+            action='store_true',
+            help='No crea nada: solo corrige en qué llega cada producto de prueba que ya exista.',
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
+        if options["solo_empaques"]:
+            return self.corregir_empaques()
+
         random.seed(42)
 
         # ---------- Usuarios ----------
@@ -374,8 +448,8 @@ class Command(BaseCommand):
                     "ultimo_costo": plan["costo"],
                     "precio_mayoreo": plan["mayoreo"],
                     "cantidad_minima_mayoreo": plan["cant_min"],
-                    "piezas_por_empaque": plan["empaque"],
-                    "tipo_empaque": "caja" if plan["empaque"] else None,
+                    "piezas_por_empaque": (EMPAQUES.get(plan["nombre"]) or (None, None))[1],
+                    "tipo_empaque": (EMPAQUES.get(plan["nombre"]) or (None, None))[0],
                     "fecha_caducidad": plan["fecha_cad"],
                     "stock_actual": stock_inicial,
                     "stock_minimo": plan["stock_minimo"],
@@ -456,3 +530,11 @@ class Command(BaseCommand):
             ))
 
         self.stdout.write(self.style.SUCCESS("Datos de prueba cargados correctamente."))
+
+    def corregir_empaques(self):
+        """Pone caja/bolsa/paquete (o suelto) a los productos de prueba sin tocar ventas ni stock."""
+        cambiados = 0
+        for nombre, empaque in EMPAQUES.items():
+            tipo, piezas = empaque or (None, None)
+            cambiados += Producto.objects.filter(nombre=nombre).update(tipo_empaque=tipo, piezas_por_empaque=piezas)
+        self.stdout.write(self.style.SUCCESS(f"Empaques corregidos en {cambiados} productos de prueba."))

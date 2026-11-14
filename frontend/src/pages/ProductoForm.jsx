@@ -51,13 +51,31 @@ const UNIDADES = [
   { id: 'bolsa', label: 'Bolsa', plural: 'bolsas' },
   { id: 'caja', label: 'Caja', plural: 'cajas' },
   { id: 'paquete', label: 'Paquete', plural: 'paquetes' },
+  { id: 'botella', label: 'Botella', plural: 'botellas' },
 ]
+
+// Qué es cada unidad, en palabras sencillas (para el globito de ayuda)
+const QUE_ES_UNIDAD = [
+  { id: 'pieza', texto: 'una unidad que se cuenta una por una.', ej: 'un Bubulubu, una paleta, un chocolate' },
+  { id: 'bolsa', texto: 'empaque de plástico o celofán.', ej: 'bolsa de bolitas de queso, de papitas' },
+  { id: 'caja', texto: 'empaque de cartón con piezas adentro.', ej: 'caja de Pulparindo con 20' },
+  { id: 'paquete', texto: 'presentación cerrada de fábrica con piezas fijas.', ej: 'paquete de Bocadín con 50' },
+  { id: 'botella', texto: 'envase de líquido.', ej: 'salsa, chamoy líquido, refresco' },
+]
+
+// Al elegir esta categoría en un producto nuevo, se propone vender por bolsa
+const CATEGORIA_POR_BOLSA = 'botanas'
 
 const EMPAQUES = [
   { id: 'caja', label: 'Caja' },
   { id: 'bolsa', label: 'Bolsa' },
   { id: 'paquete', label: 'Paquete' },
 ]
+
+// Para comparar nombres sin importar acentos ni mayúsculas
+function normalizarTexto(texto) {
+  return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
 
 const MAX_NOMBRE = 80
 const MAX_IMAGEN_MB = 4
@@ -395,6 +413,17 @@ export default function ProductoForm() {
     }
   }
 
+  // En un producto nuevo de Botanas se propone "Bolsa" y "Por bolsa" (se puede cambiar)
+  function elegirCategoria(valor) {
+    cambiar('categoria', valor)
+    const nombre = categorias.find((c) => String(c.id) === String(valor))?.nombre ?? ''
+    if (esNuevo && normalizarTexto(nombre) === CATEGORIA_POR_BOLSA) {
+      cambiar('unidad', 'bolsa')
+      cambiar('piezasEmpaque', '')
+      setEmpaqueAbierto(false)
+    }
+  }
+
   /* ---------- Imagen ---------- */
 
   function procesarArchivo(archivo) {
@@ -591,6 +620,8 @@ export default function ProductoForm() {
   const margenInfo = nivelMargen(margenPct)
 
   const unidad = UNIDADES.find((u) => u.id === form.unidad) ?? UNIDADES[0]
+  const nombreCategoria = categorias.find((c) => String(c.id) === String(form.categoria))?.nombre ?? ''
+  const esBotana = normalizarTexto(nombreCategoria) === CATEGORIA_POR_BOLSA
   const empaque = EMPAQUES.find((e) => e.id === form.tipoEmpaque) ?? EMPAQUES[0]
   const piezasEmpaque = Number(form.piezasEmpaque) || 0
   const minimoMayoreo = Number(form.minimoMayoreo) || 0
@@ -599,7 +630,7 @@ export default function ProductoForm() {
       ? minimoMayoreo / piezasEmpaque
       : null
   
-      // "Suelto" = no llega en empaque; se capturan las piezas directo al comprar
+      // "Por <unidad>" = llega igual que se vende (sin empaque); se capturan las unidades directo al comprar
   const llegaSuelto = form.piezasEmpaque === '' && !empaqueAbierto
   const empaqueTexto = empaque.label.toLowerCase()
   const empaqueCompleto = empaque.id === 'paquete' ? `el ${empaqueTexto} completo` : `la ${empaqueTexto} completa`
@@ -831,7 +862,7 @@ export default function ProductoForm() {
                       id="pf-categoria"
                       className={'pf-input' + (errores.categoria ? ' is-error' : '')}
                       value={form.categoria}
-                      onChange={(e) => cambiar('categoria', e.target.value)}
+                      onChange={(e) => elegirCategoria(e.target.value)}
                     >
                       <option value="">Elige una categoría</option>
                       {categorias.map((c) => (
@@ -894,7 +925,7 @@ export default function ProductoForm() {
                 htmlFor="pf-precio"
                 requerido
                 error={errores.precio}
-                ayuda={`Lo que cobras por cada ${unidad.label.toLowerCase()}. La unidad se elige en "¿Se vende por…?".`}
+                ayuda={`Lo que cobras por cada ${unidad.label.toLowerCase()}. La unidad se elige en "¿Cómo lo vendes?".`}
               >
                 <div className={'pf-grupo' + (errores.precio ? ' is-error' : '')}>
                   <span className="pf-grupo__extra">$</span>
@@ -1030,21 +1061,21 @@ export default function ProductoForm() {
               <div className="pf-campo">
                 <div className="pf-campo__fila">
                   <span className="pf-etiqueta">
-                    ¿Se vende por…? <span className="pf-requerido">*</span>
+                    ¿Cómo lo vendes? <span className="pf-requerido">*</span>
                   </span>
-                  <Globo titulo="¿Se vende por…?">
-                    Es lo que se lleva el cliente al pagar <strong>y con lo que se cuenta tu inventario</strong>.
+                  <Globo titulo="¿Cómo lo vendes?">
+                    Con esto se cuenta tu inventario y se registran las mermas.
                     {precio > 0 ? (
                       <>
-                        {' '}Cada {unidad.label.toLowerCase()} se vende a <strong>{moneda.format(precio)}</strong> y
-                        tu stock se cuenta en {unidad.plural}.
+                        {' '}Cada {unidad.label.toLowerCase()} se vende a <strong>{moneda.format(precio)}</strong>.
                       </>
-                    ) : (
-                      <> Ej.: si eliges Pieza, el precio de venta es por pieza y el stock se cuenta en piezas.</>
-                    )}
-                    <span className="pf-globo__nota">
-                      Ejemplos: un chocolate se vende por <strong>Pieza</strong>; unas papitas, por{' '}
-                      <strong>Bolsa</strong>.
+                    ) : null}
+                    <span className="pf-globo__lista">
+                      {QUE_ES_UNIDAD.map((u) => (
+                        <span key={u.id}>
+                          <strong>{UNIDADES.find((x) => x.id === u.id).label}:</strong> {u.texto} <em>Ej.: {u.ej}.</em>
+                        </span>
+                      ))}
                     </span>
                   </Globo>
                 </div>
@@ -1061,6 +1092,22 @@ export default function ProductoForm() {
                     </button>
                   ))}
                 </div>
+                <p className="pf-ayuda">
+                  Si lo vendes suelto y también completo, elige <strong>Pieza</strong>. Por ahora Inventia no maneja
+                  productos a granel (por kilo o por gramos); esa función llegará en una próxima actualización.
+                </p>
+                {esBotana && form.unidad === 'bolsa' ? (
+                  <p className="pf-sugerencia">Las botanas se cuentan por bolsa, no por pieza.</p>
+                ) : (
+                  ['bolsa', 'caja', 'paquete'].includes(form.unidad) && (
+                    <p className="pf-sugerencia">
+                      ¿Esta {unidad.label.toLowerCase()} trae piezas que también vendes sueltas? Entonces elige{' '}
+                      <strong>Pieza</strong> aquí y abajo indica que te llega en {unidad.label.toLowerCase()} de X
+                      piezas. Así puedes vender suelto, vender {unidad.id === 'paquete' ? 'el paquete completo' : `la ${unidad.label.toLowerCase()} completa`}{' '}
+                      y registrar mermas por pieza.
+                    </p>
+                  )
+                )}
               </div>
 
               {/* 2. Cómo llega: nunca en lo mismo que se vende */}
@@ -1071,7 +1118,8 @@ export default function ProductoForm() {
                     Es <strong>como lo compras</strong>, no como lo vendes. Sirve para registrar compras más rápido
                     (1 bolsa = 25 {unidad.plural}, por ejemplo) y para cobrar el empaque completo de un clic al vender.
                     <span className="pf-globo__nota">
-                      Si te lo dan por {unidad.label.toLowerCase()}, sin empaque, elige <strong>Suelto</strong>.
+                      Si te lo dan igual que lo vendes (una {unidad.label.toLowerCase()} por cada{' '}
+                      {unidad.label.toLowerCase()}), elige <strong>Por {unidad.label.toLowerCase()}</strong>.
                     </span>
                   </Globo>
                 </div>
@@ -1085,7 +1133,7 @@ export default function ProductoForm() {
                       cambiar('piezasEmpaque', '')
                     }}
                   >
-                    Suelto
+                    Por {unidad.label.toLowerCase()}
                   </button>
                   {EMPAQUES.filter((e) => e.id !== form.unidad).map((e) => (
                     <button
@@ -1133,8 +1181,8 @@ export default function ProductoForm() {
               <p className="pf-frase">
                 {llegaSuelto ? (
                   <>
-                    Te llega <strong>suelto</strong>: al registrar una compra capturas directo cuántas {unidad.plural}{' '}
-                    entraron.
+                    Te llega <strong>por {unidad.label.toLowerCase()}</strong>, igual que la vendes: al registrar una
+                    compra capturas cuántas {unidad.plural} te llegaron.
                   </>
                 ) : piezasEmpaque > 0 && form.tipoEmpaque !== form.unidad ? (
                   <>

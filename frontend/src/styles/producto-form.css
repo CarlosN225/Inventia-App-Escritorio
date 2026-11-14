@@ -1018,3 +1018,50 @@ textarea.pf-input {
   border-top-color: var(--color-border);
   color: var(--color-text-muted);
 }
+
+/* ============ Definiciones de unidades y sugerencias ============ */
+
+.pf-globo__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eef1f5;
+}
+
+.pf-globo__lista em {
+  color: #64748b;
+  font-style: normal;
+}
+
+.pf-sugerencia {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fff7e6;
+  color: #7a4b00;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.pf-sugerencia strong {
+  color: #5c3700;
+}
+
+:root[data-theme='dark'] .pf-globo__lista {
+  border-top-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .pf-globo__lista em {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme='dark'] .pf-sugerencia {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
+
+:root[data-theme='dark'] .pf-sugerencia strong {
+  color: #fde68a;
+}

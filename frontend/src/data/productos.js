@@ -80,6 +80,7 @@ const TEXTO_UNIDAD = {
   bolsa: { uno: 'bolsa', varios: 'bolsas', unoLargo: 'bolsa', variosLargo: 'bolsas' },
   caja: { uno: 'caja', varios: 'cajas', unoLargo: 'caja', variosLargo: 'cajas' },
   paquete: { uno: 'paq.', varios: 'paqs.', unoLargo: 'paquete', variosLargo: 'paquetes' },
+  botella: { uno: 'botella', varios: 'botellas', unoLargo: 'botella', variosLargo: 'botellas' },
 }
 
 // Unidad en que se vende (y se cuenta) un producto
