@@ -109,10 +109,10 @@ class RespaldosTests(TransactionTestCase):
         self.assertEqual(mail.outbox[0].to, ["ana@querubines.com"])
         # Ya se mandó esta semana
         self.assertFalse(respaldos.revisar_automaticos(sabado)["correo"])
-    
+
     # Sin claves de Brevo, aunque la máquina tenga un .env con las reales
     @override_settings(BREVO_SMTP_LOGIN="", BREVO_SMTP_KEY="")
-    
+
     def test_sin_brevo_el_correo_avisa(self):
         self.entrar(self.duena)
         r = self.client.post("/api/respaldos/correo/")
